@@ -8,6 +8,7 @@ import { EngineAdapter } from "../engine/adapter.ts"
 import type { Engine, EngineError, SqlParseError } from "../engine/adapter.ts"
 import { StateStore } from "../state/store.ts"
 import type { StateError, StateStoreShape } from "../state/store.ts"
+import { checkContract, type SchemaMismatchError } from "./contract.ts"
 import { envSchema, externalSourceRef, physicalRef, physicalSchema, viewRef } from "./naming.ts"
 import type { InvalidEnvironmentError, Plan, PlanAction } from "./planner.ts"
 
@@ -22,6 +23,7 @@ export type ApplyError =
   | StateError
   | EngineError
   | SqlParseError
+  | SchemaMismatchError
   | InvalidEnvironmentError
 
 /** Несколько стейтментов одной транзакцией движка; откат при любой ошибке. */
@@ -115,6 +117,8 @@ export const applyPlan = (
         case "view":
         case "full": {
           const body = render(model.fragment, { resolveRef })
+          // контракт схемы (SPEC §3.2): дрейф типов ловится до сборки
+          yield* checkContract(engine, model, body)
           const ddl =
             model.kind._tag === "view"
               ? `CREATE OR REPLACE VIEW ${target} AS ${body}`
@@ -135,6 +139,7 @@ export const applyPlan = (
             resolveRef,
             interval: { start: zero, end: zero },
           })
+          yield* checkContract(engine, model, emptyBody)
           yield* engine.execute(
             `CREATE TABLE IF NOT EXISTS ${target} AS SELECT * FROM (${emptyBody}) q LIMIT 0`,
           )

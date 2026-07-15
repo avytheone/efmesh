@@ -16,7 +16,7 @@ const scenario = <A, E>(body: Effect.Effect<A, E, EngineAdapter | StateStore>) =
 const raw = defineExternal({
   name: "src.events",
   source: external.table("src.events"),
-  schema: Schema.Struct({ id: Schema.String, happened_at: Schema.String }),
+  schema: Schema.Struct({ id: Schema.String, happened_at: Schema.DateTimeUtc }),
 })
 
 const makeDaily = (lookback = 0) =>
@@ -29,7 +29,7 @@ const makeDaily = (lookback = 0) =>
         batchSize: 2,
         lookback,
       }),
-      schema: Schema.Struct({ id: Schema.String, happened_at: Schema.String }),
+      schema: Schema.Struct({ id: Schema.String, happened_at: Schema.DateTimeUtc }),
     },
     (ctx) => ctx.sql`
       SELECT id, happened_at FROM ${ctx.ref(raw)}
