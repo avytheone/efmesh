@@ -11,7 +11,9 @@ import { EngineAdapter } from "../engine/adapter.ts"
 import type { Engine, EngineError, SqlParseError } from "../engine/adapter.ts"
 import { StateStore } from "../state/store.ts"
 import type { StateError, StateStoreShape } from "../state/store.ts"
+import { Metric } from "effect"
 import { checkContract, type SchemaMismatchError } from "./contract.ts"
+import { auditFailuresTotal, intervalsDone, snapshotsBuilt } from "./metrics.ts"
 import {
   envSchema,
   externalSourceRef,
@@ -43,13 +45,22 @@ export type ApplyError =
   | SeedReadError
   | SchemaMismatchError
   | LakeNotConfiguredError
+  | AttachNotConfiguredError
   | AuditFailure
   | InvalidEnvironmentError
 
 export interface ApplyOptions {
   /** Корень parquet-озера — локальная директория или s3://… (httpfs). */
   readonly lakePath?: string
+  /** ATTACH-базы по алиасам (SPEC §9.3) — для export-моделей. */
+  readonly attach?: Readonly<Record<string, { readonly url: string; readonly options?: string }>>
 }
+
+/** Модель просит экспорт в ATTACH-алиас, которого нет в конфиге. */
+export class AttachNotConfiguredError extends Data.TaggedError("AttachNotConfiguredError")<{
+  readonly model: string
+  readonly attach: string
+}> {}
 
 /** Несколько стейтментов одной транзакцией движка; откат при любой ошибке. */
 const transactional = (
@@ -85,6 +96,7 @@ const runAudits = (
       )
       if (violations.length === 0) continue
       if (auditDef.blocking) {
+        yield* Metric.update(auditFailuresTotal, 1)
         return yield* new AuditFailure({
           model: model.name.full,
           audit: auditDef.name,
@@ -137,6 +149,7 @@ const backfillIntoTable = (
           `(SELECT * FROM ${target} WHERE ${quoteIdent(kind.timeColumn)} >= ${start} AND ${quoteIdent(kind.timeColumn)} < ${end})`,
         ).pipe(Effect.tapError(markFailed))
         yield* store.markIntervals(action.fingerprint, marks, "done")
+        yield* Metric.update(intervalsDone, marks.length)
       }
     }
   })
@@ -177,6 +190,7 @@ const backfillIntoParquet = (
           Effect.tapError(markFailed),
         )
         yield* store.markIntervals(action.fingerprint, mark, "done")
+        yield* Metric.update(intervalsDone, 1)
       }
     }
   })
@@ -339,6 +353,7 @@ export const applyPlan = (
         }
       }
       built.push(action.name)
+      yield* Metric.update(snapshotsBuilt, 1)
     }
 
     // 2. Промоушен: view-слой окружения
@@ -362,7 +377,36 @@ export const applyPlan = (
       )
     }
 
-    // 3. Состояние окружения + журнал
+    // 3. Экспорт наружу (SPEC §9.3): после аудитов и промоушена — наружу
+    // не уезжает непроверенное; готовая витрина пишется в ATTACH-базу
+    for (const action of plan.actions) {
+      if (action.change === "removed") continue
+      const model = graph.models.get(action.name)!
+      if (model.export === undefined) continue
+      // экспорт освежается, когда есть что везти: сборка/бэкфилл/refresh
+      if (!action.build && action.backfill.length === 0 && !action.refresh) continue
+      const attach = options?.attach?.[model.export.attach]
+      if (attach === undefined) {
+        return yield* new AttachNotConfiguredError({
+          model: model.name.full,
+          attach: model.export.attach,
+        })
+      }
+      yield* engine.execute(
+        `ATTACH IF NOT EXISTS '${attach.url.replaceAll(`'`, `''`)}' AS ${quoteIdent(model.export.attach)}${attach.options !== undefined ? ` (${attach.options})` : ""}`,
+      )
+      const [exportSchema, exportTable] = model.export.table.includes(".")
+        ? (model.export.table.split(".") as [string, string])
+        : ["main", model.export.table]
+      yield* engine.execute(
+        `CREATE SCHEMA IF NOT EXISTS ${quoteIdent(model.export.attach)}.${quoteIdent(exportSchema)}`,
+      )
+      yield* engine.execute(
+        `CREATE OR REPLACE TABLE ${quoteIdent(model.export.attach)}.${quoteIdent(exportSchema)}.${quoteIdent(exportTable)} AS SELECT * FROM ${physicalFor(model, action.fingerprint)}`,
+      )
+    }
+
+    // 4. Состояние окружения + журнал
     yield* store.promote(
       plan.env,
       plan.actions
@@ -383,4 +427,4 @@ export const applyPlan = (
     )
 
     return { plan, built }
-  })
+  }).pipe(Effect.withSpan("efmesh.apply", { attributes: { env: plan.env } }))

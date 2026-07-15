@@ -118,6 +118,11 @@ export interface ModelConfig<Fields extends Schema.Struct.Fields> {
   readonly target?: MaterializationTarget
   /** Аудиты качества (SPEC §8); в fingerprint не входят. */
   readonly audits?: ReadonlyArray<Audit>
+  /**
+   * Экспорт наружу (SPEC §9.3): после аудитов и промоушена готовый
+   * результат уезжает в ATTACH-базу (`attach` — алиас из конфига).
+   */
+  readonly export?: { readonly attach: string; readonly table: string }
 }
 
 /** Контекст рендера тела модели. Тело обязано быть чистым: всё изменчивое приходит отсюда. */
@@ -152,6 +157,7 @@ export interface Model<Fields extends Schema.Struct.Fields = Schema.Struct.Field
   readonly deps: ReadonlySet<string>
   /** Сами модели-источники по имени — схемы для валидации фикстур в testModel. */
   readonly refs: ReadonlyMap<string, AnyModel>
+  readonly export?: { readonly attach: string; readonly table: string }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -267,6 +273,7 @@ export const defineModel = <const Fields extends Schema.Struct.Fields>(
     fragment,
     deps,
     refs,
+    ...(config.export !== undefined ? { export: config.export } : {}),
   }
 }
 

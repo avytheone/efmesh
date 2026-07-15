@@ -18,6 +18,8 @@ export interface EfmeshConfig {
     /** Корень parquet-озера (SPEC §3.3) — локальная директория или s3://…. */
     readonly path: string
   }
+  /** ATTACH-базы по алиасам (SPEC §9.3): url + опции (`TYPE postgres` и т.п.). */
+  readonly attach?: Readonly<Record<string, { readonly url: string; readonly options?: string }>>
 }
 
 export const defineConfig = (config: EfmeshConfig): EfmeshConfig => config

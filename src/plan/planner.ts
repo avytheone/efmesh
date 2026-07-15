@@ -151,4 +151,4 @@ export const planChanges = (
         (a) => a.change !== "unchanged" || a.backfill.length > 0 || a.refresh,
       ),
     }
-  })
+  }).pipe(Effect.withSpan("efmesh.plan", { attributes: { env } }))

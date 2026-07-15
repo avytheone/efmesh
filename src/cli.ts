@@ -5,6 +5,7 @@ import type { EfmeshConfig } from "./config.ts"
 import { buildGraph } from "./core/graph.ts"
 import { Efmesh } from "./efmesh.ts"
 import { DuckDBEngineLive } from "./engine/duckdb.ts"
+import { diffEnvironments } from "./plan/diff.ts"
 import { janitor } from "./plan/janitor.ts"
 import { fp8 } from "./plan/naming.ts"
 import { run } from "./plan/run.ts"
@@ -91,6 +92,7 @@ const applyCommand = Command.make(
       const loaded = yield* loadConfig(config)
       const applied = yield* Efmesh.apply(env, loaded.models, {
         ...(loaded.lake !== undefined ? { lakePath: loaded.lake.path } : {}),
+        ...(loaded.attach !== undefined ? { attach: loaded.attach } : {}),
       }).pipe(Effect.provide(configLayers(loaded)))
       yield* printPlan(applied.plan)
       yield* Console.log(
@@ -130,6 +132,7 @@ const runCommand = Command.make(
       const loaded = yield* loadConfig(config)
       const applied = yield* run(env, loaded.models, {
         ...(loaded.lake !== undefined ? { lakePath: loaded.lake.path } : {}),
+        ...(loaded.attach !== undefined ? { attach: loaded.attach } : {}),
       }).pipe(Effect.provide(configLayers(loaded)))
       yield* Console.log(
         applied.built.length > 0
@@ -142,6 +145,26 @@ const runCommand = Command.make(
     "Тик планировщика: догнать интервалы существующих версий (изменения — через apply)",
   ),
 )
+
+const diffCommand = Command.make(
+  "diff",
+  { envA: Argument.string("envA"), envB: Argument.string("envB"), config: configFlag },
+  ({ config, envA, envB }) =>
+    Effect.gen(function* () {
+      const loaded = yield* loadConfig(config)
+      const diff = yield* diffEnvironments(envA, envB).pipe(
+        Effect.provide(configLayers(loaded)),
+      )
+      for (const name of diff.onlyInA) yield* Console.log(`< ${name}  только в ${envA}`)
+      for (const name of diff.onlyInB) yield* Console.log(`> ${name}  только в ${envB}`)
+      for (const entry of diff.different) {
+        yield* Console.log(`≠ ${entry.name}  ${envA}@${entry.a} vs ${envB}@${entry.b}`)
+      }
+      if (diff.onlyInA.length + diff.onlyInB.length + diff.different.length === 0) {
+        yield* Console.log("окружения идентичны")
+      }
+    }),
+).pipe(Command.withDescription("Чем окружения отличаются (по state store)"))
 
 const janitorCommand = Command.make(
   "janitor",
@@ -190,6 +213,7 @@ export const rootCommand = Command.make("efmesh").pipe(
     runCommand,
     renderCommand,
     graphCommand,
+    diffCommand,
     janitorCommand,
   ]),
 )
