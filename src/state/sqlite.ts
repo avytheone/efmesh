@@ -205,8 +205,9 @@ export const SqliteStateLive = (
                 const now = new Date(nowMs).toISOString()
                 const expires = new Date(nowMs + ttlMs).toISOString()
                 const acquire = db.transaction(() => {
-                  // протухший лок упавшего процесса перехватывается
-                  db.query(`DELETE FROM locks WHERE name = ?1 AND expires_at < ?2`).run(name, now)
+                  // протухший лок упавшего процесса перехватывается;
+                  // <= — лок, истёкший в момент T, свободен с T (ttl=0 в ту же мс)
+                  db.query(`DELETE FROM locks WHERE name = ?1 AND expires_at <= ?2`).run(name, now)
                   const result = db
                     .query(
                       `INSERT INTO locks (name, acquired_at, expires_at)

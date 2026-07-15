@@ -1,7 +1,7 @@
 import { defineConfig } from "../../src/index.ts"
-import { deptLoad, moves, rawMoves, stays, staysMart } from "./models.ts"
+import { departments, deptLoad, moves, rawMoves, stays, staysMart } from "./models.ts"
 
 export default defineConfig({
-  models: [rawMoves, moves, stays, deptLoad, staysMart],
+  models: [departments, rawMoves, moves, stays, deptLoad, staysMart],
   lake: { path: "lake" },
 })

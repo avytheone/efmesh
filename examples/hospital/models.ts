@@ -1,5 +1,13 @@
 import { Schema } from "effect"
-import { defineExternal, defineModel, external, kind } from "../../src/index.ts"
+import { audit, defineExternal, defineModel, defineSeed, external, kind } from "../../src/index.ts"
+
+/** Справочник отделений из CSV: правка файла = новая версия и пересборка. */
+export const departments = defineSeed({
+  name: "ref.departments",
+  file: "departments.csv",
+  schema: Schema.Struct({ code: Schema.String, title: Schema.String }),
+  description: "Отделения больницы",
+})
 
 /** Сырьё: parquet-выгрузка из КИС (см. seed.ts). Не материализуется — читается напрямую. */
 export const rawMoves = defineExternal({
@@ -29,6 +37,11 @@ export const moves = defineModel(
     }),
     grain: ["case_id", "moved_at"],
     description: "Лента движений, очищенная и порезанная по дням",
+    audits: [
+      audit.notNull("case_id"),
+      audit.unique("case_id", "moved_at"),
+      audit.warn(audit.accepted("dept", ["КПП", "ОРИТ", "терапия", "хирургия"])),
+    ],
   },
   (ctx) => ctx.sql`
     SELECT ${ctx.cols(rawMoves, "case_id", "dept", "moved_at")}

@@ -2,11 +2,13 @@
 
 sqlmesh на bun, typescript и Effect.
 
-Спецификация: [SPEC.md](./SPEC.md). Статус: **F1** — к скелету F0 (модели/DAG,
-DuckDB-движок, state store, план как diff, физический+виртуальный слой,
-промоушен без пересчёта) добавились инкрементальность по интервалам с
-бэкфиллом и resume, fingerprint по канонизированному AST, external-источники,
-контракт схемы и parquet-озеро.
+Спецификация: [SPEC.md](./SPEC.md). Статус: **F2** — поверх F0/F1 (модели/DAG,
+DuckDB-движок, план как diff, виртуальные окружения, инкрементальность по
+интервалам с бэкфиллом и resume, AST-fingerprint, external, контракт схемы,
+parquet-озеро) добавились аудиты качества, `testModel` на in-memory DuckDB,
+категоризация breaking/non-breaking по AST, `run` по расписанию с
+межпроцессной блокировкой, janitor, seed-справочники, upsert по ключу,
+экспорт в ATTACH-базы, `diff` окружений и метрики.
 
 ## Быстрый старт
 
@@ -47,6 +49,26 @@ export const moves = defineModel(
 `target: "parquet"` кладёт физику модели в озеро (интервал = партиция),
 view поверх `read_parquet`.
 
+Качество — аудиты и юнит-тесты моделей:
+
+```ts
+// аудит: SQL-предикат нарушений; blocking роняет apply, warn — логирует
+audits: [audit.notNull("case_id"), audit.unique("case_id"), audit.warn(audit.accepted("dept", ["ОРИТ"]))]
+
+// тест: фикстуры → CTE → in-memory DuckDB → сверка (bun test)
+import { testModel } from "efmesh/testing"
+test("stays", () => testModel(stays, {
+  inputs: { [moves.name.full]: [{ case_id: "c1", moved_at: "2026-01-01T10:00:00Z" }] },
+  expect: [{ case_id: "c1", duration: null }],
+}))
+```
+
+Ещё из F2: `defineSeed` (CSV/JSON-справочник, содержимое в fingerprint),
+`kind.incrementalByUniqueKey({key})` (upsert), `export: {attach, table}`
+(витрина уезжает в ATTACH-базу после аудитов и промоушена), план
+различает breaking / non-breaking (колонки добавлены в конец) / indirect
+(каскад от родителя).
+
 `efmesh.config.ts` собирает проект:
 
 ```ts
@@ -65,6 +87,9 @@ CLI:
 bun efmesh plan dev      # diff + недостающие интервалы, ничего не меняет
 bun efmesh apply dev     # собрать физику, догнать интервалы, переключить view
 bun efmesh apply prod    # промоушен: view-swap без пересчёта
+bun efmesh run dev       # тик планировщика: только интервалы, с блокировкой
+bun efmesh diff dev prod # чем окружения отличаются
+bun efmesh janitor       # снести осиротевшую физику старше ttl
 bun efmesh render med.moves [--env dev]
 bun efmesh graph
 ```
