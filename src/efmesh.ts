@@ -6,7 +6,12 @@ import type { EngineError, SqlParseError } from "./engine/adapter.ts"
 import { EngineAdapter } from "./engine/adapter.ts"
 import { canonicalSql } from "./plan/fingerprint.ts"
 import { applyPlan, type AppliedPlan, type ApplyError } from "./plan/executor.ts"
-import { planChanges, type InvalidEnvironmentError, type Plan } from "./plan/planner.ts"
+import {
+  planChanges,
+  type InvalidEnvironmentError,
+  type Plan,
+  type PlanOptions,
+} from "./plan/planner.ts"
 import type { GraphError } from "./core/graph.ts"
 import type { StateError } from "./state/store.ts"
 import { StateStore } from "./state/store.ts"
@@ -21,20 +26,22 @@ export const Efmesh = {
   plan: (
     env: string,
     models: Iterable<AnyModel>,
+    options?: PlanOptions,
   ): Effect.Effect<
     Plan,
     GraphError | StateError | InvalidEnvironmentError | EngineError | SqlParseError,
     StateStore | EngineAdapter
-  > => buildGraph(models).pipe(Effect.flatMap((graph) => planChanges(env, graph))),
+  > => buildGraph(models).pipe(Effect.flatMap((graph) => planChanges(env, graph, options))),
 
-  /** План + применение: физика, view-слой, состояние. */
+  /** План + применение: физика, бэкфилл интервалов, view-слой, состояние. */
   apply: (
     env: string,
     models: Iterable<AnyModel>,
+    options?: PlanOptions,
   ): Effect.Effect<AppliedPlan, ApplyError, EngineAdapter | StateStore> =>
     Effect.gen(function* () {
       const graph = yield* buildGraph(models)
-      const plan = yield* planChanges(env, graph)
+      const plan = yield* planChanges(env, graph, options)
       return yield* applyPlan(plan, graph)
     }),
 

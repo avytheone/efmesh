@@ -1,5 +1,7 @@
-import { Data, Effect } from "effect"
+import { Clock, Data, Effect } from "effect"
 import type { ModelGraph } from "../core/graph.ts"
+import type { Interval } from "../core/interval.ts"
+import { enumerateIntervals, fromIso, mergeIntervals, missingIntervals } from "../core/interval.ts"
 import type { EngineError, SqlParseError } from "../engine/adapter.ts"
 import { EngineAdapter } from "../engine/adapter.ts"
 import { StateStore } from "../state/store.ts"
@@ -14,7 +16,7 @@ export class InvalidEnvironmentError extends Data.TaggedError("InvalidEnvironmen
 export type ChangeCategory =
   /** Модели не было в окружении. */
   | "added"
-  /** Fingerprint разошёлся. F0: любое изменение = breaking (категоризация по AST — F2). */
+  /** Fingerprint разошёлся. F1: любое изменение = breaking (категоризация по AST — F2). */
   | "breaking"
   /** Была в окружении, из проекта исчезла — view будет снесён при промоушене. */
   | "removed"
@@ -25,10 +27,17 @@ export interface PlanAction {
   readonly fingerprint: string
   readonly change: ChangeCategory
   /**
-   * Нужна ли сборка физики. false для unchanged/removed и для снапшотов,
-   * уже собранных другим окружением, — тогда промоушен это только view-swap.
+   * Нужна ли сборка физики. false для unchanged/removed, external и для
+   * снапшотов, уже собранных другим окружением, — тогда промоушен это
+   * только view-swap.
    */
   readonly build: boolean
+  /**
+   * Диапазоны к пересчёту у incrementalByTimeRange (слитые из недостающих
+   * интервалов + lookback); у остальных видов пуст. Дыры бывают и у
+   * unchanged-модели — время идёт, появляются новые интервалы.
+   */
+  readonly backfill: ReadonlyArray<Interval>
 }
 
 export interface Plan {
@@ -38,9 +47,15 @@ export interface Plan {
   readonly hasChanges: boolean
 }
 
+export interface PlanOptions {
+  /** «Сейчас» для расчёта интервалов; по умолчанию — Clock. Инъекция для тестов. */
+  readonly now?: number
+}
+
 export const planChanges = (
   env: string,
   graph: ModelGraph,
+  options?: PlanOptions,
 ): Effect.Effect<
   Plan,
   InvalidEnvironmentError | StateError | EngineError | SqlParseError,
@@ -49,6 +64,7 @@ export const planChanges = (
   Effect.gen(function* () {
     if (!validateEnvName(env)) return yield* new InvalidEnvironmentError({ env })
     const store = yield* StateStore
+    const now = options?.now ?? (yield* Clock.currentTimeMillis)
     const fingerprints = yield* fingerprintGraph(graph)
     const current = new Map(
       (yield* store.getEnvironment(env)).map((row) => [row.name, row.fingerprint]),
@@ -66,17 +82,35 @@ export const planChanges = (
         model.kind._tag === "external" ||
         change === "unchanged" ||
         (yield* store.getSnapshot(name, fingerprint)) !== undefined
-      actions.push({ name, fingerprint, change, build: !alreadyBuilt })
+
+      let backfill: ReadonlyArray<Interval> = []
+      if (model.kind._tag === "incrementalByTimeRange") {
+        const kind = model.kind
+        const wanted = enumerateIntervals(kind.interval, fromIso(kind.start), now)
+        // покрытие привязано к fingerprint: новая версия = пустой учёт = полный бэкфилл
+        const done = (yield* store.listIntervals(fingerprint))
+          .filter((record) => record.status === "done")
+          .map((record) => ({ start: fromIso(record.startTs), end: fromIso(record.endTs) }))
+        const missing = [...missingIntervals(wanted, done)]
+        if (kind.lookback > 0) {
+          // поздно приезжающие данные: последние done-интервалы перечитываются
+          const tail = done.sort((a, b) => a.start - b.start).slice(-kind.lookback)
+          missing.push(...tail)
+        }
+        backfill = mergeIntervals(missing.sort((a, b) => a.start - b.start))
+      }
+
+      actions.push({ name, fingerprint, change, build: !alreadyBuilt, backfill })
     }
     for (const [name, fingerprint] of current) {
       if (!graph.models.has(name)) {
-        actions.push({ name, fingerprint, change: "removed", build: false })
+        actions.push({ name, fingerprint, change: "removed", build: false, backfill: [] })
       }
     }
 
     return {
       env,
       actions,
-      hasChanges: actions.some((a) => a.change !== "unchanged"),
+      hasChanges: actions.some((a) => a.change !== "unchanged" || a.backfill.length > 0),
     }
   })
