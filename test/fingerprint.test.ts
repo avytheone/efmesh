@@ -9,6 +9,9 @@ const fingerprintsOf = (models: ReadonlyArray<AnyModel>) =>
   Effect.runPromise(
     buildGraph(models).pipe(
       Effect.flatMap(fingerprintGraph),
+      Effect.map(
+        (versions) => new Map([...versions].map(([name, v]) => [name, v.fingerprint])),
+      ),
       Effect.provide(DuckDBEngineLive()),
     ),
   )

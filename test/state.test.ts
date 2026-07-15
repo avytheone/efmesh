@@ -19,6 +19,7 @@ describe("SqliteState", () => {
           name: "med.stays",
           fingerprint: "abc123",
           renderedSql: "SELECT 1",
+          canonicalAst: `{"statements":[]}`,
           kind: "full",
         }
         yield* store.upsertSnapshot(record)

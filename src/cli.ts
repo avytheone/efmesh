@@ -42,6 +42,8 @@ const configFlag = Flag.string("config").pipe(
 const CHANGE_MARK: Record<string, string> = {
   added: "+",
   breaking: "!",
+  "non-breaking": "~",
+  indirect: "↻",
   removed: "-",
   unchanged: "·",
 }

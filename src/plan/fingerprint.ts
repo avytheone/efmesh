@@ -42,13 +42,19 @@ const kindPayload = (kind: ModelKind): unknown => {
   }
 }
 
+export interface ModelVersion {
+  readonly fingerprint: string
+  /** Канонический AST тела; null у external. Хранится в снапшоте для категоризации (§5.2). */
+  readonly ast: string | null
+}
+
 /** Fingerprint всех моделей графа; транзитивность — через хэши родителей. */
 export const fingerprintGraph = (
   graph: ModelGraph,
-): Effect.Effect<ReadonlyMap<string, string>, EngineError | SqlParseError, EngineAdapter> =>
+): Effect.Effect<ReadonlyMap<string, ModelVersion>, EngineError | SqlParseError, EngineAdapter> =>
   Effect.gen(function* () {
     const engine = yield* EngineAdapter
-    const fingerprints = new Map<string, string>()
+    const versions = new Map<string, ModelVersion>()
     for (const name of graph.order) {
       const model = graph.models.get(name)!
       // у external нет SQL — его версия определяется источником и схемой
@@ -56,7 +62,9 @@ export const fingerprintGraph = (
         model.kind._tag === "external"
           ? null
           : yield* engine.canonicalize(canonicalSql(graph, name))
-      const parents = [...model.deps].sort().map((dep) => `${dep}=${fingerprints.get(dep)!}`)
+      const parents = [...model.deps]
+        .sort()
+        .map((dep) => `${dep}=${versions.get(dep)!.fingerprint}`)
       const payload = JSON.stringify({
         ast,
         kind: kindPayload(model.kind),
@@ -66,7 +74,7 @@ export const fingerprintGraph = (
         target: model.target,
         parents,
       })
-      fingerprints.set(name, sha256(payload))
+      versions.set(name, { fingerprint: sha256(payload), ast })
     }
-    return fingerprints
+    return versions
   })

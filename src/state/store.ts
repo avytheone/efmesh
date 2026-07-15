@@ -11,6 +11,8 @@ export interface SnapshotRecord {
   readonly fingerprint: string
   /** Canonical-рендер SQL — для diff-показа и отладки. */
   readonly renderedSql: string
+  /** Канонический AST тела (JSON) — для категоризации изменений (SPEC §5.2). */
+  readonly canonicalAst: string
   readonly kind: string
   readonly createdAt: string
 }

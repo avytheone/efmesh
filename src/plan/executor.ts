@@ -256,6 +256,7 @@ export const applyPlan = (
           yield* store.upsertSnapshot({
             name: action.name,
             fingerprint: action.fingerprint,
+            canonicalAst: action.canonicalAst ?? "",
             renderedSql: body,
             kind: model.kind._tag,
           })
@@ -273,6 +274,7 @@ export const applyPlan = (
             yield* store.upsertSnapshot({
               name: action.name,
               fingerprint: action.fingerprint,
+              canonicalAst: action.canonicalAst ?? "",
               renderedSql: render(model.fragment, { resolveRef: (ref) => ref }),
               kind: model.kind._tag,
             })
@@ -286,6 +288,7 @@ export const applyPlan = (
             yield* store.upsertSnapshot({
               name: action.name,
               fingerprint: action.fingerprint,
+              canonicalAst: action.canonicalAst ?? "",
               renderedSql: render(model.fragment, { resolveRef: (ref) => ref }),
               kind: model.kind._tag,
             })

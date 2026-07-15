@@ -76,11 +76,12 @@ describe("external-модели (SPEC §3.1, §9.3)", () => {
         expect(rows).toEqual([{ n: 1 }])
 
         // сменили путь источника — потомок пересобирается транзитивно
+        // (его собственное тело не менялось — категория indirect)
         const rawB = lake(join(dir, "b.parquet"))
         const plan = yield* Efmesh.plan("dev", [rawB, stays(rawB)])
         const changes = new Map(plan.actions.map((a) => [a.name, a.change]))
         expect(changes.get("src.moves")).toBe("breaking")
-        expect(changes.get("med.stays")).toBe("breaking")
+        expect(changes.get("med.stays")).toBe("indirect")
         const applied = yield* Efmesh.apply("dev", [rawB, stays(rawB)])
         expect(applied.built).toEqual(["med.stays"])
         const rows2 = yield* engine.query(`SELECT count(*)::INT AS n FROM dev__med.stays`)

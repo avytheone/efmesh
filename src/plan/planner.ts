@@ -6,6 +6,7 @@ import type { EngineError, SqlParseError } from "../engine/adapter.ts"
 import { EngineAdapter } from "../engine/adapter.ts"
 import { StateStore } from "../state/store.ts"
 import type { StateError } from "../state/store.ts"
+import { categorizeAstChange } from "./categorize.ts"
 import { fingerprintGraph } from "./fingerprint.ts"
 import { validateEnvName } from "./naming.ts"
 
@@ -16,8 +17,12 @@ export class InvalidEnvironmentError extends Data.TaggedError("InvalidEnvironmen
 export type ChangeCategory =
   /** Модели не было в окружении. */
   | "added"
-  /** Fingerprint разошёлся. F1: любое изменение = breaking (категоризация по AST — F2). */
+  /** Смысловая правка запроса или метаданных: модель и потомки пересобираются. */
   | "breaking"
+  /** Добавлены колонки в конец SELECT, остальное дерево нетронуто (SPEC §5.2). */
+  | "non-breaking"
+  /** Собственный AST не менялся — версия сдвинулась каскадом от родителя. */
+  | "indirect"
   /** Была в окружении, из проекта исчезла — view будет снесён при промоушене. */
   | "removed"
   | "unchanged"
@@ -25,6 +30,8 @@ export type ChangeCategory =
 export interface PlanAction {
   readonly name: string
   readonly fingerprint: string
+  /** Канонический AST тела (null у external) — сохраняется в снапшот. */
+  readonly canonicalAst: string | null
   readonly change: ChangeCategory
   /**
    * Нужна ли сборка физики. false для unchanged/removed, external и для
@@ -65,7 +72,7 @@ export const planChanges = (
     if (!validateEnvName(env)) return yield* new InvalidEnvironmentError({ env })
     const store = yield* StateStore
     const now = options?.now ?? (yield* Clock.currentTimeMillis)
-    const fingerprints = yield* fingerprintGraph(graph)
+    const versions = yield* fingerprintGraph(graph)
     const current = new Map(
       (yield* store.getEnvironment(env)).map((row) => [row.name, row.fingerprint]),
     )
@@ -73,10 +80,20 @@ export const planChanges = (
     const actions: Array<PlanAction> = []
     for (const name of graph.order) {
       const model = graph.models.get(name)!
-      const fingerprint = fingerprints.get(name)!
+      const { fingerprint, ast } = versions.get(name)!
       const known = current.get(name)
-      const change: ChangeCategory =
-        known === undefined ? "added" : known === fingerprint ? "unchanged" : "breaking"
+      let change: ChangeCategory
+      if (known === undefined) change = "added"
+      else if (known === fingerprint) change = "unchanged"
+      else {
+        // категоризация по AST против последнего известного снапшота (SPEC §5.2);
+        // старых записей без AST и external — консервативно breaking
+        const previous = yield* store.getSnapshot(name, known)
+        const oldAst = previous?.canonicalAst ?? ""
+        if (oldAst === "" || ast === null) change = "breaking"
+        else if (oldAst === ast) change = "indirect" // версия сдвинута родителем/метаданными
+        else change = categorizeAstChange(oldAst, ast)
+      }
       // external не материализуется — версия участвует в diff, физики нет
       const alreadyBuilt =
         model.kind._tag === "external" ||
@@ -100,11 +117,18 @@ export const planChanges = (
         backfill = mergeIntervals(missing.sort((a, b) => a.start - b.start))
       }
 
-      actions.push({ name, fingerprint, change, build: !alreadyBuilt, backfill })
+      actions.push({ name, fingerprint, canonicalAst: ast, change, build: !alreadyBuilt, backfill })
     }
     for (const [name, fingerprint] of current) {
       if (!graph.models.has(name)) {
-        actions.push({ name, fingerprint, change: "removed", build: false, backfill: [] })
+        actions.push({
+          name,
+          fingerprint,
+          canonicalAst: null,
+          change: "removed",
+          build: false,
+          backfill: [],
+        })
       }
     }
 

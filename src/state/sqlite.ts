@@ -11,11 +11,12 @@ import { StateError, StateStore } from "./store.ts"
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS snapshots (
-  name         TEXT NOT NULL,
-  fingerprint  TEXT NOT NULL,
-  rendered_sql TEXT NOT NULL,
-  kind         TEXT NOT NULL,
-  created_at   TEXT NOT NULL,
+  name          TEXT NOT NULL,
+  fingerprint   TEXT NOT NULL,
+  rendered_sql  TEXT NOT NULL,
+  canonical_ast TEXT NOT NULL DEFAULT '',
+  kind          TEXT NOT NULL,
+  created_at    TEXT NOT NULL,
   PRIMARY KEY (name, fingerprint)
 );
 CREATE TABLE IF NOT EXISTS environments (
@@ -60,6 +61,12 @@ export const SqliteStateLive = (
             const db = new Database(options?.path ?? ":memory:", { create: true })
             db.exec("PRAGMA journal_mode = WAL;")
             db.exec(SCHEMA)
+            // миграция баз, созданных до появления canonical_ast (F2)
+            try {
+              db.exec(`ALTER TABLE snapshots ADD COLUMN canonical_ast TEXT NOT NULL DEFAULT ''`)
+            } catch {
+              // колонка уже есть
+            }
             return db
           },
           catch: (cause) => new StateError({ operation: "open", cause }),
@@ -76,10 +83,17 @@ export const SqliteStateLive = (
             Effect.flatMap((now) =>
               attempt("upsertSnapshot", () => {
                 db.query(
-                  `INSERT INTO snapshots (name, fingerprint, rendered_sql, kind, created_at)
-                   VALUES (?1, ?2, ?3, ?4, ?5)
+                  `INSERT INTO snapshots (name, fingerprint, rendered_sql, canonical_ast, kind, created_at)
+                   VALUES (?1, ?2, ?3, ?4, ?5, ?6)
                    ON CONFLICT (name, fingerprint) DO NOTHING`,
-                ).run(snapshot.name, snapshot.fingerprint, snapshot.renderedSql, snapshot.kind, now)
+                ).run(
+                  snapshot.name,
+                  snapshot.fingerprint,
+                  snapshot.renderedSql,
+                  snapshot.canonicalAst,
+                  snapshot.kind,
+                  now,
+                )
               }),
             ),
           ),
@@ -88,7 +102,8 @@ export const SqliteStateLive = (
           attempt("getSnapshot", () => {
             const row = db
               .query(
-                `SELECT name, fingerprint, rendered_sql AS renderedSql, kind, created_at AS createdAt
+                `SELECT name, fingerprint, rendered_sql AS renderedSql,
+                        canonical_ast AS canonicalAst, kind, created_at AS createdAt
                  FROM snapshots WHERE name = ?1 AND fingerprint = ?2`,
               )
               .get(name, fingerprint) as SnapshotRecord | null
