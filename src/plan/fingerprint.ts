@@ -62,6 +62,8 @@ export const fingerprintGraph = (
         kind: kindPayload(model.kind),
         grain: model.grain,
         columns: columnNames(model),
+        // смена цели материализации = новая физика, потребители перечитают её
+        target: model.target,
         parents,
       })
       fingerprints.set(name, sha256(payload))

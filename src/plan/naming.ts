@@ -30,6 +30,24 @@ export const physicalRef = (name: ModelName, fingerprint: string): string =>
 export const envSchema = (env: string, modelSchema: string): string =>
   env === PROD_ENV ? modelSchema : `${env}__${modelSchema}`
 
+/**
+ * Раскладка parquet-озера (SPEC §3.3): `<lake>/<схема>/<таблица>/fp=<fp8>/…`,
+ * у incremental внутри — партиции `interval=<ключ>/data.parquet`.
+ * Интервал = партиция: пересчёт — перезапись файлов партиции, источник
+ * правды — учёт интервалов, поэтому неатомарность перезаписи не страшна.
+ */
+export const parquetPrefix = (lakePath: string, name: ModelName, fingerprint: string): string =>
+  `${lakePath.replace(/\/+$/, "")}/${name.schema}/${name.table}/fp=${fp8(fingerprint)}`
+
+export const parquetRef = (lakePath: string, name: ModelName, fingerprint: string): string =>
+  `read_parquet('${parquetPrefix(lakePath, name, fingerprint).replaceAll(`'`, `''`)}/**/*.parquet')`
+
+/** Ключ партиции интервала — безопасен для файловых систем (без двоеточий). */
+export const intervalKey = (unit: "day" | "hour", startMs: number): string => {
+  const iso = new Date(startMs).toISOString()
+  return unit === "day" ? iso.slice(0, 10) : `${iso.slice(0, 10)}T${iso.slice(11, 13)}`
+}
+
 const READERS = { parquet: "read_parquet", csv: "read_csv", json: "read_json" } as const
 
 /**

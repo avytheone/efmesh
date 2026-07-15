@@ -86,6 +86,12 @@ export const parseModelName = (raw: string): ModelName => {
   return { full: raw, schema, table }
 }
 
+/**
+ * Куда складывать физический слой (SPEC §3.3): нативная таблица движка
+ * или parquet-файлы озера (интервал = партиция, view поверх read_parquet).
+ */
+export type MaterializationTarget = "table" | "parquet"
+
 export interface ModelConfig<Fields extends Schema.Struct.Fields> {
   readonly name: string
   readonly kind: ModelKind
@@ -93,6 +99,8 @@ export interface ModelConfig<Fields extends Schema.Struct.Fields> {
   readonly description?: string
   /** Логический первичный ключ; пока метаданные (аудит unique — F2). */
   readonly grain?: ReadonlyArray<Extract<keyof Fields, string>>
+  /** Цель материализации; по умолчанию — таблица движка. */
+  readonly target?: MaterializationTarget
 }
 
 /** Контекст рендера тела модели. Тело обязано быть чистым: всё изменчивое приходит отсюда. */
@@ -119,6 +127,7 @@ export interface Model<Fields extends Schema.Struct.Fields = Schema.Struct.Field
   readonly schema: Schema.Struct<Fields>
   readonly description: string | undefined
   readonly grain: ReadonlyArray<string>
+  readonly target: MaterializationTarget
   /** Тело, отрендеренное в фрагмент один раз при определении. */
   readonly fragment: SqlFragment
   /** Имена моделей, на которые тело ссылается через `ctx.ref`. */
@@ -145,6 +154,12 @@ export const defineModel = <const Fields extends Schema.Struct.Fields>(
     throw new ModelDefinitionError({
       model: name.full,
       reason: "external-модель не имеет тела — используй defineExternal",
+    })
+  }
+  if (config.kind._tag === "view" && config.target === "parquet") {
+    throw new ModelDefinitionError({
+      model: name.full,
+      reason: "view не материализуется — parquet-цель к нему неприменима",
     })
   }
   if (config.kind._tag === "incrementalByTimeRange") {
@@ -198,6 +213,7 @@ export const defineModel = <const Fields extends Schema.Struct.Fields>(
     schema: config.schema,
     description: config.description,
     grain: config.grain ?? [],
+    target: config.target ?? "table",
     fragment,
     deps,
   }
@@ -225,6 +241,7 @@ export const defineExternal = <const Fields extends Schema.Struct.Fields>(
   schema: config.schema,
   description: config.description,
   grain: [],
+  target: "table", // не материализуется — поле не используется
   fragment: { _tag: "SqlFragment", nodes: [] },
   deps: new Set(),
 })

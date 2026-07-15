@@ -5,7 +5,12 @@ import { render } from "./core/sql.ts"
 import type { EngineError, SqlParseError } from "./engine/adapter.ts"
 import { EngineAdapter } from "./engine/adapter.ts"
 import { canonicalSql } from "./plan/fingerprint.ts"
-import { applyPlan, type AppliedPlan, type ApplyError } from "./plan/executor.ts"
+import {
+  applyPlan,
+  type AppliedPlan,
+  type ApplyError,
+  type ApplyOptions,
+} from "./plan/executor.ts"
 import {
   planChanges,
   type InvalidEnvironmentError,
@@ -37,12 +42,12 @@ export const Efmesh = {
   apply: (
     env: string,
     models: Iterable<AnyModel>,
-    options?: PlanOptions,
+    options?: PlanOptions & ApplyOptions,
   ): Effect.Effect<AppliedPlan, ApplyError, EngineAdapter | StateStore> =>
     Effect.gen(function* () {
       const graph = yield* buildGraph(models)
       const plan = yield* planChanges(env, graph, options)
-      return yield* applyPlan(plan, graph)
+      return yield* applyPlan(plan, graph, options)
     }),
 
   /** Canonical-рендер SQL модели (ссылки — логические имена) для отладки. */

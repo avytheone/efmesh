@@ -14,6 +14,10 @@ export interface EfmeshConfig {
     /** Путь к SQLite-файлу состояния; по умолчанию `efmesh.state.sqlite`. */
     readonly path?: string
   }
+  readonly lake?: {
+    /** Корень parquet-озера (SPEC §3.3) — локальная директория или s3://…. */
+    readonly path: string
+  }
 }
 
 export const defineConfig = (config: EfmeshConfig): EfmeshConfig => config

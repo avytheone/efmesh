@@ -1,4 +1,5 @@
-import { Effect } from "effect"
+import { mkdirSync } from "node:fs"
+import { Data, Effect } from "effect"
 import type { GraphError, ModelGraph } from "../core/graph.ts"
 import type { Interval } from "../core/interval.ts"
 import { intervalsWithin, splitIntoBatches, sqlTimestamp, toIso } from "../core/interval.ts"
@@ -9,7 +10,16 @@ import type { Engine, EngineError, SqlParseError } from "../engine/adapter.ts"
 import { StateStore } from "../state/store.ts"
 import type { StateError, StateStoreShape } from "../state/store.ts"
 import { checkContract, type SchemaMismatchError } from "./contract.ts"
-import { envSchema, externalSourceRef, physicalRef, physicalSchema, viewRef } from "./naming.ts"
+import {
+  envSchema,
+  externalSourceRef,
+  intervalKey,
+  parquetPrefix,
+  parquetRef,
+  physicalRef,
+  physicalSchema,
+  viewRef,
+} from "./naming.ts"
 import type { InvalidEnvironmentError, Plan, PlanAction } from "./planner.ts"
 
 export interface AppliedPlan {
@@ -18,13 +28,24 @@ export interface AppliedPlan {
   readonly built: ReadonlyArray<string>
 }
 
+/** В проекте есть parquet-модели, но путь озера не задан в конфиге. */
+export class LakeNotConfiguredError extends Data.TaggedError("LakeNotConfiguredError")<{
+  readonly model: string
+}> {}
+
 export type ApplyError =
   | GraphError
   | StateError
   | EngineError
   | SqlParseError
   | SchemaMismatchError
+  | LakeNotConfiguredError
   | InvalidEnvironmentError
+
+export interface ApplyOptions {
+  /** Корень parquet-озера — локальная директория или s3://… (httpfs). */
+  readonly lakePath?: string
+}
 
 /** Несколько стейтментов одной транзакцией движка; откат при любой ошибке. */
 const transactional = (
@@ -37,14 +58,20 @@ const transactional = (
     Effect.onError(() => engine.execute("ROLLBACK").pipe(Effect.ignore)),
   )
 
+/** Для s3://-путей mkdir не нужен (и невозможен) — httpfs пишет напрямую. */
+const ensureDir = (path: string): Effect.Effect<void> =>
+  path.startsWith("s3://")
+    ? Effect.void
+    : Effect.sync(() => mkdirSync(path, { recursive: true }))
+
 /**
- * Бэкфилл incrementalByTimeRange (SPEC §5.3): каждый диапазон плана режется
- * на батчи ≤ batchSize; батч — транзакция DELETE-диапазона + INSERT, после
- * успеха его интервалы помечаются done. Упавший батч помечается failed и
- * прерывает apply; уже отмеченное не пересчитывается при повторе — бэкфилл
- * продолжается с места остановки.
+ * Бэкфилл incrementalByTimeRange в таблицу (SPEC §5.3): каждый диапазон
+ * плана режется на батчи ≤ batchSize; батч — транзакция DELETE-диапазона +
+ * INSERT, после успеха его интервалы помечаются done. Упавший батч
+ * помечается failed и прерывает apply; уже отмеченное не пересчитывается
+ * при повторе — бэкфилл продолжается с места остановки.
  */
-const backfillModel = (
+const backfillIntoTable = (
   engine: Engine,
   store: StateStoreShape,
   model: AnyModel,
@@ -78,6 +105,45 @@ const backfillModel = (
   })
 
 /**
+ * Бэкфилл в parquet-озеро (SPEC §3.3): интервал = партиция, пересчёт —
+ * перезапись файла партиции. Транзакция не нужна: недописанная партиция
+ * не помечена done и будет перезаписана при повторе.
+ */
+const backfillIntoParquet = (
+  engine: Engine,
+  store: StateStoreShape,
+  model: AnyModel,
+  action: PlanAction,
+  prefix: string,
+  resolveRef: (ref: string) => string,
+): Effect.Effect<void, EngineError | StateError> =>
+  Effect.gen(function* () {
+    if (model.kind._tag !== "incrementalByTimeRange") return
+    const kind = model.kind
+    for (const range of action.backfill) {
+      for (const interval of intervalsWithin(range, kind.interval)) {
+        const partition = `${prefix}/interval=${intervalKey(kind.interval, interval.start)}`
+        yield* ensureDir(partition)
+        const body = render(model.fragment, {
+          resolveRef,
+          interval: { start: sqlTimestamp(interval.start), end: sqlTimestamp(interval.end) },
+        })
+        const mark = [{ startTs: toIso(interval.start), endTs: toIso(interval.end) }]
+        yield* engine
+          .execute(
+            `COPY (${body}) TO '${partition.replaceAll(`'`, `''`)}/data.parquet' (FORMAT PARQUET)`,
+          )
+          .pipe(
+            Effect.tapError(() =>
+              store.markIntervals(action.fingerprint, mark, "failed").pipe(Effect.ignore),
+            ),
+          )
+        yield* store.markIntervals(action.fingerprint, mark, "done")
+      }
+    }
+  })
+
+/**
  * Применяет план (SPEC §5): в топологическом порядке собирает недостающую
  * физику и догоняет интервалы (ссылки в SQL резолвятся в физические таблицы
  * ЭТОГО плана, не во view окружения — середина apply не видна снаружи),
@@ -87,21 +153,38 @@ const backfillModel = (
 export const applyPlan = (
   plan: Plan,
   graph: ModelGraph,
+  options?: ApplyOptions,
 ): Effect.Effect<AppliedPlan, ApplyError, EngineAdapter | StateStore> =>
   Effect.gen(function* () {
     const engine = yield* EngineAdapter
     const store = yield* StateStore
+    const lakePath = options?.lakePath
 
     const fingerprintOf = new Map(plan.actions.map((a) => [a.name, a.fingerprint]))
+    // физика модели — то, что увидят её потребители и view окружения
+    const physicalFor = (model: AnyModel, fingerprint: string): string => {
+      if (model.kind._tag === "external") return externalSourceRef(model.kind.source)
+      if (model.target === "parquet") {
+        if (lakePath === undefined) throw new LakeNotConfiguredError({ model: model.name.full })
+        return parquetRef(lakePath, model.name, fingerprint)
+      }
+      return physicalRef(model.name, fingerprint)
+    }
     const resolveRef = (ref: string): string => {
       const model = graph.models.get(ref)
       const fingerprint = fingerprintOf.get(ref)
       if (model === undefined || fingerprint === undefined) {
         throw new Error(`ссылка на модель вне плана: ${ref}`)
       }
-      // external читается напрямую из источника — физики у него нет
-      if (model.kind._tag === "external") return externalSourceRef(model.kind.source)
-      return physicalRef(model.name, fingerprint)
+      return physicalFor(model, fingerprint)
+    }
+
+    // parquet-модели без озера — падение до любых действий
+    for (const action of plan.actions) {
+      const model = graph.models.get(action.name)
+      if (model !== undefined && model.target === "parquet" && lakePath === undefined) {
+        return yield* new LakeNotConfiguredError({ model: model.name.full })
+      }
     }
 
     // 1. Физика + бэкфилл
@@ -110,7 +193,6 @@ export const applyPlan = (
     for (const action of plan.actions) {
       if (!action.build && action.backfill.length === 0) continue
       const model = graph.models.get(action.name)!
-      const target = physicalRef(model.name, action.fingerprint)
       switch (model.kind._tag) {
         case "external":
           continue
@@ -119,11 +201,20 @@ export const applyPlan = (
           const body = render(model.fragment, { resolveRef })
           // контракт схемы (SPEC §3.2): дрейф типов ловится до сборки
           yield* checkContract(engine, model, body)
-          const ddl =
-            model.kind._tag === "view"
-              ? `CREATE OR REPLACE VIEW ${target} AS ${body}`
-              : `CREATE OR REPLACE TABLE ${target} AS ${body}`
-          yield* engine.execute(ddl)
+          if (model.kind._tag === "full" && model.target === "parquet") {
+            const prefix = parquetPrefix(lakePath!, model.name, action.fingerprint)
+            yield* ensureDir(prefix)
+            yield* engine.execute(
+              `COPY (${body}) TO '${prefix.replaceAll(`'`, `''`)}/data.parquet' (FORMAT PARQUET)`,
+            )
+          } else {
+            const target = physicalRef(model.name, action.fingerprint)
+            const ddl =
+              model.kind._tag === "view"
+                ? `CREATE OR REPLACE VIEW ${target} AS ${body}`
+                : `CREATE OR REPLACE TABLE ${target} AS ${body}`
+            yield* engine.execute(ddl)
+          }
           yield* store.upsertSnapshot({
             name: action.name,
             fingerprint: action.fingerprint,
@@ -133,23 +224,35 @@ export const applyPlan = (
           break
         }
         case "incrementalByTimeRange": {
-          // пустой скелет с формой запроса; при resume уже существует
           const zero = sqlTimestamp(0)
           const emptyBody = render(model.fragment, {
             resolveRef,
             interval: { start: zero, end: zero },
           })
           yield* checkContract(engine, model, emptyBody)
-          yield* engine.execute(
-            `CREATE TABLE IF NOT EXISTS ${target} AS SELECT * FROM (${emptyBody}) q LIMIT 0`,
-          )
-          yield* store.upsertSnapshot({
-            name: action.name,
-            fingerprint: action.fingerprint,
-            renderedSql: render(model.fragment, { resolveRef: (ref) => ref }),
-            kind: model.kind._tag,
-          })
-          yield* backfillModel(engine, store, model, action, target, resolveRef)
+          if (model.target === "parquet") {
+            const prefix = parquetPrefix(lakePath!, model.name, action.fingerprint)
+            yield* store.upsertSnapshot({
+              name: action.name,
+              fingerprint: action.fingerprint,
+              renderedSql: render(model.fragment, { resolveRef: (ref) => ref }),
+              kind: model.kind._tag,
+            })
+            yield* backfillIntoParquet(engine, store, model, action, prefix, resolveRef)
+          } else {
+            // пустой скелет с формой запроса; при resume уже существует
+            const target = physicalRef(model.name, action.fingerprint)
+            yield* engine.execute(
+              `CREATE TABLE IF NOT EXISTS ${target} AS SELECT * FROM (${emptyBody}) q LIMIT 0`,
+            )
+            yield* store.upsertSnapshot({
+              name: action.name,
+              fingerprint: action.fingerprint,
+              renderedSql: render(model.fragment, { resolveRef: (ref) => ref }),
+              kind: model.kind._tag,
+            })
+            yield* backfillIntoTable(engine, store, model, action, target, resolveRef)
+          }
           break
         }
       }
@@ -173,7 +276,7 @@ export const applyPlan = (
         `CREATE SCHEMA IF NOT EXISTS "${envSchema(plan.env, model.name.schema)}"`,
       )
       yield* engine.execute(
-        `CREATE OR REPLACE VIEW ${viewRef(plan.env, model.name)} AS SELECT * FROM ${physicalRef(model.name, action.fingerprint)}`,
+        `CREATE OR REPLACE VIEW ${viewRef(plan.env, model.name)} AS SELECT * FROM ${physicalFor(model, action.fingerprint)}`,
       )
     }
 
