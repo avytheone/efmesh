@@ -7,6 +7,7 @@ import { Efmesh } from "./efmesh.ts"
 import { DuckDBEngineLive } from "./engine/duckdb.ts"
 import { janitor } from "./plan/janitor.ts"
 import { fp8 } from "./plan/naming.ts"
+import { run } from "./plan/run.ts"
 import type { Plan } from "./plan/planner.ts"
 import { SqliteStateLive } from "./state/sqlite.ts"
 
@@ -121,6 +122,27 @@ const renderCommand = Command.make(
     }),
 ).pipe(Command.withDescription("Показать итоговый SQL модели"))
 
+const runCommand = Command.make(
+  "run",
+  { env: Argument.string("env"), config: configFlag },
+  ({ config, env }) =>
+    Effect.gen(function* () {
+      const loaded = yield* loadConfig(config)
+      const applied = yield* run(env, loaded.models, {
+        ...(loaded.lake !== undefined ? { lakePath: loaded.lake.path } : {}),
+      }).pipe(Effect.provide(configLayers(loaded)))
+      yield* Console.log(
+        applied.built.length > 0
+          ? `обработано: ${applied.built.join(", ")}`
+          : "новых интервалов нет",
+      )
+    }),
+).pipe(
+  Command.withDescription(
+    "Тик планировщика: догнать интервалы существующих версий (изменения — через apply)",
+  ),
+)
+
 const janitorCommand = Command.make(
   "janitor",
   {
@@ -165,6 +187,7 @@ export const rootCommand = Command.make("efmesh").pipe(
   Command.withSubcommands([
     planCommand,
     applyCommand,
+    runCommand,
     renderCommand,
     graphCommand,
     janitorCommand,

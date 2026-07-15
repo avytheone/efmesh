@@ -70,6 +70,13 @@ export interface StateStoreShape {
   /** Журнал применённых планов. */
   readonly recordPlan: (env: string, summary: string) => Effect.Effect<void, StateError>
   readonly listPlans: (env: string) => Effect.Effect<ReadonlyArray<PlanRecord>, StateError>
+  /**
+   * Межпроцессная блокировка (SPEC §7): true — получена, false — держит
+   * другой процесс. Протухшие (expires) локи перехватываются — упавший
+   * процесс не оставляет вечный замок.
+   */
+  readonly acquireLock: (name: string, ttlMs: number) => Effect.Effect<boolean, StateError>
+  readonly releaseLock: (name: string) => Effect.Effect<void, StateError>
   /** Транзакционный upsert интервалов снапшота (повторная отметка — обновление статуса). */
   readonly markIntervals: (
     snapshotFp: string,

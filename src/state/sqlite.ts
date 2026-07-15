@@ -40,6 +40,11 @@ CREATE TABLE IF NOT EXISTS intervals (
   updated_at  TEXT NOT NULL,
   PRIMARY KEY (snapshot_fp, start_ts)
 );
+CREATE TABLE IF NOT EXISTS locks (
+  name        TEXT PRIMARY KEY,
+  acquired_at TEXT NOT NULL,
+  expires_at  TEXT NOT NULL
+);
 `
 
 export interface SqliteStateOptions {
@@ -191,6 +196,34 @@ export const SqliteStateLive = (
                  FROM plans WHERE env = ?1 ORDER BY id`,
               )
               .all(env) as ReadonlyArray<PlanRecord>
+          }),
+
+        acquireLock: (name, ttlMs) =>
+          Clock.currentTimeMillis.pipe(
+            Effect.flatMap((nowMs) =>
+              attempt("acquireLock", () => {
+                const now = new Date(nowMs).toISOString()
+                const expires = new Date(nowMs + ttlMs).toISOString()
+                const acquire = db.transaction(() => {
+                  // протухший лок упавшего процесса перехватывается
+                  db.query(`DELETE FROM locks WHERE name = ?1 AND expires_at < ?2`).run(name, now)
+                  const result = db
+                    .query(
+                      `INSERT INTO locks (name, acquired_at, expires_at)
+                       VALUES (?1, ?2, ?3)
+                       ON CONFLICT (name) DO NOTHING`,
+                    )
+                    .run(name, now, expires)
+                  return result.changes > 0
+                })
+                return acquire()
+              }),
+            ),
+          ),
+
+        releaseLock: (name) =>
+          attempt("releaseLock", () => {
+            db.query(`DELETE FROM locks WHERE name = ?1`).run(name)
           }),
 
         markIntervals: (snapshotFp, intervals, status) =>
