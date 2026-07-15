@@ -1,6 +1,12 @@
 import { Database } from "bun:sqlite"
 import { Clock, Effect, Layer } from "effect"
-import type { EnvironmentRecord, PlanRecord, SnapshotRecord, StateStoreShape } from "./store.ts"
+import type {
+  EnvironmentRecord,
+  IntervalRecord,
+  PlanRecord,
+  SnapshotRecord,
+  StateStoreShape,
+} from "./store.ts"
 import { StateError, StateStore } from "./store.ts"
 
 const SCHEMA = `
@@ -24,6 +30,14 @@ CREATE TABLE IF NOT EXISTS plans (
   env        TEXT NOT NULL,
   summary    TEXT NOT NULL,
   applied_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS intervals (
+  snapshot_fp TEXT NOT NULL,
+  start_ts    TEXT NOT NULL,
+  end_ts      TEXT NOT NULL,
+  status      TEXT NOT NULL,
+  updated_at  TEXT NOT NULL,
+  PRIMARY KEY (snapshot_fp, start_ts)
 );
 `
 
@@ -139,6 +153,37 @@ export const SqliteStateLive = (
                  FROM plans WHERE env = ?1 ORDER BY id`,
               )
               .all(env) as ReadonlyArray<PlanRecord>
+          }),
+
+        markIntervals: (snapshotFp, intervals, status) =>
+          isoNow.pipe(
+            Effect.flatMap((now) =>
+              attempt("markIntervals", () => {
+                const upsert = db.query(
+                  `INSERT INTO intervals (snapshot_fp, start_ts, end_ts, status, updated_at)
+                   VALUES (?1, ?2, ?3, ?4, ?5)
+                   ON CONFLICT (snapshot_fp, start_ts)
+                   DO UPDATE SET end_ts = ?3, status = ?4, updated_at = ?5`,
+                )
+                const all = db.transaction(() => {
+                  for (const interval of intervals) {
+                    upsert.run(snapshotFp, interval.startTs, interval.endTs, status, now)
+                  }
+                })
+                all()
+              }),
+            ),
+          ),
+
+        listIntervals: (snapshotFp) =>
+          attempt("listIntervals", () => {
+            return db
+              .query(
+                `SELECT snapshot_fp AS snapshotFp, start_ts AS startTs, end_ts AS endTs,
+                        status, updated_at AS updatedAt
+                 FROM intervals WHERE snapshot_fp = ?1 ORDER BY start_ts`,
+              )
+              .all(snapshotFp) as ReadonlyArray<IntervalRecord>
           }),
       }
       return service

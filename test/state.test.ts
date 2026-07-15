@@ -59,6 +59,27 @@ describe("SqliteState", () => {
     expect(referenced).toEqual(new Set(["f1", "f2"]))
   })
 
+  test("интервалы: upsert по (fp, start), статус обновляется, изоляция по fp", async () => {
+    const { mine, other } = await withStore((store) =>
+      Effect.gen(function* () {
+        const jan1 = { startTs: "2026-01-01T00:00:00Z", endTs: "2026-01-02T00:00:00Z" }
+        const jan2 = { startTs: "2026-01-02T00:00:00Z", endTs: "2026-01-03T00:00:00Z" }
+        yield* store.markIntervals("fp_a", [jan1, jan2], "failed")
+        yield* store.markIntervals("fp_a", [jan2], "done") // ретрай успешен
+        yield* store.markIntervals("fp_b", [jan1], "done")
+        return {
+          mine: yield* store.listIntervals("fp_a"),
+          other: yield* store.listIntervals("fp_b"),
+        }
+      }),
+    )
+    expect(mine.map((i) => [i.startTs, i.status])).toEqual([
+      ["2026-01-01T00:00:00Z", "failed"],
+      ["2026-01-02T00:00:00Z", "done"],
+    ])
+    expect(other).toHaveLength(1)
+  })
+
   test("журнал планов пишется и читается по порядку", async () => {
     const plans = await withStore((store) =>
       Effect.gen(function* () {

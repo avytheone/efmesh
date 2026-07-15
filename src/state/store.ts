@@ -30,6 +30,19 @@ export interface PlanRecord {
   readonly appliedAt: string
 }
 
+/**
+ * Учёт заполненных интервалов снапшота (SPEC §6) — единственный источник
+ * правды о том, что посчитано: физическая таблица без записей здесь
+ * считается пустой. Границы — ISO UTC (сортируются лексикографически).
+ */
+export interface IntervalRecord {
+  readonly snapshotFp: string
+  readonly startTs: string
+  readonly endTs: string
+  readonly status: "done" | "failed"
+  readonly updatedAt: string
+}
+
 export interface StateStoreShape {
   /** Идемпотентно: (name, fingerprint) уникальны, повторная запись — no-op. */
   readonly upsertSnapshot: (
@@ -52,6 +65,15 @@ export interface StateStoreShape {
   /** Журнал применённых планов. */
   readonly recordPlan: (env: string, summary: string) => Effect.Effect<void, StateError>
   readonly listPlans: (env: string) => Effect.Effect<ReadonlyArray<PlanRecord>, StateError>
+  /** Транзакционный upsert интервалов снапшота (повторная отметка — обновление статуса). */
+  readonly markIntervals: (
+    snapshotFp: string,
+    intervals: ReadonlyArray<{ readonly startTs: string; readonly endTs: string }>,
+    status: IntervalRecord["status"],
+  ) => Effect.Effect<void, StateError>
+  readonly listIntervals: (
+    snapshotFp: string,
+  ) => Effect.Effect<ReadonlyArray<IntervalRecord>, StateError>
 }
 
 export class StateStore extends Context.Service<StateStore, StateStoreShape>()(
