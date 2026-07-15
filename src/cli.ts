@@ -1,0 +1,129 @@
+import * as NodePath from "node:path"
+import { Console, Data, Effect, Layer } from "effect"
+import { Argument, Command, Flag } from "effect/unstable/cli"
+import type { EfmeshConfig } from "./config.ts"
+import { buildGraph } from "./core/graph.ts"
+import { Efmesh } from "./efmesh.ts"
+import { DuckDBEngineLive } from "./engine/duckdb.ts"
+import { fp8 } from "./plan/naming.ts"
+import type { Plan } from "./plan/planner.ts"
+import { SqliteStateLive } from "./state/sqlite.ts"
+
+export class ConfigLoadError extends Data.TaggedError("ConfigLoadError")<{
+  readonly path: string
+  readonly reason: string
+}> {}
+
+const loadConfig = (configPath: string): Effect.Effect<EfmeshConfig, ConfigLoadError> =>
+  Effect.tryPromise({
+    try: async () => {
+      const absolute = NodePath.resolve(process.cwd(), configPath)
+      const module = (await import(absolute)) as { default?: EfmeshConfig }
+      if (module.default === undefined || !Array.isArray(module.default.models)) {
+        throw new Error("конфиг должен экспортировать default с полем models")
+      }
+      return module.default
+    },
+    catch: (cause) => new ConfigLoadError({ path: configPath, reason: String(cause) }),
+  })
+
+/** Слои движка и состояния из конфига — общие для plan/apply. */
+const configLayers = (config: EfmeshConfig) =>
+  Layer.mergeAll(
+    DuckDBEngineLive({ path: config.engine?.path ?? "efmesh.duckdb" }),
+    SqliteStateLive({ path: config.state?.path ?? "efmesh.state.sqlite" }),
+  )
+
+const configFlag = Flag.string("config").pipe(
+  Flag.withDefault("efmesh.config.ts"),
+  Flag.withDescription("Путь к efmesh.config.ts"),
+)
+
+const CHANGE_MARK: Record<string, string> = {
+  added: "+",
+  breaking: "!",
+  removed: "-",
+  unchanged: "·",
+}
+
+const printPlan = (plan: Plan) =>
+  Effect.gen(function* () {
+    yield* Console.log(`план для окружения «${plan.env}»:`)
+    for (const action of plan.actions) {
+      const mark = CHANGE_MARK[action.change] ?? "?"
+      const build = action.build ? "  [сборка]" : ""
+      yield* Console.log(
+        `  ${mark} ${action.name}  ${action.change} @${fp8(action.fingerprint)}${build}`,
+      )
+    }
+    if (!plan.hasChanges) yield* Console.log("  изменений нет")
+  })
+
+const planCommand = Command.make(
+  "plan",
+  { env: Argument.string("env"), config: configFlag },
+  ({ config, env }) =>
+    Effect.gen(function* () {
+      const loaded = yield* loadConfig(config)
+      const plan = yield* Efmesh.plan(env, loaded.models).pipe(
+        Effect.provide(configLayers(loaded)),
+      )
+      yield* printPlan(plan)
+    }),
+).pipe(Command.withDescription("Показать diff проекта против окружения, ничего не меняя"))
+
+const applyCommand = Command.make(
+  "apply",
+  { env: Argument.string("env"), config: configFlag },
+  ({ config, env }) =>
+    Effect.gen(function* () {
+      const loaded = yield* loadConfig(config)
+      const applied = yield* Efmesh.apply(env, loaded.models).pipe(
+        Effect.provide(configLayers(loaded)),
+      )
+      yield* printPlan(applied.plan)
+      yield* Console.log(
+        applied.built.length > 0
+          ? `собрано: ${applied.built.join(", ")}`
+          : "сборка не потребовалась (только view-swap)",
+      )
+      yield* Console.log(`окружение «${applied.plan.env}» промоутнуто`)
+    }),
+).pipe(Command.withDescription("Применить план: собрать физику и переключить view"))
+
+const renderCommand = Command.make(
+  "render",
+  {
+    model: Argument.string("model"),
+    config: configFlag,
+    env: Flag.string("env").pipe(
+      Flag.withDefault(""),
+      Flag.withDescription("Рендер против view-слоя окружения вместо логических имён"),
+    ),
+  },
+  ({ config, env, model }) =>
+    Effect.gen(function* () {
+      const loaded = yield* loadConfig(config)
+      const sql = env === ""
+        ? yield* Efmesh.render(loaded.models, model)
+        : yield* Efmesh.renderFor(loaded.models, model, env)
+      yield* Console.log(sql.trim())
+    }),
+).pipe(Command.withDescription("Показать итоговый SQL модели"))
+
+const graphCommand = Command.make("graph", { config: configFlag }, ({ config }) =>
+  Effect.gen(function* () {
+    const loaded = yield* loadConfig(config)
+    const graph = yield* buildGraph(loaded.models)
+    for (const name of graph.order) {
+      const model = graph.models.get(name)!
+      const deps = model.deps.size > 0 ? `  ←  ${[...model.deps].sort().join(", ")}` : ""
+      yield* Console.log(`${name} (${model.kind._tag})${deps}`)
+    }
+  }),
+).pipe(Command.withDescription("DAG моделей в топологическом порядке"))
+
+export const rootCommand = Command.make("efmesh").pipe(
+  Command.withDescription("sqlmesh на bun, typescript и Effect"),
+  Command.withSubcommands([planCommand, applyCommand, renderCommand, graphCommand]),
+)

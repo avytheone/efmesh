@@ -2,9 +2,13 @@ import type { ModelName } from "../core/model.ts"
 
 /**
  * Раскладка объектов в движке (SPEC §2):
- * - физика: схема `efmesh`, таблица `<схема>__<таблица>__<fp8>`;
+ * - физика: схема `_efmesh`, таблица `<схема>__<таблица>__<fp8>`;
  * - виртуалка: prod живёт в родных схемах моделей (`med.stays`),
  *   остальные окружения — в префиксованных (`dev__med.stays`).
+ *
+ * Схема именно `_efmesh`, не `efmesh`: DuckDB называет каталог по имени
+ * файла базы, и для `efmesh.duckdb` ссылка `efmesh.x` становится
+ * неоднозначной (каталог или схема) — Binder Error.
  */
 
 export const PROD_ENV = "prod"
@@ -15,7 +19,7 @@ export const validateEnvName = (env: string): boolean => ENV_NAME.test(env)
 
 export const fp8 = (fingerprint: string): string => fingerprint.slice(0, 8)
 
-export const physicalSchema = "efmesh"
+export const physicalSchema = "_efmesh"
 
 export const physicalTable = (name: ModelName, fingerprint: string): string =>
   `${name.schema}__${name.table}__${fp8(fingerprint)}`
