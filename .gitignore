@@ -1,0 +1,13 @@
+node_modules
+dist
+out
+coverage
+*.tsbuildinfo
+.env
+.env.*
+*.duckdb
+*.duckdb.wal
+*.sqlite
+*.sqlite-*
+.cache
+.DS_Store

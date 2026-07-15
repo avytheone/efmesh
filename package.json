@@ -1,0 +1,23 @@
+{
+  "name": "efmesh",
+  "version": "0.0.1",
+  "description": "sqlmesh-like data transformation framework on TypeScript, Bun and Effect",
+  "type": "module",
+  "module": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing": "./src/testing/index.ts"
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@duckdb/node-api": "1.5.4-r.1",
+    "effect": "^4.0.0-beta.98"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^7.0.2"
+  }
+}
