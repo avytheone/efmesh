@@ -5,7 +5,7 @@ import { EngineAdapter } from "../engine/adapter.ts"
 import type { EngineError, SqlParseError } from "../engine/adapter.ts"
 import { StateStore } from "../state/store.ts"
 import type { StateError } from "../state/store.ts"
-import { envSchema, physicalRef, physicalSchema, viewRef } from "./naming.ts"
+import { envSchema, externalSourceRef, physicalRef, physicalSchema, viewRef } from "./naming.ts"
 import type { InvalidEnvironmentError, Plan } from "./planner.ts"
 
 export interface AppliedPlan {
@@ -42,6 +42,8 @@ export const applyPlan = (
       if (model === undefined || fingerprint === undefined) {
         throw new Error(`ссылка на модель вне плана: ${ref}`)
       }
+      // external читается напрямую из источника — физики у него нет
+      if (model.kind._tag === "external") return externalSourceRef(model.kind.source)
       return physicalRef(model.name, fingerprint)
     }
 
@@ -79,6 +81,7 @@ export const applyPlan = (
         continue
       }
       const model = graph.models.get(action.name)!
+      if (model.kind._tag === "external") continue // view-слоя у external нет
       yield* engine.execute(
         `CREATE SCHEMA IF NOT EXISTS "${envSchema(plan.env, model.name.schema)}"`,
       )

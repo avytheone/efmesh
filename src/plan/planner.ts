@@ -56,11 +56,14 @@ export const planChanges = (
 
     const actions: Array<PlanAction> = []
     for (const name of graph.order) {
+      const model = graph.models.get(name)!
       const fingerprint = fingerprints.get(name)!
       const known = current.get(name)
       const change: ChangeCategory =
         known === undefined ? "added" : known === fingerprint ? "unchanged" : "breaking"
+      // external не материализуется — версия участвует в diff, физики нет
       const alreadyBuilt =
+        model.kind._tag === "external" ||
         change === "unchanged" ||
         (yield* store.getSnapshot(name, fingerprint)) !== undefined
       actions.push({ name, fingerprint, change, build: !alreadyBuilt })

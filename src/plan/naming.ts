@@ -1,4 +1,4 @@
-import type { ModelName } from "../core/model.ts"
+import type { ExternalSource, ModelName } from "../core/model.ts"
 
 /**
  * Раскладка объектов в движке (SPEC §2):
@@ -29,6 +29,18 @@ export const physicalRef = (name: ModelName, fingerprint: string): string =>
 
 export const envSchema = (env: string, modelSchema: string): string =>
   env === PROD_ENV ? modelSchema : `${env}__${modelSchema}`
+
+const READERS = { parquet: "read_parquet", csv: "read_csv", json: "read_json" } as const
+
+/**
+ * Во что рендерится ссылка на external-модель (SPEC §9.3): имя таблицы
+ * (движка или ATTACH-базы) как есть, файлы/URL — через read_*.
+ * external не материализуется, потребители читают источник напрямую.
+ */
+export const externalSourceRef = (source: ExternalSource): string =>
+  source._tag === "table"
+    ? source.table
+    : `${READERS[source.format]}('${source.path.replaceAll(`'`, `''`)}')`
 
 export const viewRef = (env: string, name: ModelName): string =>
   `"${envSchema(env, name.schema)}"."${name.table}"`
