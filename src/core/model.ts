@@ -136,6 +136,8 @@ export interface Model<Fields extends Schema.Struct.Fields = Schema.Struct.Field
   readonly fragment: SqlFragment
   /** Имена моделей, на которые тело ссылается через `ctx.ref`. */
   readonly deps: ReadonlySet<string>
+  /** Сами модели-источники по имени — схемы для валидации фикстур в testModel. */
+  readonly refs: ReadonlyMap<string, AnyModel>
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -180,9 +182,13 @@ export const defineModel = <const Fields extends Schema.Struct.Fields>(
       })
     }
   }
+  const refs = new Map<string, AnyModel>()
   const ctx: ModelCtx = {
     sql,
-    ref: (model) => ({ _tag: "RefValue", modelName: model.name.full }),
+    ref: (model) => {
+      refs.set(model.name.full, model)
+      return { _tag: "RefValue", modelName: model.name.full }
+    },
     cols: (model, ...names) => {
       const known = new Set(Object.keys(model.schema.fields))
       for (const column of names) {
@@ -221,6 +227,7 @@ export const defineModel = <const Fields extends Schema.Struct.Fields>(
     audits: config.audits ?? [],
     fragment,
     deps,
+    refs,
   }
 }
 
@@ -250,4 +257,5 @@ export const defineExternal = <const Fields extends Schema.Struct.Fields>(
   audits: [],
   fragment: { _tag: "SqlFragment", nodes: [] },
   deps: new Set(),
+  refs: new Map(),
 })

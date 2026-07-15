@@ -18,10 +18,10 @@ export class SchemaMismatchError extends Data.TaggedError("SchemaMismatchError")
   readonly problems: ReadonlyArray<string>
 }> {}
 
-type TypeFamily = "text" | "numeric" | "boolean" | "temporal" | "any"
+export type TypeFamily = "text" | "numeric" | "boolean" | "temporal" | "any"
 
-/** Семейство, ожидаемое от поля Effect Schema (по AST). */
-const familyOfAst = (ast: unknown): TypeFamily => {
+/** Семейство, ожидаемое от поля Effect Schema (по AST). Реюз: testModel рендерит фикстуры по нему. */
+export const familyOfAst = (ast: unknown): TypeFamily => {
   const node = ast as {
     readonly _tag: string
     readonly types?: ReadonlyArray<unknown>
