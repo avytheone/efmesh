@@ -1,0 +1,59 @@
+import { Context, Data, Effect } from "effect"
+
+export class StateError extends Data.TaggedError("StateError")<{
+  readonly operation: string
+  readonly cause: unknown
+}> {}
+
+/** Версия модели, известная state store (SPEC §6). */
+export interface SnapshotRecord {
+  readonly name: string
+  readonly fingerprint: string
+  /** Canonical-рендер SQL — для diff-показа и отладки. */
+  readonly renderedSql: string
+  readonly kind: string
+  readonly createdAt: string
+}
+
+/** Строка окружения: логическое имя → снапшот, на который указывает view. */
+export interface EnvironmentRecord {
+  readonly env: string
+  readonly name: string
+  readonly fingerprint: string
+  readonly promotedAt: string
+}
+
+export interface PlanRecord {
+  readonly id: number
+  readonly env: string
+  readonly summary: string
+  readonly appliedAt: string
+}
+
+export interface StateStoreShape {
+  /** Идемпотентно: (name, fingerprint) уникальны, повторная запись — no-op. */
+  readonly upsertSnapshot: (
+    snapshot: Omit<SnapshotRecord, "createdAt">,
+  ) => Effect.Effect<void, StateError>
+  readonly getSnapshot: (
+    name: string,
+    fingerprint: string,
+  ) => Effect.Effect<SnapshotRecord | undefined, StateError>
+  /** Все снапшоты, на которые ссылается хоть одно окружение, — для janitor (F2). */
+  readonly listReferencedFingerprints: () => Effect.Effect<ReadonlySet<string>, StateError>
+  readonly getEnvironment: (
+    env: string,
+  ) => Effect.Effect<ReadonlyArray<EnvironmentRecord>, StateError>
+  /** Транзакционно заменяет весь набор окружения. */
+  readonly promote: (
+    env: string,
+    entries: ReadonlyArray<{ readonly name: string; readonly fingerprint: string }>,
+  ) => Effect.Effect<void, StateError>
+  /** Журнал применённых планов. */
+  readonly recordPlan: (env: string, summary: string) => Effect.Effect<void, StateError>
+  readonly listPlans: (env: string) => Effect.Effect<ReadonlyArray<PlanRecord>, StateError>
+}
+
+export class StateStore extends Context.Service<StateStore, StateStoreShape>()(
+  "efmesh/StateStore",
+) {}
