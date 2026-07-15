@@ -2,6 +2,7 @@ import { Effect } from "effect"
 import { buildGraph } from "./core/graph.ts"
 import type { AnyModel } from "./core/model.ts"
 import { render } from "./core/sql.ts"
+import type { EngineError, SqlParseError } from "./engine/adapter.ts"
 import { EngineAdapter } from "./engine/adapter.ts"
 import { canonicalSql } from "./plan/fingerprint.ts"
 import { applyPlan, type AppliedPlan, type ApplyError } from "./plan/executor.ts"
@@ -16,12 +17,15 @@ import { viewRef } from "./plan/naming.ts"
  * приложение; CLI — тонкая обёртка над ними.
  */
 export const Efmesh = {
-  /** Посчитать план для окружения, ничего не меняя. */
+  /** Посчитать план для окружения, ничего не меняя. Движок нужен для канонизации SQL. */
   plan: (
     env: string,
     models: Iterable<AnyModel>,
-  ): Effect.Effect<Plan, GraphError | StateError | InvalidEnvironmentError, StateStore> =>
-    buildGraph(models).pipe(Effect.flatMap((graph) => planChanges(env, graph))),
+  ): Effect.Effect<
+    Plan,
+    GraphError | StateError | InvalidEnvironmentError | EngineError | SqlParseError,
+    StateStore | EngineAdapter
+  > => buildGraph(models).pipe(Effect.flatMap((graph) => planChanges(env, graph))),
 
   /** План + применение: физика, view-слой, состояние. */
   apply: (

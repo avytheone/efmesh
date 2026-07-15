@@ -1,5 +1,7 @@
 import { Data, Effect } from "effect"
 import type { ModelGraph } from "../core/graph.ts"
+import type { EngineError, SqlParseError } from "../engine/adapter.ts"
+import { EngineAdapter } from "../engine/adapter.ts"
 import { StateStore } from "../state/store.ts"
 import type { StateError } from "../state/store.ts"
 import { fingerprintGraph } from "./fingerprint.ts"
@@ -39,11 +41,15 @@ export interface Plan {
 export const planChanges = (
   env: string,
   graph: ModelGraph,
-): Effect.Effect<Plan, InvalidEnvironmentError | StateError, StateStore> =>
+): Effect.Effect<
+  Plan,
+  InvalidEnvironmentError | StateError | EngineError | SqlParseError,
+  StateStore | EngineAdapter
+> =>
   Effect.gen(function* () {
     if (!validateEnvName(env)) return yield* new InvalidEnvironmentError({ env })
     const store = yield* StateStore
-    const fingerprints = fingerprintGraph(graph)
+    const fingerprints = yield* fingerprintGraph(graph)
     const current = new Map(
       (yield* store.getEnvironment(env)).map((row) => [row.name, row.fingerprint]),
     )

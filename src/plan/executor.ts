@@ -2,7 +2,7 @@ import { Effect } from "effect"
 import type { GraphError, ModelGraph } from "../core/graph.ts"
 import { render } from "../core/sql.ts"
 import { EngineAdapter } from "../engine/adapter.ts"
-import type { EngineError } from "../engine/adapter.ts"
+import type { EngineError, SqlParseError } from "../engine/adapter.ts"
 import { StateStore } from "../state/store.ts"
 import type { StateError } from "../state/store.ts"
 import { envSchema, physicalRef, physicalSchema, viewRef } from "./naming.ts"
@@ -14,7 +14,12 @@ export interface AppliedPlan {
   readonly built: ReadonlyArray<string>
 }
 
-export type ApplyError = GraphError | StateError | EngineError | InvalidEnvironmentError
+export type ApplyError =
+  | GraphError
+  | StateError
+  | EngineError
+  | SqlParseError
+  | InvalidEnvironmentError
 
 /**
  * Применяет план (SPEC §5): в топологическом порядке собирает недостающую
