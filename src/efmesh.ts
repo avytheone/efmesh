@@ -1,0 +1,56 @@
+import { Effect } from "effect"
+import { buildGraph } from "./core/graph.ts"
+import type { AnyModel } from "./core/model.ts"
+import { render } from "./core/sql.ts"
+import { EngineAdapter } from "./engine/adapter.ts"
+import { canonicalSql } from "./plan/fingerprint.ts"
+import { applyPlan, type AppliedPlan, type ApplyError } from "./plan/executor.ts"
+import { planChanges, type InvalidEnvironmentError, type Plan } from "./plan/planner.ts"
+import type { GraphError } from "./core/graph.ts"
+import type { StateError } from "./state/store.ts"
+import { StateStore } from "./state/store.ts"
+import { viewRef } from "./plan/naming.ts"
+
+/**
+ * Фасад efmesh (SPEC §10): обычные Effect'ы, встраиваемые в любое
+ * приложение; CLI — тонкая обёртка над ними.
+ */
+export const Efmesh = {
+  /** Посчитать план для окружения, ничего не меняя. */
+  plan: (
+    env: string,
+    models: Iterable<AnyModel>,
+  ): Effect.Effect<Plan, GraphError | StateError | InvalidEnvironmentError, StateStore> =>
+    buildGraph(models).pipe(Effect.flatMap((graph) => planChanges(env, graph))),
+
+  /** План + применение: физика, view-слой, состояние. */
+  apply: (
+    env: string,
+    models: Iterable<AnyModel>,
+  ): Effect.Effect<AppliedPlan, ApplyError, EngineAdapter | StateStore> =>
+    Effect.gen(function* () {
+      const graph = yield* buildGraph(models)
+      const plan = yield* planChanges(env, graph)
+      return yield* applyPlan(plan, graph)
+    }),
+
+  /** Canonical-рендер SQL модели (ссылки — логические имена) для отладки. */
+  render: (models: Iterable<AnyModel>, name: string): Effect.Effect<string, GraphError> =>
+    buildGraph(models).pipe(Effect.map((graph) => canonicalSql(graph, name))),
+
+  /** Рендер SQL модели против view-слоя окружения — «как выполнит движок». */
+  renderFor: (
+    models: Iterable<AnyModel>,
+    name: string,
+    env: string,
+  ): Effect.Effect<string, GraphError> =>
+    buildGraph(models).pipe(
+      Effect.map((graph) => {
+        const model = graph.models.get(name)
+        if (model === undefined) throw new Error(`модели ${name} нет в проекте`)
+        return render(model.fragment, {
+          resolveRef: (ref) => viewRef(env, graph.models.get(ref)!.name),
+        })
+      }),
+    ),
+} as const
