@@ -1,14 +1,69 @@
 import type { Schema } from "effect"
+import type { IntervalUnit } from "./interval.ts"
 import { ModelDefinitionError } from "./errors.ts"
-import type { IdentsValue, RefValue, SqlFragment } from "./sql.ts"
-import { collectRefs, sql } from "./sql.ts"
+import type { BoundValue, IdentsValue, RefValue, SqlFragment } from "./sql.ts"
+import { collectRefs, sql, usesBounds } from "./sql.ts"
 
-/** Вид материализации (F0: только full и view, см. SPEC §3.1). */
-export type ModelKind = { readonly _tag: "full" } | { readonly _tag: "view" }
+/** Вид материализации (SPEC §3.1). */
+export type ModelKind =
+  | { readonly _tag: "full" }
+  | { readonly _tag: "view" }
+  | {
+      readonly _tag: "incrementalByTimeRange"
+      /** Колонка времени, по которой режутся и перечитываются интервалы. */
+      readonly timeColumn: string
+      /** С какого момента бэкфиллить (ISO UTC). */
+      readonly start: string
+      /** Зерно интервала. */
+      readonly interval: IntervalUnit
+      /** Сколько интервалов зерна исполняется одним DELETE+INSERT. */
+      readonly batchSize: number
+      /** Сколько последних done-интервалов пересчитывать заново (поздние данные). */
+      readonly lookback: number
+    }
+  | { readonly _tag: "external"; readonly source: ExternalSource }
+
+/**
+ * Определение внешнего источника (SPEC §9.3): таблица движка/ATTACH-базы
+ * или файлы по пути/URL (`read_parquet`/`read_csv`/`read_json`, включая
+ * HTTPS — REST-JSON ложится сюда же).
+ */
+export type ExternalSource =
+  | { readonly _tag: "table"; readonly table: string }
+  | {
+      readonly _tag: "files"
+      readonly path: string
+      readonly format: "parquet" | "csv" | "json"
+    }
+
+export interface IncrementalByTimeRangeOptions {
+  readonly timeColumn: string
+  readonly start: string
+  readonly interval?: IntervalUnit
+  readonly batchSize?: number
+  readonly lookback?: number
+}
 
 export const kind = {
   full: (): ModelKind => ({ _tag: "full" }),
   view: (): ModelKind => ({ _tag: "view" }),
+  incrementalByTimeRange: (options: IncrementalByTimeRangeOptions): ModelKind => ({
+    _tag: "incrementalByTimeRange",
+    timeColumn: options.timeColumn,
+    start: options.start,
+    interval: options.interval ?? "day",
+    batchSize: options.batchSize ?? 30,
+    lookback: options.lookback ?? 0,
+  }),
+} as const
+
+export const external = {
+  table: (table: string): ExternalSource => ({ _tag: "table", table }),
+  files: (path: string, format: "parquet" | "csv" | "json"): ExternalSource => ({
+    _tag: "files",
+    path,
+    format,
+  }),
 } as const
 
 /** Имя модели: `<схема>.<таблица>`. */
@@ -48,6 +103,13 @@ export interface ModelCtx {
     model: Model<Fields>,
     ...names: ReadonlyArray<Extract<keyof Fields, string>>
   ) => IdentsValue
+  /**
+   * Границы обрабатываемого интервала `[start, end)` — только для
+   * incrementalByTimeRange. При исполнении подставляются литералами,
+   * в canonical-текст попадают плейсхолдерами (SPEC §3).
+   */
+  readonly start: BoundValue
+  readonly end: BoundValue
 }
 
 export interface Model<Fields extends Schema.Struct.Fields = Schema.Struct.Fields> {
@@ -79,6 +141,26 @@ export const defineModel = <const Fields extends Schema.Struct.Fields>(
   body: (ctx: ModelCtx) => SqlFragment,
 ): Model<Fields> => {
   const name = parseModelName(config.name)
+  if (config.kind._tag === "external") {
+    throw new ModelDefinitionError({
+      model: name.full,
+      reason: "external-модель не имеет тела — используй defineExternal",
+    })
+  }
+  if (config.kind._tag === "incrementalByTimeRange") {
+    if (!(config.kind.timeColumn in config.schema.fields)) {
+      throw new ModelDefinitionError({
+        model: name.full,
+        reason: `timeColumn «${config.kind.timeColumn}» нет в схеме модели`,
+      })
+    }
+    if (Number.isNaN(Date.parse(config.kind.start))) {
+      throw new ModelDefinitionError({
+        model: name.full,
+        reason: `start «${config.kind.start}» — не ISO-время`,
+      })
+    }
+  }
   const ctx: ModelCtx = {
     sql,
     ref: (model) => ({ _tag: "RefValue", modelName: model.name.full }),
@@ -95,8 +177,16 @@ export const defineModel = <const Fields extends Schema.Struct.Fields>(
       }
       return { _tag: "IdentsValue", names }
     },
+    start: { _tag: "BoundValue", which: "start" },
+    end: { _tag: "BoundValue", which: "end" },
   }
   const fragment = body(ctx)
+  if (usesBounds(fragment) && config.kind._tag !== "incrementalByTimeRange") {
+    throw new ModelDefinitionError({
+      model: name.full,
+      reason: `ctx.start/ctx.end доступны только incrementalByTimeRange, вид модели — ${config.kind._tag}`,
+    })
+  }
   const deps = collectRefs(fragment)
   if (deps.has(name.full)) {
     throw new ModelDefinitionError({ model: name.full, reason: "модель ссылается сама на себя" })
@@ -112,3 +202,29 @@ export const defineModel = <const Fields extends Schema.Struct.Fields>(
     deps,
   }
 }
+
+export interface ExternalConfig<Fields extends Schema.Struct.Fields> {
+  readonly name: string
+  readonly source: ExternalSource
+  readonly schema: Schema.Struct<Fields>
+  readonly description?: string
+}
+
+/**
+ * Внешний источник (SPEC §3.1, §9.3): не материализуется, но участвует
+ * в DAG и lineage, схема объявляется. В fingerprint входит только
+ * *определение* источника — содержимое меняется между запусками, и это
+ * нормально для сырья.
+ */
+export const defineExternal = <const Fields extends Schema.Struct.Fields>(
+  config: ExternalConfig<Fields>,
+): Model<Fields> => ({
+  _tag: "Model",
+  name: parseModelName(config.name),
+  kind: { _tag: "external", source: config.source },
+  schema: config.schema,
+  description: config.description,
+  grain: [],
+  fragment: { _tag: "SqlFragment", nodes: [] },
+  deps: new Set(),
+})

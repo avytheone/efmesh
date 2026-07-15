@@ -15,6 +15,7 @@ export type SqlNode =
   | { readonly _tag: "Text"; readonly text: string }
   | { readonly _tag: "Ref"; readonly modelName: string }
   | { readonly _tag: "Idents"; readonly names: ReadonlyArray<string> }
+  | { readonly _tag: "Bound"; readonly which: "start" | "end" }
 
 /** Ссылка на модель, полученная из `ctx.ref(model)`. */
 export interface RefValue {
@@ -28,10 +29,16 @@ export interface IdentsValue {
   readonly names: ReadonlyArray<string>
 }
 
+/** Граница обрабатываемого интервала — `ctx.start` / `ctx.end` (SPEC §3). */
+export interface BoundValue {
+  readonly _tag: "BoundValue"
+  readonly which: "start" | "end"
+}
+
 /** Скалярные значения инлайнятся как SQL-литералы (детерминированно). */
 export type SqlLiteral = string | number | boolean | bigint | null
 
-export type Interpolation = SqlFragment | RefValue | IdentsValue | SqlLiteral
+export type Interpolation = SqlFragment | RefValue | IdentsValue | BoundValue | SqlLiteral
 
 const isSqlFragment = (v: unknown): v is SqlFragment =>
   typeof v === "object" && v !== null && (v as any)._tag === "SqlFragment"
@@ -41,6 +48,9 @@ const isRefValue = (v: unknown): v is RefValue =>
 
 const isIdentsValue = (v: unknown): v is IdentsValue =>
   typeof v === "object" && v !== null && (v as any)._tag === "IdentsValue"
+
+const isBoundValue = (v: unknown): v is BoundValue =>
+  typeof v === "object" && v !== null && (v as any)._tag === "BoundValue"
 
 export const quoteIdent = (name: string): string => `"${name.replaceAll(`"`, `""`)}"`
 
@@ -87,6 +97,8 @@ export const sql = (
       nodes.push({ _tag: "Ref", modelName: value.modelName })
     } else if (isIdentsValue(value)) {
       nodes.push({ _tag: "Idents", names: value.names })
+    } else if (isBoundValue(value)) {
+      nodes.push({ _tag: "Bound", which: value.which })
     } else {
       pushText(escapeLiteral(value))
     }
@@ -97,6 +109,13 @@ export const sql = (
 export interface RenderOptions {
   /** Во что превращается ссылка на модель (physical-таблица, view окружения, логическое имя…). */
   readonly resolveRef: (modelName: string) => string
+  /**
+   * Границы обрабатываемого интервала — готовые SQL-выражения
+   * (`TIMESTAMP '…'` при исполнении). Без них `ctx.start`/`ctx.end`
+   * рендерятся плейсхолдерами `$start`/`$end` — так канонический текст
+   * не зависит от конкретных дат и fingerprint стабилен (SPEC §3, §4).
+   */
+  readonly interval?: { readonly start: string; readonly end: string }
 }
 
 export const render = (fragment: SqlFragment, options: RenderOptions): string => {
@@ -112,6 +131,9 @@ export const render = (fragment: SqlFragment, options: RenderOptions): string =>
       case "Idents":
         out += node.names.map(quoteIdent).join(", ")
         break
+      case "Bound":
+        out += options.interval === undefined ? `$${node.which}` : options.interval[node.which]
+        break
     }
   }
   return out
@@ -124,3 +146,7 @@ export const collectRefs = (fragment: SqlFragment): ReadonlySet<string> => {
   }
   return refs
 }
+
+/** Использует ли фрагмент границы интервала (валидация вида модели). */
+export const usesBounds = (fragment: SqlFragment): boolean =>
+  fragment.nodes.some((node) => node._tag === "Bound")

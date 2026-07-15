@@ -1,6 +1,7 @@
 export * from "./core/errors.ts"
 export * from "./efmesh.ts"
 export * from "./core/graph.ts"
+export * from "./core/interval.ts"
 export * from "./core/model.ts"
 export * from "./core/sql.ts"
 export * from "./engine/adapter.ts"
