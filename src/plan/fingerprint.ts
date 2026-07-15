@@ -1,4 +1,6 @@
+import { readFileSync } from "node:fs"
 import { Effect } from "effect"
+import { SeedReadError } from "../core/errors.ts"
 import type { ModelGraph } from "../core/graph.ts"
 import type { ModelKind } from "../core/model.ts"
 import { columnNames } from "../core/model.ts"
@@ -29,16 +31,35 @@ export const canonicalSql = (graph: ModelGraph, name: string): string => {
   return render(model.fragment, { resolveRef: (ref) => ref })
 }
 
-/** Часть kind, влияющая на данные. */
-const kindPayload = (kind: ModelKind): unknown => {
+/** Часть kind, влияющая на данные. Для seed — хэш содержимого файла: правка данных = новая версия. */
+const kindPayload = (
+  model: { readonly name: { readonly full: string } },
+  kind: ModelKind,
+): Effect.Effect<unknown, SeedReadError> => {
   switch (kind._tag) {
     case "full":
     case "view":
-      return { _tag: kind._tag }
+      return Effect.succeed({ _tag: kind._tag })
     case "incrementalByTimeRange":
-      return { _tag: kind._tag, timeColumn: kind.timeColumn, interval: kind.interval }
+      return Effect.succeed({
+        _tag: kind._tag,
+        timeColumn: kind.timeColumn,
+        interval: kind.interval,
+      })
+    case "incrementalByUniqueKey":
+      return Effect.succeed({ _tag: kind._tag, key: kind.key })
     case "external":
-      return { _tag: kind._tag, source: kind.source }
+      return Effect.succeed({ _tag: kind._tag, source: kind.source })
+    case "seed":
+      return Effect.try({
+        try: () => ({
+          _tag: kind._tag,
+          file: kind.file,
+          contentHash: sha256(readFileSync(kind.file, "utf8")),
+        }),
+        catch: (cause) =>
+          new SeedReadError({ model: model.name.full, file: kind.file, cause }),
+      })
   }
 }
 
@@ -51,15 +72,19 @@ export interface ModelVersion {
 /** Fingerprint всех моделей графа; транзитивность — через хэши родителей. */
 export const fingerprintGraph = (
   graph: ModelGraph,
-): Effect.Effect<ReadonlyMap<string, ModelVersion>, EngineError | SqlParseError, EngineAdapter> =>
+): Effect.Effect<
+  ReadonlyMap<string, ModelVersion>,
+  EngineError | SqlParseError | SeedReadError,
+  EngineAdapter
+> =>
   Effect.gen(function* () {
     const engine = yield* EngineAdapter
     const versions = new Map<string, ModelVersion>()
     for (const name of graph.order) {
       const model = graph.models.get(name)!
-      // у external нет SQL — его версия определяется источником и схемой
+      // у external и seed нет SQL — версия определяется источником/файлом и схемой
       const ast =
-        model.kind._tag === "external"
+        model.kind._tag === "external" || model.kind._tag === "seed"
           ? null
           : yield* engine.canonicalize(canonicalSql(graph, name))
       const parents = [...model.deps]
@@ -67,7 +92,7 @@ export const fingerprintGraph = (
         .map((dep) => `${dep}=${versions.get(dep)!.fingerprint}`)
       const payload = JSON.stringify({
         ast,
-        kind: kindPayload(model.kind),
+        kind: yield* kindPayload(model, model.kind),
         grain: model.grain,
         columns: columnNames(model),
         // смена цели материализации = новая физика, потребители перечитают её

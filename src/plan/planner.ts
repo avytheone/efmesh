@@ -1,4 +1,5 @@
 import { Clock, Data, Effect } from "effect"
+import type { SeedReadError } from "../core/errors.ts"
 import type { ModelGraph } from "../core/graph.ts"
 import type { Interval } from "../core/interval.ts"
 import { enumerateIntervals, fromIso, mergeIntervals, missingIntervals } from "../core/interval.ts"
@@ -45,6 +46,8 @@ export interface PlanAction {
    * unchanged-модели — время идёт, появляются новые интервалы.
    */
   readonly backfill: ReadonlyArray<Interval>
+  /** true у incrementalByUniqueKey: каждый apply перегоняет запрос (upsert по ключу). */
+  readonly refresh: boolean
 }
 
 export interface Plan {
@@ -65,7 +68,7 @@ export const planChanges = (
   options?: PlanOptions,
 ): Effect.Effect<
   Plan,
-  InvalidEnvironmentError | StateError | EngineError | SqlParseError,
+  InvalidEnvironmentError | StateError | EngineError | SqlParseError | SeedReadError,
   StateStore | EngineAdapter
 > =>
   Effect.gen(function* () {
@@ -117,7 +120,15 @@ export const planChanges = (
         backfill = mergeIntervals(missing.sort((a, b) => a.start - b.start))
       }
 
-      actions.push({ name, fingerprint, canonicalAst: ast, change, build: !alreadyBuilt, backfill })
+      actions.push({
+        name,
+        fingerprint,
+        canonicalAst: ast,
+        change,
+        build: !alreadyBuilt,
+        backfill,
+        refresh: model.kind._tag === "incrementalByUniqueKey",
+      })
     }
     for (const [name, fingerprint] of current) {
       if (!graph.models.has(name)) {
@@ -128,6 +139,7 @@ export const planChanges = (
           change: "removed",
           build: false,
           backfill: [],
+          refresh: false,
         })
       }
     }
@@ -135,6 +147,8 @@ export const planChanges = (
     return {
       env,
       actions,
-      hasChanges: actions.some((a) => a.change !== "unchanged" || a.backfill.length > 0),
+      hasChanges: actions.some(
+        (a) => a.change !== "unchanged" || a.backfill.length > 0 || a.refresh,
+      ),
     }
   })

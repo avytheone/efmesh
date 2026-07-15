@@ -18,3 +18,10 @@ export class UnknownDependencyError extends Data.TaggedError("UnknownDependencyE
 export class DagCycleError extends Data.TaggedError("DagCycleError")<{
   readonly cycle: ReadonlyArray<string>
 }> {}
+
+/** Файл seed-модели не читается — fingerprint и сборка невозможны. */
+export class SeedReadError extends Data.TaggedError("SeedReadError")<{
+  readonly model: string
+  readonly file: string
+  readonly cause: unknown
+}> {}

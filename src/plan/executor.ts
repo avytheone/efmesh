@@ -1,6 +1,7 @@
 import { mkdirSync } from "node:fs"
 import { Data, Effect } from "effect"
 import { AuditFailure } from "../core/audit.ts"
+import type { SeedReadError } from "../core/errors.ts"
 import type { GraphError, ModelGraph } from "../core/graph.ts"
 import type { Interval } from "../core/interval.ts"
 import { intervalsWithin, splitIntoBatches, sqlTimestamp, toIso } from "../core/interval.ts"
@@ -39,6 +40,7 @@ export type ApplyError =
   | StateError
   | EngineError
   | SqlParseError
+  | SeedReadError
   | SchemaMismatchError
   | LakeNotConfiguredError
   | AuditFailure
@@ -227,11 +229,50 @@ export const applyPlan = (
     yield* engine.execute(`CREATE SCHEMA IF NOT EXISTS "${physicalSchema}"`)
     const built: Array<string> = []
     for (const action of plan.actions) {
-      if (!action.build && action.backfill.length === 0) continue
+      if (!action.build && action.backfill.length === 0 && !action.refresh) continue
       const model = graph.models.get(action.name)!
       switch (model.kind._tag) {
         case "external":
           continue
+        case "seed": {
+          const reader = model.kind.format === "csv" ? "read_csv" : "read_json"
+          const body = `SELECT * FROM ${reader}('${model.kind.file.replaceAll(`'`, `''`)}')`
+          yield* checkContract(engine, model, body)
+          const target = physicalRef(model.name, action.fingerprint)
+          yield* engine.execute(`CREATE OR REPLACE TABLE ${target} AS ${body}`)
+          yield* runAudits(engine, model, target)
+          yield* store.upsertSnapshot({
+            name: action.name,
+            fingerprint: action.fingerprint,
+            canonicalAst: "",
+            renderedSql: body,
+            kind: model.kind._tag,
+          })
+          break
+        }
+        case "incrementalByUniqueKey": {
+          const body = render(model.fragment, { resolveRef })
+          yield* checkContract(engine, model, body)
+          const target = physicalRef(model.name, action.fingerprint)
+          yield* engine.execute(
+            `CREATE TABLE IF NOT EXISTS ${target} AS SELECT * FROM (${body}) q LIMIT 0`,
+          )
+          // upsert: строки с ключами из свежего запроса заменяются, остальные живут
+          const keys = model.kind.key.map(quoteIdent).join(", ")
+          yield* transactional(engine, [
+            `DELETE FROM ${target} WHERE (${keys}) IN (SELECT ${keys} FROM (${body}) q)`,
+            `INSERT INTO ${target} ${body}`,
+          ])
+          yield* runAudits(engine, model, target)
+          yield* store.upsertSnapshot({
+            name: action.name,
+            fingerprint: action.fingerprint,
+            canonicalAst: action.canonicalAst ?? "",
+            renderedSql: render(model.fragment, { resolveRef: (ref) => ref }),
+            kind: model.kind._tag,
+          })
+          break
+        }
         case "view":
         case "full": {
           const body = render(model.fragment, { resolveRef })

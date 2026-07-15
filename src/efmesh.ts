@@ -17,6 +17,7 @@ import {
   type Plan,
   type PlanOptions,
 } from "./plan/planner.ts"
+import type { SeedReadError } from "./core/errors.ts"
 import type { GraphError } from "./core/graph.ts"
 import type { StateError } from "./state/store.ts"
 import { StateStore } from "./state/store.ts"
@@ -34,7 +35,7 @@ export const Efmesh = {
     options?: PlanOptions,
   ): Effect.Effect<
     Plan,
-    GraphError | StateError | InvalidEnvironmentError | EngineError | SqlParseError,
+    GraphError | StateError | InvalidEnvironmentError | EngineError | SqlParseError | SeedReadError,
     StateStore | EngineAdapter
   > => buildGraph(models).pipe(Effect.flatMap((graph) => planChanges(env, graph, options))),
 

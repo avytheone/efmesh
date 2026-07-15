@@ -23,6 +23,17 @@ export type ModelKind =
       readonly lookback: number
     }
   | { readonly _tag: "external"; readonly source: ExternalSource }
+  | {
+      readonly _tag: "seed"
+      /** CSV/JSON-файл с данными; содержимое входит в fingerprint. */
+      readonly file: string
+      readonly format: "csv" | "json"
+    }
+  | {
+      readonly _tag: "incrementalByUniqueKey"
+      /** Логический ключ upsert'а; каждый apply перегоняет запрос и заменяет строки по ключу. */
+      readonly key: ReadonlyArray<string>
+    }
 
 /**
  * Определение внешнего источника (SPEC §9.3): таблица движка/ATTACH-базы
@@ -56,6 +67,9 @@ export const kind = {
     batchSize: options.batchSize ?? 30,
     lookback: options.lookback ?? 0,
   }),
+  incrementalByUniqueKey: (options: {
+    readonly key: ReadonlyArray<string>
+  }): ModelKind => ({ _tag: "incrementalByUniqueKey", key: options.key }),
 } as const
 
 export const external = {
@@ -162,10 +176,35 @@ export const defineModel = <const Fields extends Schema.Struct.Fields>(
       reason: "external-модель не имеет тела — используй defineExternal",
     })
   }
+  if (config.kind._tag === "seed") {
+    throw new ModelDefinitionError({
+      model: name.full,
+      reason: "seed-модель не имеет тела — используй defineSeed",
+    })
+  }
+  if (config.kind._tag === "incrementalByUniqueKey") {
+    for (const keyColumn of config.kind.key) {
+      if (!(keyColumn in config.schema.fields)) {
+        throw new ModelDefinitionError({
+          model: name.full,
+          reason: `ключевой колонки «${keyColumn}» нет в схеме модели`,
+        })
+      }
+    }
+    if (config.kind.key.length === 0) {
+      throw new ModelDefinitionError({ model: name.full, reason: "key не может быть пустым" })
+    }
+  }
   if (config.kind._tag === "view" && config.target === "parquet") {
     throw new ModelDefinitionError({
       model: name.full,
       reason: "view не материализуется — parquet-цель к нему неприменима",
+    })
+  }
+  if (config.kind._tag === "incrementalByUniqueKey" && config.target === "parquet") {
+    throw new ModelDefinitionError({
+      model: name.full,
+      reason: "upsert по ключу в parquet-файлы невозможен — используй target: \"table\"",
     })
   }
   if (config.kind._tag === "incrementalByTimeRange") {
@@ -259,3 +298,37 @@ export const defineExternal = <const Fields extends Schema.Struct.Fields>(
   deps: new Set(),
   refs: new Map(),
 })
+
+export interface SeedConfig<Fields extends Schema.Struct.Fields> {
+  readonly name: string
+  /** Путь к CSV/JSON-файлу; формат — по расширению или явно. */
+  readonly file: string
+  readonly format?: "csv" | "json"
+  readonly schema: Schema.Struct<Fields>
+  readonly description?: string
+  readonly audits?: ReadonlyArray<Audit>
+}
+
+/**
+ * Seed (SPEC §3.1): справочник из файла. В отличие от external, содержимое
+ * файла входит в fingerprint — правка данных = новая версия и пересборка;
+ * форма проверяется контрактом схемы при сборке.
+ */
+export const defineSeed = <const Fields extends Schema.Struct.Fields>(
+  config: SeedConfig<Fields>,
+): Model<Fields> => {
+  const format = config.format ?? (config.file.endsWith(".json") ? "json" : "csv")
+  return {
+    _tag: "Model",
+    name: parseModelName(config.name),
+    kind: { _tag: "seed", file: config.file, format },
+    schema: config.schema,
+    description: config.description,
+    grain: [],
+    target: "table",
+    audits: config.audits ?? [],
+    fragment: { _tag: "SqlFragment", nodes: [] },
+    deps: new Set(),
+    refs: new Map(),
+  }
+}
