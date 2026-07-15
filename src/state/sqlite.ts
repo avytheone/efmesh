@@ -118,6 +118,29 @@ export const SqliteStateLive = (
             return new Set(rows.map((r) => r.fingerprint))
           }),
 
+        listSnapshots: () =>
+          attempt("listSnapshots", () => {
+            return db
+              .query(
+                `SELECT name, fingerprint, rendered_sql AS renderedSql,
+                        canonical_ast AS canonicalAst, kind, created_at AS createdAt
+                 FROM snapshots ORDER BY name, created_at`,
+              )
+              .all() as ReadonlyArray<SnapshotRecord>
+          }),
+
+        deleteSnapshot: (name, fingerprint) =>
+          attempt("deleteSnapshot", () => {
+            const remove = db.transaction(() => {
+              db.query(`DELETE FROM snapshots WHERE name = ?1 AND fingerprint = ?2`).run(
+                name,
+                fingerprint,
+              )
+              db.query(`DELETE FROM intervals WHERE snapshot_fp = ?1`).run(fingerprint)
+            })
+            remove()
+          }),
+
         getEnvironment: (env) =>
           attempt("getEnvironment", () => {
             return db

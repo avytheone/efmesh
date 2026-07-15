@@ -54,8 +54,11 @@ export interface StateStoreShape {
     name: string,
     fingerprint: string,
   ) => Effect.Effect<SnapshotRecord | undefined, StateError>
-  /** Все снапшоты, на которые ссылается хоть одно окружение, — для janitor (F2). */
+  /** Все снапшоты, на которые ссылается хоть одно окружение, — для janitor. */
   readonly listReferencedFingerprints: () => Effect.Effect<ReadonlySet<string>, StateError>
+  readonly listSnapshots: () => Effect.Effect<ReadonlyArray<SnapshotRecord>, StateError>
+  /** Удаляет запись снапшота и его учёт интервалов (физику убирает janitor). */
+  readonly deleteSnapshot: (name: string, fingerprint: string) => Effect.Effect<void, StateError>
   readonly getEnvironment: (
     env: string,
   ) => Effect.Effect<ReadonlyArray<EnvironmentRecord>, StateError>

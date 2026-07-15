@@ -5,6 +5,7 @@ import type { EfmeshConfig } from "./config.ts"
 import { buildGraph } from "./core/graph.ts"
 import { Efmesh } from "./efmesh.ts"
 import { DuckDBEngineLive } from "./engine/duckdb.ts"
+import { janitor } from "./plan/janitor.ts"
 import { fp8 } from "./plan/naming.ts"
 import type { Plan } from "./plan/planner.ts"
 import { SqliteStateLive } from "./state/sqlite.ts"
@@ -120,6 +121,33 @@ const renderCommand = Command.make(
     }),
 ).pipe(Command.withDescription("Показать итоговый SQL модели"))
 
+const janitorCommand = Command.make(
+  "janitor",
+  {
+    config: configFlag,
+    ttl: Flag.string("ttl").pipe(
+      Flag.withDefault("7"),
+      Flag.withDescription("Сколько дней осиротевшая физика живёт до сноса"),
+    ),
+  },
+  ({ config, ttl }) =>
+    Effect.gen(function* () {
+      const loaded = yield* loadConfig(config)
+      const report = yield* janitor({
+        ttlDays: Number(ttl),
+        ...(loaded.lake !== undefined ? { lakePath: loaded.lake.path } : {}),
+      }).pipe(Effect.provide(configLayers(loaded)))
+      yield* Console.log(
+        report.removed.length > 0
+          ? `снесено: ${report.removed.join(", ")}`
+          : "осиротевшей физики старше ttl нет",
+      )
+      if (report.kept.length > 0) {
+        yield* Console.log(`осиротело, но моложе ttl: ${report.kept.join(", ")}`)
+      }
+    }),
+).pipe(Command.withDescription("Убрать физику, на которую не ссылается ни одно окружение"))
+
 const graphCommand = Command.make("graph", { config: configFlag }, ({ config }) =>
   Effect.gen(function* () {
     const loaded = yield* loadConfig(config)
@@ -134,5 +162,11 @@ const graphCommand = Command.make("graph", { config: configFlag }, ({ config }) 
 
 export const rootCommand = Command.make("efmesh").pipe(
   Command.withDescription("sqlmesh на bun, typescript и Effect"),
-  Command.withSubcommands([planCommand, applyCommand, renderCommand, graphCommand]),
+  Command.withSubcommands([
+    planCommand,
+    applyCommand,
+    renderCommand,
+    graphCommand,
+    janitorCommand,
+  ]),
 )
