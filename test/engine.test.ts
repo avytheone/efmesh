@@ -42,4 +42,37 @@ describe("DuckDBEngine", () => {
     expect(error._tag).toBe("EngineError")
     expect(error.sql).toContain("nope")
   })
+
+  test("canonicalize: переформатирование не меняет результат", async () => {
+    const [a, b] = await withEngine((engine) =>
+      Effect.all([
+        engine.canonicalize("select  a,b from t where x=1 and ts>=$start"),
+        engine.canonicalize('SELECT "a", "b"\nFROM "t"\nWHERE "x" = 1 AND "ts" >= $start'),
+      ]),
+    )
+    expect(a).toBe(b)
+  })
+
+  test("canonicalize: разные запросы различаются", async () => {
+    const [a, b] = await withEngine((engine) =>
+      Effect.all([
+        engine.canonicalize("SELECT a FROM t"),
+        engine.canonicalize("SELECT b FROM t"),
+      ]),
+    )
+    expect(a).not.toBe(b)
+  })
+
+  test("canonicalize: не-SELECT/битый текст — SqlParseError, не исключение", async () => {
+    const error = await withEngine((engine) => Effect.flip(engine.canonicalize("SELEC oops")))
+    expect(error._tag).toBe("SqlParseError")
+    expect(error.message).toContain("SELEC")
+  })
+
+  test("canonicalize переживает одинарные кавычки в литералах", async () => {
+    const canon = await withEngine((engine) =>
+      engine.canonicalize("SELECT 'o''hara' AS s FROM t"),
+    )
+    expect(canon).toContain("o'hara")
+  })
 })
