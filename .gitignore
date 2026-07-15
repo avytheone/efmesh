@@ -11,3 +11,6 @@ coverage
 *.sqlite-*
 .cache
 .DS_Store
+
+# артефакты примеров/озера
+examples/**/lake/

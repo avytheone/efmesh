@@ -1,26 +1,39 @@
 import { Schema } from "effect"
-import { defineModel, kind } from "../../src/index.ts"
+import { defineExternal, defineModel, external, kind } from "../../src/index.ts"
 
-/** Сырьё (в F1 станет external поверх parquet/ATTACH; в F0 — full на VALUES). */
+/** Сырьё: parquet-выгрузка из КИС (см. seed.ts). Не материализуется — читается напрямую. */
+export const rawMoves = defineExternal({
+  name: "raw.moves",
+  source: external.files("lake/raw/moves.parquet", "parquet"),
+  schema: Schema.Struct({
+    case_id: Schema.String,
+    dept: Schema.String,
+    moved_at: Schema.DateTimeUtc,
+  }),
+  description: "Движения пациентов по отделениям — выгрузка КИС",
+})
+
+/** Инкрементальная лента движений: пересчёт по дням, дозагрузка при каждом apply. */
 export const moves = defineModel(
   {
     name: "med.moves",
-    kind: kind.full(),
+    kind: kind.incrementalByTimeRange({
+      timeColumn: "moved_at",
+      start: "2026-01-01T00:00:00Z",
+      lookback: 1,
+    }),
     schema: Schema.Struct({
       case_id: Schema.String,
       dept: Schema.String,
-      moved_at: Schema.String,
+      moved_at: Schema.DateTimeUtc,
     }),
-    description: "Движения пациентов по отделениям",
+    grain: ["case_id", "moved_at"],
+    description: "Лента движений, очищенная и порезанная по дням",
   },
   (ctx) => ctx.sql`
-    SELECT * FROM (VALUES
-      ('c1', 'КПП',      '2026-01-01 10:00'),
-      ('c1', 'ОРИТ',     '2026-01-01 12:00'),
-      ('c1', 'терапия',  '2026-01-03 09:00'),
-      ('c2', 'КПП',      '2026-01-02 08:00'),
-      ('c2', 'хирургия', '2026-01-02 11:00')
-    ) AS t(case_id, dept, moved_at)
+    SELECT ${ctx.cols(rawMoves, "case_id", "dept", "moved_at")}
+    FROM ${ctx.ref(rawMoves)}
+    WHERE moved_at >= ${ctx.start} AND moved_at < ${ctx.end}
   `,
 )
 
@@ -31,8 +44,8 @@ export const stays = defineModel(
     schema: Schema.Struct({
       case_id: Schema.String,
       dept: Schema.String,
-      moved_at: Schema.String,
-      next_moved_at: Schema.String,
+      moved_at: Schema.DateTimeUtc,
+      next_moved_at: Schema.NullOr(Schema.DateTimeUtc),
     }),
     grain: ["case_id", "moved_at"],
     description: "Пребывания: движение + момент следующего движения",
@@ -57,5 +70,23 @@ export const deptLoad = defineModel(
     FROM ${ctx.ref(stays)}
     GROUP BY dept
     ORDER BY visits DESC
+  `,
+)
+
+/** Витрина в озеро: физика — parquet-файлы, view поверх read_parquet. */
+export const staysMart = defineModel(
+  {
+    name: "mart.stays",
+    kind: kind.full(),
+    target: "parquet",
+    schema: Schema.Struct({
+      case_id: Schema.String,
+      dept: Schema.String,
+      moved_at: Schema.DateTimeUtc,
+    }),
+    description: "Витрина пребываний для внешних потребителей озера",
+  },
+  (ctx) => ctx.sql`
+    SELECT ${ctx.cols(stays, "case_id", "dept", "moved_at")} FROM ${ctx.ref(stays)}
   `,
 )

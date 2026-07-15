@@ -46,14 +46,21 @@ const CHANGE_MARK: Record<string, string> = {
   unchanged: "·",
 }
 
+const formatRange = (range: { readonly start: number; readonly end: number }): string =>
+  `[${new Date(range.start).toISOString().slice(0, 10)} … ${new Date(range.end).toISOString().slice(0, 10)})`
+
 const printPlan = (plan: Plan) =>
   Effect.gen(function* () {
     yield* Console.log(`план для окружения «${plan.env}»:`)
     for (const action of plan.actions) {
       const mark = CHANGE_MARK[action.change] ?? "?"
       const build = action.build ? "  [сборка]" : ""
+      const backfill =
+        action.backfill.length > 0
+          ? `  бэкфилл ${action.backfill.map(formatRange).join(", ")}`
+          : ""
       yield* Console.log(
-        `  ${mark} ${action.name}  ${action.change} @${fp8(action.fingerprint)}${build}`,
+        `  ${mark} ${action.name}  ${action.change} @${fp8(action.fingerprint)}${build}${backfill}`,
       )
     }
     if (!plan.hasChanges) yield* Console.log("  изменений нет")
@@ -78,9 +85,9 @@ const applyCommand = Command.make(
   ({ config, env }) =>
     Effect.gen(function* () {
       const loaded = yield* loadConfig(config)
-      const applied = yield* Efmesh.apply(env, loaded.models).pipe(
-        Effect.provide(configLayers(loaded)),
-      )
+      const applied = yield* Efmesh.apply(env, loaded.models, {
+        ...(loaded.lake !== undefined ? { lakePath: loaded.lake.path } : {}),
+      }).pipe(Effect.provide(configLayers(loaded)))
       yield* printPlan(applied.plan)
       yield* Console.log(
         applied.built.length > 0
