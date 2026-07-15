@@ -16,6 +16,7 @@ export type SqlNode =
   | { readonly _tag: "Ref"; readonly modelName: string }
   | { readonly _tag: "Idents"; readonly names: ReadonlyArray<string> }
   | { readonly _tag: "Bound"; readonly which: "start" | "end" }
+  | { readonly _tag: "Self" }
 
 /** Ссылка на модель, полученная из `ctx.ref(model)`. */
 export interface RefValue {
@@ -35,10 +36,21 @@ export interface BoundValue {
   readonly which: "start" | "end"
 }
 
+/** Результат самой модели в запросе аудита — `ctx.self` (SPEC §8). */
+export interface SelfValue {
+  readonly _tag: "SelfValue"
+}
+
 /** Скалярные значения инлайнятся как SQL-литералы (детерминированно). */
 export type SqlLiteral = string | number | boolean | bigint | null
 
-export type Interpolation = SqlFragment | RefValue | IdentsValue | BoundValue | SqlLiteral
+export type Interpolation =
+  | SqlFragment
+  | RefValue
+  | IdentsValue
+  | BoundValue
+  | SelfValue
+  | SqlLiteral
 
 const isSqlFragment = (v: unknown): v is SqlFragment =>
   typeof v === "object" && v !== null && (v as any)._tag === "SqlFragment"
@@ -51,6 +63,9 @@ const isIdentsValue = (v: unknown): v is IdentsValue =>
 
 const isBoundValue = (v: unknown): v is BoundValue =>
   typeof v === "object" && v !== null && (v as any)._tag === "BoundValue"
+
+const isSelfValue = (v: unknown): v is SelfValue =>
+  typeof v === "object" && v !== null && (v as any)._tag === "SelfValue"
 
 export const quoteIdent = (name: string): string => `"${name.replaceAll(`"`, `""`)}"`
 
@@ -99,6 +114,8 @@ export const sql = (
       nodes.push({ _tag: "Idents", names: value.names })
     } else if (isBoundValue(value)) {
       nodes.push({ _tag: "Bound", which: value.which })
+    } else if (isSelfValue(value)) {
+      nodes.push({ _tag: "Self" })
     } else {
       pushText(escapeLiteral(value))
     }
@@ -116,6 +133,8 @@ export interface RenderOptions {
    * не зависит от конкретных дат и fingerprint стабилен (SPEC §3, §4).
    */
   readonly interval?: { readonly start: string; readonly end: string }
+  /** Во что рендерится `ctx.self` в запросе аудита (физика или подзапрос интервала). */
+  readonly self?: string
 }
 
 export const render = (fragment: SqlFragment, options: RenderOptions): string => {
@@ -133,6 +152,10 @@ export const render = (fragment: SqlFragment, options: RenderOptions): string =>
         break
       case "Bound":
         out += options.interval === undefined ? `$${node.which}` : options.interval[node.which]
+        break
+      case "Self":
+        if (options.self === undefined) throw new Error("рендер ctx.self без options.self")
+        out += options.self
         break
     }
   }

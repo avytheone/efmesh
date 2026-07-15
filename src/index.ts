@@ -1,3 +1,4 @@
+export * from "./core/audit.ts"
 export * from "./core/errors.ts"
 export * from "./efmesh.ts"
 export * from "./core/graph.ts"

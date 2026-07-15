@@ -1,4 +1,5 @@
 import type { Schema } from "effect"
+import type { Audit } from "./audit.ts"
 import type { IntervalUnit } from "./interval.ts"
 import { ModelDefinitionError } from "./errors.ts"
 import type { BoundValue, IdentsValue, RefValue, SqlFragment } from "./sql.ts"
@@ -101,6 +102,8 @@ export interface ModelConfig<Fields extends Schema.Struct.Fields> {
   readonly grain?: ReadonlyArray<Extract<keyof Fields, string>>
   /** Цель материализации; по умолчанию — таблица движка. */
   readonly target?: MaterializationTarget
+  /** Аудиты качества (SPEC §8); в fingerprint не входят. */
+  readonly audits?: ReadonlyArray<Audit>
 }
 
 /** Контекст рендера тела модели. Тело обязано быть чистым: всё изменчивое приходит отсюда. */
@@ -128,6 +131,7 @@ export interface Model<Fields extends Schema.Struct.Fields = Schema.Struct.Field
   readonly description: string | undefined
   readonly grain: ReadonlyArray<string>
   readonly target: MaterializationTarget
+  readonly audits: ReadonlyArray<Audit>
   /** Тело, отрендеренное в фрагмент один раз при определении. */
   readonly fragment: SqlFragment
   /** Имена моделей, на которые тело ссылается через `ctx.ref`. */
@@ -214,6 +218,7 @@ export const defineModel = <const Fields extends Schema.Struct.Fields>(
     description: config.description,
     grain: config.grain ?? [],
     target: config.target ?? "table",
+    audits: config.audits ?? [],
     fragment,
     deps,
   }
@@ -242,6 +247,7 @@ export const defineExternal = <const Fields extends Schema.Struct.Fields>(
   description: config.description,
   grain: [],
   target: "table", // не материализуется — поле не используется
+  audits: [],
   fragment: { _tag: "SqlFragment", nodes: [] },
   deps: new Set(),
 })

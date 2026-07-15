@@ -1,5 +1,6 @@
 import { mkdirSync } from "node:fs"
 import { Data, Effect } from "effect"
+import { AuditFailure } from "../core/audit.ts"
 import type { GraphError, ModelGraph } from "../core/graph.ts"
 import type { Interval } from "../core/interval.ts"
 import { intervalsWithin, splitIntoBatches, sqlTimestamp, toIso } from "../core/interval.ts"
@@ -40,6 +41,7 @@ export type ApplyError =
   | SqlParseError
   | SchemaMismatchError
   | LakeNotConfiguredError
+  | AuditFailure
   | InvalidEnvironmentError
 
 export interface ApplyOptions {
@@ -65,6 +67,35 @@ const ensureDir = (path: string): Effect.Effect<void> =>
     : Effect.sync(() => mkdirSync(path, { recursive: true }))
 
 /**
+ * Прогон аудитов модели (SPEC §8): `self` — физика снапшота или подзапрос
+ * только что загруженного интервала. Запрос аудита возвращает нарушения:
+ * blocking → AuditFailure, warn → лог и дальше.
+ */
+const runAudits = (
+  engine: Engine,
+  model: AnyModel,
+  self: string,
+): Effect.Effect<void, EngineError | AuditFailure> =>
+  Effect.gen(function* () {
+    for (const auditDef of model.audits) {
+      const violations = yield* engine.query(
+        render(auditDef.fragment, { resolveRef: (ref) => ref, self }),
+      )
+      if (violations.length === 0) continue
+      if (auditDef.blocking) {
+        return yield* new AuditFailure({
+          model: model.name.full,
+          audit: auditDef.name,
+          violations: violations.length,
+        })
+      }
+      yield* Effect.logWarning(
+        `аудит ${auditDef.name} модели ${model.name.full}: ${violations.length} нарушений (warn)`,
+      )
+    }
+  })
+
+/**
  * Бэкфилл incrementalByTimeRange в таблицу (SPEC §5.3): каждый диапазон
  * плана режется на батчи ≤ batchSize; батч — транзакция DELETE-диапазона +
  * INSERT, после успеха его интервалы помечаются done. Упавший батч
@@ -78,7 +109,7 @@ const backfillIntoTable = (
   action: PlanAction,
   target: string,
   resolveRef: (ref: string) => string,
-): Effect.Effect<void, EngineError | StateError> =>
+): Effect.Effect<void, EngineError | StateError | AuditFailure> =>
   Effect.gen(function* () {
     if (model.kind._tag !== "incrementalByTimeRange") return
     const kind = model.kind
@@ -91,14 +122,18 @@ const backfillIntoTable = (
         const start = sqlTimestamp(batch.start)
         const end = sqlTimestamp(batch.end)
         const body = render(model.fragment, { resolveRef, interval: { start, end } })
+        const markFailed = () =>
+          store.markIntervals(action.fingerprint, marks, "failed").pipe(Effect.ignore)
         yield* transactional(engine, [
           `DELETE FROM ${target} WHERE ${quoteIdent(kind.timeColumn)} >= ${start} AND ${quoteIdent(kind.timeColumn)} < ${end}`,
           `INSERT INTO ${target} ${body}`,
-        ]).pipe(
-          Effect.tapError(() =>
-            store.markIntervals(action.fingerprint, marks, "failed").pipe(Effect.ignore),
-          ),
-        )
+        ]).pipe(Effect.tapError(markFailed))
+        // аудит свежезагруженного интервала — до отметки done (SPEC §8)
+        yield* runAudits(
+          engine,
+          model,
+          `(SELECT * FROM ${target} WHERE ${quoteIdent(kind.timeColumn)} >= ${start} AND ${quoteIdent(kind.timeColumn)} < ${end})`,
+        ).pipe(Effect.tapError(markFailed))
         yield* store.markIntervals(action.fingerprint, marks, "done")
       }
     }
@@ -116,7 +151,7 @@ const backfillIntoParquet = (
   action: PlanAction,
   prefix: string,
   resolveRef: (ref: string) => string,
-): Effect.Effect<void, EngineError | StateError> =>
+): Effect.Effect<void, EngineError | StateError | AuditFailure> =>
   Effect.gen(function* () {
     if (model.kind._tag !== "incrementalByTimeRange") return
     const kind = model.kind
@@ -129,15 +164,16 @@ const backfillIntoParquet = (
           interval: { start: sqlTimestamp(interval.start), end: sqlTimestamp(interval.end) },
         })
         const mark = [{ startTs: toIso(interval.start), endTs: toIso(interval.end) }]
+        const markFailed = () =>
+          store.markIntervals(action.fingerprint, mark, "failed").pipe(Effect.ignore)
+        const file = `${partition.replaceAll(`'`, `''`)}/data.parquet`
         yield* engine
-          .execute(
-            `COPY (${body}) TO '${partition.replaceAll(`'`, `''`)}/data.parquet' (FORMAT PARQUET)`,
-          )
-          .pipe(
-            Effect.tapError(() =>
-              store.markIntervals(action.fingerprint, mark, "failed").pipe(Effect.ignore),
-            ),
-          )
+          .execute(`COPY (${body}) TO '${file}' (FORMAT PARQUET)`)
+          .pipe(Effect.tapError(markFailed))
+        // аудит записанной партиции — до отметки done; провал = не done → перезапись
+        yield* runAudits(engine, model, `(SELECT * FROM read_parquet('${file}'))`).pipe(
+          Effect.tapError(markFailed),
+        )
         yield* store.markIntervals(action.fingerprint, mark, "done")
       }
     }
@@ -215,6 +251,8 @@ export const applyPlan = (
                 : `CREATE OR REPLACE TABLE ${target} AS ${body}`
             yield* engine.execute(ddl)
           }
+          // аудиты собранного снапшота — до промоушена (SPEC §8)
+          yield* runAudits(engine, model, physicalFor(model, action.fingerprint))
           yield* store.upsertSnapshot({
             name: action.name,
             fingerprint: action.fingerprint,
