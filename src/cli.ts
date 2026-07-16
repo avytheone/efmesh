@@ -194,7 +194,7 @@ const initCommand = Command.make(
     Effect.gen(function* () {
       const created = yield* scaffold(dir)
       for (const file of created) yield* Console.log(`создан ${file}`)
-      yield* Console.log("дальше: bun efmesh plan dev && bun efmesh apply dev")
+      yield* Console.log("дальше: bunx efmesh plan dev && bunx efmesh apply dev")
     }),
 ).pipe(Command.withDescription("Скаффолд проекта: конфиг, модели-пример, seed"))
 
