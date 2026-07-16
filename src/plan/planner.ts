@@ -197,7 +197,9 @@ export const planChanges = (
         change,
         build: !alreadyBuilt,
         backfill,
-        refresh: model.kind._tag === "incrementalByUniqueKey",
+        // каждый apply сверяет запрос с физикой: upsert / SCD-версионирование
+        refresh:
+          model.kind._tag === "incrementalByUniqueKey" || model.kind._tag === "scdType2",
       })
     }
     for (const [name, fingerprint] of current) {

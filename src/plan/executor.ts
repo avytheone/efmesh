@@ -1,11 +1,11 @@
 import { mkdirSync } from "node:fs"
-import { Data, Effect } from "effect"
+import { Clock, Data, Effect } from "effect"
 import { AuditFailure } from "../core/audit.ts"
 import type { SeedReadError } from "../core/errors.ts"
 import type { GraphError, ModelGraph } from "../core/graph.ts"
 import type { Interval } from "../core/interval.ts"
 import { intervalsWithin, splitIntoBatches, sqlTimestamp, toIso } from "../core/interval.ts"
-import type { AnyModel } from "../core/model.ts"
+import { columnNames, type AnyModel } from "../core/model.ts"
 import { quoteIdent, render } from "../core/sql.ts"
 import { EngineAdapter } from "../engine/adapter.ts"
 import type { Engine, EngineError, SqlParseError } from "../engine/adapter.ts"
@@ -22,6 +22,7 @@ import {
   parquetRef,
   physicalRef,
   physicalSchema,
+  physicalTable,
   viewRef,
 } from "./naming.ts"
 import type { ForwardOnlyError, InvalidEnvironmentError, Plan, PlanAction } from "./planner.ts"
@@ -51,6 +52,8 @@ export type ApplyError =
   | ForwardOnlyError
 
 export interface ApplyOptions {
+  /** «Сейчас» для scdType2-версионирования; по умолчанию — Clock. Инъекция для тестов. */
+  readonly now?: number
   /** Корень parquet-озера — локальная директория или s3://… (httpfs). */
   readonly lakePath?: string
   /** ATTACH-базы по алиасам (SPEC §9.3) — для export-моделей. */
@@ -249,6 +252,7 @@ export const applyPlan = (
     const engine = yield* EngineAdapter
     const store = yield* StateStore
     const lakePath = options?.lakePath
+    const nowMs = options?.now ?? (yield* Clock.currentTimeMillis)
 
     // физика модели — то, что увидят её потребители и view окружения;
     // ключ — physicalFingerprint: при forward-only это физика старой версии
@@ -335,6 +339,56 @@ export const applyPlan = (
           yield* transactional(engine, [
             `DELETE FROM ${target} WHERE (${keys}) IN (SELECT ${keys} FROM (${body}) q)`,
             `INSERT INTO ${target} ${body}`,
+          ])
+          yield* runAudits(engine, model, target)
+          yield* store.upsertSnapshot({
+            name: action.name,
+            fingerprint: action.fingerprint,
+            physicalFp: action.physicalFingerprint,
+            canonicalAst: action.canonicalAst ?? "",
+            renderedSql: render(model.fragment, { resolveRef: (ref) => ref }),
+            kind: model.kind._tag,
+          })
+          break
+        }
+        case "scdType2": {
+          const scd = model.kind
+          const body = render(model.fragment, { resolveRef })
+          const managed = new Set([scd.validFrom, scd.validTo])
+          yield* checkContract(engine, model, body, managed)
+          const target = physicalRef(model.name, action.physicalFingerprint)
+          const from = quoteIdent(scd.validFrom)
+          const to = quoteIdent(scd.validTo)
+          yield* engine.execute(
+            `CREATE TABLE IF NOT EXISTS ${target} AS
+             SELECT q.*, CAST(NULL AS TIMESTAMP) AS ${from}, CAST(NULL AS TIMESTAMP) AS ${to}
+             FROM (${body}) q LIMIT 0`,
+          )
+          const cols = columnNames(model)
+            .filter((column) => !managed.has(column))
+            .map(quoteIdent)
+          const tableName = quoteIdent(physicalTable(model.name, action.physicalFingerprint))
+          const ts = sqlTimestamp(nowMs)
+          const sameAsOuter = cols
+            .map((column) => `q.${column} IS NOT DISTINCT FROM ${tableName}.${column}`)
+            .join(" AND ")
+          const sameAsOpen = cols
+            .map((column) => `t.${column} IS NOT DISTINCT FROM q.${column}`)
+            .join(" AND ")
+          // SCD2-сверка (SPEC §3.1): открытая строка без идентичной строки в
+          // запросе закрывается (изменилась или исчезла); строка запроса без
+          // идентичной открытой строки вставляется новой открытой версией.
+          // Идентичные пары не трогаются — их valid_from не дрожит.
+          yield* transactional(engine, [
+            `UPDATE ${target} SET ${to} = ${ts}
+             WHERE ${to} IS NULL
+               AND NOT EXISTS (SELECT 1 FROM (${body}) q WHERE ${sameAsOuter})`,
+            `INSERT INTO ${target} (${cols.join(", ")}, ${from}, ${to})
+             SELECT ${cols.map((column) => `q.${column}`).join(", ")}, ${ts}, NULL
+             FROM (${body}) q
+             WHERE NOT EXISTS (
+               SELECT 1 FROM ${target} t WHERE t.${to} IS NULL AND ${sameAsOpen}
+             )`,
           ])
           yield* runAudits(engine, model, target)
           yield* store.upsertSnapshot({

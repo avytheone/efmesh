@@ -71,18 +71,22 @@ const familyOfEngineType = (engineType: string): TypeFamily => {
 /**
  * Сверяет объявленную схему модели с фактическим результатом запроса.
  * `renderedSql` — исполнимый рендер тела (ссылки уже в физике/источниках).
+ * `managed` — колонки, которые efmesh ведёт сам (scdType2: valid_from/
+ * valid_to): в схеме объявлены — потребители их видят, — но запрос
+ * их не возвращает.
  */
 export const checkContract = (
   engine: Engine,
   model: AnyModel,
   renderedSql: string,
+  managed?: ReadonlySet<string>,
 ): Effect.Effect<void, EngineError | SchemaMismatchError> =>
   Effect.gen(function* () {
     const actual = yield* engine.describe(renderedSql)
     const actualByName = new Map(actual.map((column) => [column.name, column.type]))
-    const declared = Object.entries(model.schema.fields) as ReadonlyArray<
-      [string, { readonly ast: unknown }]
-    >
+    const declared = (
+      Object.entries(model.schema.fields) as ReadonlyArray<[string, { readonly ast: unknown }]>
+    ).filter(([name]) => !(managed?.has(name) ?? false))
 
     const problems: Array<string> = []
     for (const [name, field] of declared) {

@@ -38,6 +38,19 @@ export type ModelKind =
       /** Логический ключ upsert'а; каждый apply перегоняет запрос и заменяет строки по ключу. */
       readonly key: ReadonlyArray<string>
     }
+  | {
+      /**
+       * Медленно меняющееся измерение, тип 2 (SPEC §3.1): история версий
+       * строк. Каждый apply сверяет запрос с открытыми строками: изменившиеся
+       * и исчезнувшие закрываются (validTo = сейчас), новые версии
+       * вставляются открытыми (validTo IS NULL).
+       */
+      readonly _tag: "scdType2"
+      readonly key: ReadonlyArray<string>
+      /** Колонки версионирования — ведёт efmesh: в схеме объявлены, в запросе отсутствуют. */
+      readonly validFrom: string
+      readonly validTo: string
+    }
 
 /**
  * Определение внешнего источника (SPEC §9.3): таблица движка/ATTACH-базы
@@ -75,6 +88,16 @@ export const kind = {
   incrementalByUniqueKey: (options: {
     readonly key: ReadonlyArray<string>
   }): ModelKind => ({ _tag: "incrementalByUniqueKey", key: options.key }),
+  scdType2: (options: {
+    readonly key: ReadonlyArray<string>
+    readonly validFrom?: string
+    readonly validTo?: string
+  }): ModelKind => ({
+    _tag: "scdType2",
+    key: options.key,
+    validFrom: options.validFrom ?? "valid_from",
+    validTo: options.validTo ?? "valid_to",
+  }),
 } as const
 
 export const external = {
@@ -193,7 +216,7 @@ export const defineModel = <const Fields extends Schema.Struct.Fields>(
       reason: "seed-модель не имеет тела — используй defineSeed",
     })
   }
-  if (config.kind._tag === "incrementalByUniqueKey") {
+  if (config.kind._tag === "incrementalByUniqueKey" || config.kind._tag === "scdType2") {
     for (const keyColumn of config.kind.key) {
       if (!(keyColumn in config.schema.fields)) {
         throw new ModelDefinitionError({
@@ -204,6 +227,35 @@ export const defineModel = <const Fields extends Schema.Struct.Fields>(
     }
     if (config.kind.key.length === 0) {
       throw new ModelDefinitionError({ model: name.full, reason: "key не может быть пустым" })
+    }
+  }
+  if (config.kind._tag === "scdType2") {
+    const { validFrom, validTo } = config.kind
+    if (validFrom === validTo) {
+      throw new ModelDefinitionError({
+        model: name.full,
+        reason: "validFrom и validTo не могут совпадать",
+      })
+    }
+    for (const column of [validFrom, validTo]) {
+      if (!(column in config.schema.fields)) {
+        throw new ModelDefinitionError({
+          model: name.full,
+          reason: `колонки версионирования «${column}» нет в схеме модели — потребители должны её видеть`,
+        })
+      }
+      if (config.kind.key.includes(column)) {
+        throw new ModelDefinitionError({
+          model: name.full,
+          reason: `колонка версионирования «${column}» не может входить в key`,
+        })
+      }
+    }
+    if (config.target === "parquet") {
+      throw new ModelDefinitionError({
+        model: name.full,
+        reason: "scdType2 закрывает строки на месте — parquet-цель неприменима",
+      })
     }
   }
   if (

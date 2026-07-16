@@ -49,6 +49,13 @@ const kindPayload = (
       })
     case "incrementalByUniqueKey":
       return Effect.succeed({ _tag: kind._tag, key: kind.key })
+    case "scdType2":
+      return Effect.succeed({
+        _tag: kind._tag,
+        key: kind.key,
+        validFrom: kind.validFrom,
+        validTo: kind.validTo,
+      })
     case "external":
       return Effect.succeed({ _tag: kind._tag, source: kind.source })
     case "seed":
