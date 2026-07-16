@@ -162,6 +162,31 @@ export const render = (fragment: SqlFragment, options: RenderOptions): string =>
   return out
 }
 
+/**
+ * Парсер сырого SQL-текста (SPEC §14.1): `@ref(схема.таблица)` — ссылка
+ * на модель, `@start`/`@end` — границы интервала. Всё остальное — текст
+ * как есть. Для миграции существующих dbt/sqlmesh-проектов: типизация
+ * ссылок теряется, зависимости объявляются рядом (defineSqlModel.refs).
+ */
+export const parseSqlText = (text: string): SqlFragment => {
+  const nodes: Array<SqlNode> = []
+  const pattern = /@ref\(\s*([^)\s]+)\s*\)|@start\b|@end\b/g
+  let cursor = 0
+  for (const match of text.matchAll(pattern)) {
+    const before = text.slice(cursor, match.index)
+    if (before !== "") nodes.push({ _tag: "Text", text: before })
+    if (match[0].startsWith("@ref")) {
+      nodes.push({ _tag: "Ref", modelName: match[1]! })
+    } else {
+      nodes.push({ _tag: "Bound", which: match[0] === "@start" ? "start" : "end" })
+    }
+    cursor = match.index + match[0].length
+  }
+  const tail = text.slice(cursor)
+  if (tail !== "") nodes.push({ _tag: "Text", text: tail })
+  return { _tag: "SqlFragment", nodes }
+}
+
 export const collectRefs = (fragment: SqlFragment): ReadonlySet<string> => {
   const refs = new Set<string>()
   for (const node of fragment.nodes) {

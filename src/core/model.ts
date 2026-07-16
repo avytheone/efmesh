@@ -1,9 +1,10 @@
+import { readFileSync } from "node:fs"
 import type { Schema } from "effect"
 import type { Audit } from "./audit.ts"
 import type { IntervalUnit } from "./interval.ts"
 import { ModelDefinitionError } from "./errors.ts"
 import type { BoundValue, IdentsValue, RefValue, SqlFragment } from "./sql.ts"
-import { collectRefs, sql, usesBounds } from "./sql.ts"
+import { collectRefs, parseSqlText, sql, usesBounds } from "./sql.ts"
 
 /** Вид материализации (SPEC §3.1). */
 export type ModelKind =
@@ -194,16 +195,11 @@ export type AnyModel = Model<any>
 export const columnNames = (model: AnyModel): ReadonlyArray<string> =>
   Object.keys(model.schema.fields)
 
-/**
- * Определяет модель. Вызывается на верхнем уровне модуля; тело выполняется
- * ровно один раз — сразу, поэтому ссылки (`ctx.ref`) известны статически
- * и DAG строится без парсинга SQL.
- */
-export const defineModel = <const Fields extends Schema.Struct.Fields>(
+/** Общие проверки конфигурации вида модели — для defineModel и defineSqlModel. */
+const validateKindConfig = <Fields extends Schema.Struct.Fields>(
+  name: ModelName,
   config: ModelConfig<Fields>,
-  body: (ctx: ModelCtx) => SqlFragment,
-): Model<Fields> => {
-  const name = parseModelName(config.name)
+): void => {
   if (config.kind._tag === "external") {
     throw new ModelDefinitionError({
       model: name.full,
@@ -287,30 +283,15 @@ export const defineModel = <const Fields extends Schema.Struct.Fields>(
       })
     }
   }
-  const refs = new Map<string, AnyModel>()
-  const ctx: ModelCtx = {
-    sql,
-    ref: (model) => {
-      refs.set(model.name.full, model)
-      return { _tag: "RefValue", modelName: model.name.full }
-    },
-    cols: (model, ...names) => {
-      const known = new Set(Object.keys(model.schema.fields))
-      for (const column of names) {
-        if (!known.has(column)) {
-          // недостижимо при честной типизации; защита от `as any`
-          throw new ModelDefinitionError({
-            model: config.name,
-            reason: `колонки «${column}» нет в схеме модели ${model.name.full}`,
-          })
-        }
-      }
-      return { _tag: "IdentsValue", names }
-    },
-    start: { _tag: "BoundValue", which: "start" },
-    end: { _tag: "BoundValue", which: "end" },
-  }
-  const fragment = body(ctx)
+}
+
+/** Финальная сборка модели из фрагмента — общие инварианты тела. */
+const assembleModel = <Fields extends Schema.Struct.Fields>(
+  name: ModelName,
+  config: ModelConfig<Fields>,
+  fragment: SqlFragment,
+  refs: ReadonlyMap<string, AnyModel>,
+): Model<Fields> => {
   if (usesBounds(fragment) && config.kind._tag !== "incrementalByTimeRange") {
     throw new ModelDefinitionError({
       model: name.full,
@@ -335,6 +316,96 @@ export const defineModel = <const Fields extends Schema.Struct.Fields>(
     refs,
     ...(config.export !== undefined ? { export: config.export } : {}),
   }
+}
+
+/**
+ * Определяет модель. Вызывается на верхнем уровне модуля; тело выполняется
+ * ровно один раз — сразу, поэтому ссылки (`ctx.ref`) известны статически
+ * и DAG строится без парсинга SQL.
+ */
+export const defineModel = <const Fields extends Schema.Struct.Fields>(
+  config: ModelConfig<Fields>,
+  body: (ctx: ModelCtx) => SqlFragment,
+): Model<Fields> => {
+  const name = parseModelName(config.name)
+  validateKindConfig(name, config)
+  const refs = new Map<string, AnyModel>()
+  const ctx: ModelCtx = {
+    sql,
+    ref: (model) => {
+      refs.set(model.name.full, model)
+      return { _tag: "RefValue", modelName: model.name.full }
+    },
+    cols: (model, ...names) => {
+      const known = new Set(Object.keys(model.schema.fields))
+      for (const column of names) {
+        if (!known.has(column)) {
+          // недостижимо при честной типизации; защита от `as any`
+          throw new ModelDefinitionError({
+            model: config.name,
+            reason: `колонки «${column}» нет в схеме модели ${model.name.full}`,
+          })
+        }
+      }
+      return { _tag: "IdentsValue", names }
+    },
+    start: { _tag: "BoundValue", which: "start" },
+    end: { _tag: "BoundValue", which: "end" },
+  }
+  return assembleModel(name, config, body(ctx), refs)
+}
+
+export interface SqlModelConfig<Fields extends Schema.Struct.Fields>
+  extends ModelConfig<Fields> {
+  /** Путь к .sql-файлу тела: `@ref(схема.таблица)`, `@start`, `@end`. */
+  readonly file: string
+  /**
+   * Модели, на которые SQL-текст ссылается через `@ref` — значениями,
+   * чтобы DAG и testModel работали как у обычных моделей.
+   */
+  readonly refs?: ReadonlyArray<AnyModel>
+}
+
+/**
+ * Модель из сырого .sql-файла (SPEC §14.1) — для миграции существующих
+ * dbt/sqlmesh-проектов. Типизация ссылок теряется (это честная цена):
+ * каждая `@ref` в тексте обязана быть объявлена в `refs`, лишние
+ * объявления — ошибка.
+ */
+export const defineSqlModel = <const Fields extends Schema.Struct.Fields>(
+  config: SqlModelConfig<Fields>,
+): Model<Fields> => {
+  const name = parseModelName(config.name)
+  validateKindConfig(name, config)
+  let text: string
+  try {
+    text = readFileSync(config.file, "utf8")
+  } catch (cause) {
+    throw new ModelDefinitionError({
+      model: name.full,
+      reason: `не удалось прочитать ${config.file}: ${String(cause)}`,
+    })
+  }
+  const fragment = parseSqlText(text)
+  const declared = new Map((config.refs ?? []).map((model) => [model.name.full, model]))
+  const used = collectRefs(fragment)
+  for (const ref of used) {
+    if (!declared.has(ref)) {
+      throw new ModelDefinitionError({
+        model: name.full,
+        reason: `@ref(${ref}) в ${config.file} не объявлен в refs`,
+      })
+    }
+  }
+  for (const declaredName of declared.keys()) {
+    if (!used.has(declaredName)) {
+      throw new ModelDefinitionError({
+        model: name.full,
+        reason: `модель ${declaredName} объявлена в refs, но @ref в ${config.file} её не использует`,
+      })
+    }
+  }
+  return assembleModel(name, config, fragment, declared)
 }
 
 export interface ExternalConfig<Fields extends Schema.Struct.Fields> {
