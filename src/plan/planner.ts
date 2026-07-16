@@ -132,7 +132,12 @@ export const planChanges = (
         })
       }
     }
-    const versions = yield* fingerprintGraph(graph)
+    // кэш канонизации (#8) — стор под рукой; его сбои глотаются:
+    // промах кэша — это просто честный пересчёт, а не ошибка плана
+    const versions = yield* fingerprintGraph(graph, {
+      get: (key) => store.getCanon(key).pipe(Effect.orElseSucceed(() => undefined)),
+      put: (key, canonical) => store.putCanon(key, canonical).pipe(Effect.ignore),
+    })
     const current = new Map(
       (yield* store.getEnvironment(env)).map((row) => [row.name, row.fingerprint]),
     )

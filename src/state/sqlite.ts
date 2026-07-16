@@ -55,6 +55,10 @@ CREATE TABLE IF NOT EXISTS runs (
   outcome     TEXT NOT NULL,
   detail      TEXT NOT NULL DEFAULT ''
 );
+CREATE TABLE IF NOT EXISTS canon_cache (
+  key       TEXT PRIMARY KEY,
+  canonical TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS locks (
   name        TEXT PRIMARY KEY,
   acquired_at TEXT NOT NULL,
@@ -349,6 +353,22 @@ export const SqliteStateLive = (
                  FROM plans WHERE env = ?1 ORDER BY id`,
               )
               .all(env) as ReadonlyArray<PlanRecord>
+          }),
+
+        getCanon: (key) =>
+          attempt("getCanon", () => {
+            const row = db
+              .query(`SELECT canonical FROM canon_cache WHERE key = ?1`)
+              .get(key) as { canonical: string } | null
+            return row?.canonical ?? undefined
+          }),
+
+        putCanon: (key, canonical) =>
+          attempt("putCanon", () => {
+            db.query(
+              `INSERT INTO canon_cache (key, canonical) VALUES (?1, ?2)
+               ON CONFLICT (key) DO NOTHING`,
+            ).run(key, canonical)
           }),
 
         recordRun: (record) =>

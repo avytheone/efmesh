@@ -15,6 +15,10 @@ the first version gathers them in full.
   unsuccessful ones (#2).
 - `--json` on `plan`, `audit` and `status`: a stable machine-readable shape
   for CI and bots; exit codes unchanged (#3).
+- Canonicalization cache in the state store (schema v5): a no-op plan on
+  2000 models drops from ~0.6 s to ~50 ms; the cache key includes the
+  dialect and `FINGERPRINT_VERSION`, so canon drift can never be masked (#8).
+- Integration test: stale lock reclaim under a real `kill -9` (#7).
 
 ## [0.1.0-beta.2] — 2026-07-16
 

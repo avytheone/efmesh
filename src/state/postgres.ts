@@ -63,6 +63,10 @@ CREATE TABLE IF NOT EXISTS efmesh_state.runs (
   outcome     TEXT NOT NULL,
   detail      TEXT NOT NULL DEFAULT ''
 );
+CREATE TABLE IF NOT EXISTS efmesh_state.canon_cache (
+  key       TEXT PRIMARY KEY,
+  canonical TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS efmesh_state.locks (
   name        TEXT PRIMARY KEY,
   acquired_at TEXT NOT NULL,
@@ -338,6 +342,24 @@ export const PostgresStateLive = (
                FROM efmesh_state.plans WHERE env = $1 ORDER BY id`,
               [env],
             )) as ReadonlyArray<PlanRecord>
+          }),
+
+        getCanon: (key) =>
+          attempt("getCanon", async () => {
+            const rows = (await sql.unsafe(
+              `SELECT canonical FROM efmesh_state.canon_cache WHERE key = $1`,
+              [key],
+            )) as ReadonlyArray<{ canonical: string }>
+            return rows[0]?.canonical
+          }),
+
+        putCanon: (key, canonical) =>
+          attempt("putCanon", async () => {
+            await sql.unsafe(
+              `INSERT INTO efmesh_state.canon_cache (key, canonical) VALUES ($1, $2)
+               ON CONFLICT (key) DO NOTHING`,
+              [key, canonical],
+            )
           }),
 
         recordRun: (record) =>

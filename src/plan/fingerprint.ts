@@ -89,9 +89,24 @@ export interface ModelVersion {
   readonly ast: string | null
 }
 
+/**
+ * Кэш канонизации (#8): повторный plan почти целиком состоит из
+ * json_serialize_sql-раундтрипов по неизменённым моделям. Кэш — не
+ * данные: get/put обязаны быть безошибочными (промах/сбой = пересчёт).
+ */
+export interface CanonCache {
+  readonly get: (key: string) => Effect.Effect<string | undefined>
+  readonly put: (key: string, canonical: string) => Effect.Effect<void>
+}
+
+/** Ключ кэша: версия алгоритма + диалект + исходник — апгрейд канона не маскируется. */
+export const canonCacheKey = (dialect: string, source: string): string =>
+  sha256(`${FINGERPRINT_VERSION}:${dialect}:${source}`)
+
 /** Fingerprint всех моделей графа; транзитивность — через хэши родителей. */
 export const fingerprintGraph = (
   graph: ModelGraph,
+  cache?: CanonCache,
 ): Effect.Effect<
   ReadonlyMap<string, ModelVersion>,
   EngineError | SqlParseError | SeedReadError,
@@ -99,6 +114,16 @@ export const fingerprintGraph = (
 > =>
   Effect.gen(function* () {
     const engine = yield* EngineAdapter
+    const canonicalize = (source: string): Effect.Effect<string, EngineError | SqlParseError> =>
+      Effect.gen(function* () {
+        if (cache === undefined) return yield* engine.canonicalize(source)
+        const key = canonCacheKey(engine.dialect, source)
+        const hit = yield* cache.get(key)
+        if (hit !== undefined) return hit
+        const canon = yield* engine.canonicalize(source)
+        yield* cache.put(key, canon)
+        return canon
+      })
     const versions = new Map<string, ModelVersion>()
     for (const name of graph.order) {
       const model = graph.models.get(name)!
@@ -106,7 +131,7 @@ export const fingerprintGraph = (
       const ast =
         model.kind._tag === "external" || model.kind._tag === "seed"
           ? null
-          : yield* engine.canonicalize(canonicalSql(graph, name))
+          : yield* canonicalize(canonicalSql(graph, name))
       const parents = [...model.deps]
         .sort()
         .map((dep) => `${dep}=${versions.get(dep)!.fingerprint}`)

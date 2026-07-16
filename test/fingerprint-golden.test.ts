@@ -3,7 +3,9 @@ import { Effect, Layer, Schema } from "effect"
 import { buildGraph } from "../src/core/graph.ts"
 import { defineExternal, defineModel, external, kind } from "../src/core/model.ts"
 import { Efmesh } from "../src/efmesh.ts"
+import { EngineAdapter } from "../src/engine/adapter.ts"
 import { DuckDBEngineLive } from "../src/engine/duckdb.ts"
+import { planChanges } from "../src/plan/planner.ts"
 import { canonicalizePostgresSql } from "../src/engine/postgres.ts"
 import { FINGERPRINT_VERSION, fingerprintGraph } from "../src/plan/fingerprint.ts"
 import { SqliteStateLive } from "../src/state/sqlite.ts"
@@ -133,5 +135,41 @@ describe("golden fingerprints — канонизация как контракт
     )
     expect(failure._tag).toBe("FingerprintVersionError")
     expect(failure).toMatchObject({ model: "golden.daily", wanted: FINGERPRINT_VERSION })
+  })
+})
+
+describe("кэш канонизации (#8)", () => {
+  test("второй plan не зовёт canonicalize; отпечатки идентичны; чужой ключ не липнет", async () => {
+    let calls = 0
+    const models = [raw, incremental, mart]
+    const { first, second } = await Effect.runPromise(
+      Effect.gen(function* () {
+        const engine = yield* EngineAdapter
+        const counting = {
+          ...engine,
+          canonicalize: (sql: string) =>
+            Effect.suspend(() => {
+              calls += 1
+              return engine.canonicalize(sql)
+            }),
+        }
+        const graph = yield* buildGraph(models)
+        const first = yield* planChanges("dev", graph).pipe(
+          Effect.provideService(EngineAdapter, counting),
+        )
+        const callsAfterFirst = calls
+        const second = yield* planChanges("dev", graph).pipe(
+          Effect.provideService(EngineAdapter, counting),
+        )
+        expect(callsAfterFirst).toBeGreaterThan(0)
+        expect(calls).toBe(callsAfterFirst) // всё из кэша
+        return { first, second }
+      }).pipe(
+        Effect.provide(Layer.mergeAll(DuckDBEngineLive(), SqliteStateLive())),
+      ),
+    )
+    expect(second.actions.map((a) => a.fingerprint)).toEqual(
+      first.actions.map((a) => a.fingerprint),
+    )
   })
 })

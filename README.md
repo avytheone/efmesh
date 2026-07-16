@@ -188,9 +188,9 @@ The framework overhead is negligible for any realistic project (in-memory DuckDB
 
 | models | cold plan | apply (all physical) | no-op plan | promote to prod |
 |---|---|---|---|---|
-| 100 | 51 ms | 155 ms | 35 ms | 67 ms |
-| 500 | 177 ms | 729 ms | 160 ms | 332 ms |
-| 2000 | 0.7 s | 2.9 s | 0.6 s | 1.3 s |
+| 100 | 54 ms | 158 ms | 3 ms | 51 ms |
+| 500 | 228 ms | 759 ms | 11 ms | 197 ms |
+| 2000 | 0.9 s | 2.9 s | 50 ms | 1.3 s |
 
 ## Postgres
 

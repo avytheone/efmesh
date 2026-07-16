@@ -10,9 +10,10 @@ export class StateError extends Data.TaggedError("StateError")<{
  * на неё; стор со схемой старше (в т.ч. созданный до появления версии)
  * открытие не проходит — данные догоняет явный `efmesh migrate`.
  * 1 — базовая раскладка (F4), 2 — applied_by в журнале планов (F5),
- * 3 — fingerprint_version в снапшотах (F6), 4 — журнал тиков run (0.2.0).
+ * 3 — fingerprint_version в снапшотах (F6), 4 — журнал тиков run (0.2.0),
+ * 5 — кэш канонизации canon_cache (0.2.0, #8).
  */
-export const STATE_VERSION = 4
+export const STATE_VERSION = 5
 
 /** Схема стора не совпадает с ожидаемой бинарём — нужен `efmesh migrate`. */
 export class StateSchemaError extends Data.TaggedError("StateSchemaError")<{
@@ -153,6 +154,13 @@ export interface StateStoreShape {
     summary: string,
     appliedBy: string,
   ) => Effect.Effect<void, StateError>
+  /**
+   * Кэш канонизации (#8): ключ уже включает диалект и FINGERPRINT_VERSION —
+   * смена алгоритма или движка не может отдать протухший канон. Кэш — не
+   * данные: промах или сбой безопасны, вызывающий обязан их глотать.
+   */
+  readonly getCanon: (key: string) => Effect.Effect<string | undefined, StateError>
+  readonly putCanon: (key: string, canonical: string) => Effect.Effect<void, StateError>
   /** Журнал тиков run (SPEC §7): исход каждого тика, включая неуспешные. */
   readonly recordRun: (record: Omit<RunRecord, "id">) => Effect.Effect<void, StateError>
   /** Последние тики окружения, свежие первыми. */
