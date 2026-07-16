@@ -8,6 +8,7 @@ import { Efmesh } from "./efmesh.ts"
 import { DuckDBEngineLive } from "./engine/duckdb.ts"
 import { PostgresEngineLive } from "./engine/postgres.ts"
 import { PostgresStateLive } from "./state/postgres.ts"
+import { auditEnvironment, EnvironmentAuditError } from "./plan/audit-run.ts"
 import { diffEnvironments } from "./plan/diff.ts"
 import { renderGraphHtml } from "./plan/graph-html.ts"
 import { formatLineage, lineage, LineageError } from "./plan/lineage.ts"
@@ -248,6 +249,47 @@ const janitorCommand = Command.make(
     }),
 ).pipe(Command.withDescription("Убрать физику, на которую не ссылается ни одно окружение"))
 
+const auditCommand = Command.make(
+  "audit",
+  {
+    env: Argument.string("env"),
+    config: configFlag,
+    model: Flag.string("model").pipe(
+      Flag.withDefault(""),
+      Flag.withDescription("Только эти модели, через запятую (по умолчанию — все с аудитами)"),
+    ),
+  },
+  ({ config, env, model }) =>
+    Effect.gen(function* () {
+      const loaded = yield* loadConfig(config)
+      const only = parseForwardOnly(model)
+      const report = yield* auditEnvironment(env, loaded.models, only).pipe(
+        Effect.provide(configLayers(loaded)),
+      )
+      if (report.results.length === 0) {
+        yield* Console.log("аудитов нет — нечего проверять")
+        return
+      }
+      for (const result of report.results) {
+        const mark = result.violations === 0 ? "✓" : result.blocking ? "✗" : "⚠"
+        const tail =
+          result.violations > 0
+            ? `  ${result.violations} нарушений${result.blocking ? "" : " (warn)"}`
+            : ""
+        yield* Console.log(`  ${mark} ${result.model}  ${result.audit}${tail}`)
+      }
+      if (report.blockingViolations > 0) {
+        return yield* new EnvironmentAuditError({
+          env,
+          blockingViolations: report.blockingViolations,
+        })
+      }
+      yield* Console.log(`blocking-аудиты окружения «${env}» чисты`)
+    }),
+).pipe(
+  Command.withDescription("Прогнать аудиты по view-слою окружения, ничего не меняя"),
+)
+
 const graphCommand = Command.make(
   "graph",
   {
@@ -310,6 +352,7 @@ export const rootCommand = Command.make("efmesh").pipe(
     planCommand,
     applyCommand,
     runCommand,
+    auditCommand,
     renderCommand,
     graphCommand,
     lineageCommand,
