@@ -232,6 +232,55 @@ describe.skipIf(!hasPostgres)("Postgres-адаптер (SPEC §9.1, F3)", () => 
     )
   })
 
+  test("DAG-конкурентность: независимые модели строятся параллельно", async () => {
+    const slow = (name: string) =>
+      defineModel(
+        { name, kind: kind.full(), schema: Schema.Struct({ n: Schema.Number }) },
+        (ctx) => ctx.sql`SELECT 1::INT AS n FROM pg_sleep(0.6)`,
+      )
+    await scenario(
+      Effect.gen(function* () {
+        const models = [slow("par.a"), slow("par.b")]
+        const startedAt = performance.now()
+        const applied = yield* Efmesh.apply("dev", models, { modelConcurrency: 4 })
+        const elapsed = performance.now() - startedAt
+        expect(applied.built).toEqual(["par.a", "par.b"])
+        // последовательно было бы ≥ 1200 мс (2 × pg_sleep 0.6); параллельно ~600
+        expect(elapsed).toBeLessThan(1100)
+      }),
+    )
+  })
+
+  test("DAG-конкурентность: ромб при modelConcurrency 4 собирается по порядку", async () => {
+    await scenario(
+      Effect.gen(function* () {
+        const engine = yield* EngineAdapter
+        const root = defineModel(
+          { name: "dg.root", kind: kind.full(), schema: Schema.Struct({ n: Schema.Number }) },
+          (ctx) => ctx.sql`SELECT 1::INT AS n`,
+        )
+        const left = defineModel(
+          { name: "dg.left", kind: kind.full(), schema: Schema.Struct({ n: Schema.Number }) },
+          (ctx) => ctx.sql`SELECT (n + 10)::INT AS n FROM ${ctx.ref(root)}`,
+        )
+        const right = defineModel(
+          { name: "dg.right", kind: kind.full(), schema: Schema.Struct({ n: Schema.Number }) },
+          (ctx) => ctx.sql`SELECT (n + 100)::INT AS n FROM ${ctx.ref(root)}`,
+        )
+        const bottom = defineModel(
+          { name: "dg.bottom", kind: kind.full(), schema: Schema.Struct({ n: Schema.Number }) },
+          (ctx) => ctx.sql`
+            SELECT (l.n + r.n)::INT AS n FROM ${ctx.ref(left)} l CROSS JOIN ${ctx.ref(right)} r
+          `,
+        )
+        // неверный порядок сборки упал бы на отсутствующей физике родителя
+        yield* Efmesh.apply("dev", [root, left, right, bottom], { modelConcurrency: 4 })
+        const rows = yield* engine.query(`SELECT n FROM dev__dg.bottom`)
+        expect(rows).toEqual([{ n: 112 }])
+      }),
+    )
+  })
+
   test("DuckDB-федерация на Postgres — честная EngineFeatureError", async () => {
     await scenario(
       Effect.gen(function* () {

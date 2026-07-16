@@ -1,5 +1,5 @@
 import { mkdirSync } from "node:fs"
-import { Clock, Data, Effect } from "effect"
+import { Clock, Data, Deferred, Effect } from "effect"
 import { AuditFailure } from "../core/audit.ts"
 import type { SeedReadError } from "../core/errors.ts"
 import type { GraphError, ModelGraph } from "../core/graph.ts"
@@ -65,6 +65,14 @@ export interface ApplyOptions {
    * одно соединение — там бэкфилл последовательный независимо от значения.
    */
   readonly concurrency?: number
+  /**
+   * Межмодельная DAG-конкурентность (SPEC §5.3): сколько моделей строить
+   * одновременно. Модель стартует, как только готовы её родители из этого
+   * плана — независимые ветки DAG идут параллельно. Осмыслен на движке
+   * с пулом (Postgres); DuckDB держит одно соединение — там модели строятся
+   * последовательно, иначе чужие стейтменты вклинивались бы в BEGIN/COMMIT.
+   */
+  readonly modelConcurrency?: number
 }
 
 /** Модель просит экспорт в ATTACH-алиас, которого нет в конфиге. */
@@ -328,15 +336,25 @@ export const applyPlan = (
       }
     }
 
-    // 1. Физика + бэкфилл
+    // 1. Физика + бэкфилл — DAG-конкурентно (SPEC §5.3): модель стартует,
+    // как только готовы её родители из этого плана (Deferred-гейты, без
+    // волновых барьеров); независимые ветки идут параллельно на движке
+    // с пулом; упавший родитель не открывает гейт — потомки не строятся
     yield* engine.execute(`CREATE SCHEMA IF NOT EXISTS "${physicalSchema}"`)
-    const built: Array<string> = []
-    for (const action of plan.actions) {
-      if (!action.build && action.backfill.length === 0 && !action.refresh) continue
+    const working = plan.actions.filter(
+      (action) =>
+        (action.build || action.backfill.length > 0 || action.refresh) &&
+        graph.models.get(action.name)?.kind._tag !== "external",
+    )
+    const gates = new Map<string, Deferred.Deferred<void>>()
+    for (const action of working) gates.set(action.name, yield* Deferred.make<void>())
+
+    const buildOne = (action: PlanAction): Effect.Effect<void, ApplyError> =>
+      Effect.gen(function* () {
       const model = graph.models.get(action.name)!
       switch (model.kind._tag) {
         case "external":
-          continue
+          return
         case "embedded": {
           // физики нет — но контракт и аудиты версии проверяются здесь,
           // чтобы потребители не унесли в себя сломанный подзапрос
@@ -540,9 +558,34 @@ export const applyPlan = (
           break
         }
       }
-      built.push(action.name)
-      yield* Metric.update(snapshotsBuilt, 1)
-    }
+      })
+
+    const runOne = (action: PlanAction): Effect.Effect<void, ApplyError> =>
+      Effect.gen(function* () {
+        const model = graph.models.get(action.name)!
+        // ждём только родителей, которые строит этот же план; остальные готовы
+        yield* Effect.forEach(
+          [...model.deps].flatMap((dep) => {
+            const gate = gates.get(dep)
+            return gate === undefined ? [] : [gate]
+          }),
+          (gate) => Deferred.await(gate),
+          { discard: true },
+        )
+        yield* buildOne(action)
+        yield* Metric.update(snapshotsBuilt, 1)
+        yield* Deferred.succeed(gates.get(action.name)!, undefined)
+      })
+
+    // working в топологическом порядке, а forEach стартует элементы по
+    // порядку — у самого раннего незавершённого элемента родители всегда
+    // уже готовы, поэтому ожидание гейтов не выедает слоты до дедлока
+    yield* Effect.forEach(working, runOne, {
+      concurrency:
+        engine.dialect === "duckdb" ? 1 : Math.max(1, options?.modelConcurrency ?? 4),
+      discard: true,
+    })
+    const built = working.map((action) => action.name)
 
     // 2. Промоушен: view-слой окружения
     for (const action of plan.actions) {

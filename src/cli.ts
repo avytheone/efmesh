@@ -71,6 +71,18 @@ const forwardOnlyFlag = Flag.string("forward-only").pipe(
   ),
 )
 
+const jobsFlag = Flag.string("jobs").pipe(
+  Flag.withDefault(""),
+  Flag.withDescription(
+    "Сколько моделей строить одновременно (DAG-конкурентность; на DuckDB всегда 1)",
+  ),
+)
+
+const parseJobs = (value: string): number | undefined => {
+  const jobs = Number(value)
+  return value !== "" && Number.isFinite(jobs) && jobs >= 1 ? Math.floor(jobs) : undefined
+}
+
 const parseForwardOnly = (value: string): ReadonlyArray<string> | undefined => {
   const names = value
     .split(",")
@@ -115,15 +127,22 @@ const planCommand = Command.make(
 
 const applyCommand = Command.make(
   "apply",
-  { env: Argument.string("env"), config: configFlag, forwardOnly: forwardOnlyFlag },
-  ({ config, env, forwardOnly }) =>
+  {
+    env: Argument.string("env"),
+    config: configFlag,
+    forwardOnly: forwardOnlyFlag,
+    jobs: jobsFlag,
+  },
+  ({ config, env, forwardOnly, jobs }) =>
     Effect.gen(function* () {
       const loaded = yield* loadConfig(config)
       const names = parseForwardOnly(forwardOnly)
+      const modelConcurrency = parseJobs(jobs)
       const applied = yield* Efmesh.apply(env, loaded.models, {
         ...(loaded.lake !== undefined ? { lakePath: loaded.lake.path } : {}),
         ...(loaded.attach !== undefined ? { attach: loaded.attach } : {}),
         ...(names !== undefined ? { forwardOnly: names } : {}),
+        ...(modelConcurrency !== undefined ? { modelConcurrency } : {}),
       }).pipe(Effect.provide(configLayers(loaded)))
       yield* printPlan(applied.plan)
       yield* Console.log(
@@ -157,13 +176,15 @@ const renderCommand = Command.make(
 
 const runCommand = Command.make(
   "run",
-  { env: Argument.string("env"), config: configFlag },
-  ({ config, env }) =>
+  { env: Argument.string("env"), config: configFlag, jobs: jobsFlag },
+  ({ config, env, jobs }) =>
     Effect.gen(function* () {
       const loaded = yield* loadConfig(config)
+      const modelConcurrency = parseJobs(jobs)
       const applied = yield* run(env, loaded.models, {
         ...(loaded.lake !== undefined ? { lakePath: loaded.lake.path } : {}),
         ...(loaded.attach !== undefined ? { attach: loaded.attach } : {}),
+        ...(modelConcurrency !== undefined ? { modelConcurrency } : {}),
       }).pipe(Effect.provide(configLayers(loaded)))
       yield* Console.log(
         applied.built.length > 0
