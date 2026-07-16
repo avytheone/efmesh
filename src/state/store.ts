@@ -15,6 +15,12 @@ export interface SnapshotRecord {
   readonly canonicalAst: string
   readonly kind: string
   readonly createdAt: string
+  /**
+   * Когда снапшот перестал быть указан хоть одним окружением (ISO UTC);
+   * null — на него ссылаются. Ставится и снимается при промоушене,
+   * ttl janitor'а отсчитывается отсюда (SPEC §5.4).
+   */
+  readonly orphanedAt: string | null
 }
 
 /** Строка окружения: логическое имя → снапшот, на который указывает view. */
@@ -48,7 +54,7 @@ export interface IntervalRecord {
 export interface StateStoreShape {
   /** Идемпотентно: (name, fingerprint) уникальны, повторная запись — no-op. */
   readonly upsertSnapshot: (
-    snapshot: Omit<SnapshotRecord, "createdAt">,
+    snapshot: Omit<SnapshotRecord, "createdAt" | "orphanedAt">,
   ) => Effect.Effect<void, StateError>
   readonly getSnapshot: (
     name: string,

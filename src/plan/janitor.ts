@@ -9,12 +9,16 @@ import { parquetPrefix, physicalRef } from "./naming.ts"
 
 /**
  * Уборка осиротевшей физики (SPEC §5.4): снапшоты, на которые не ссылается
- * ни одно окружение и которые старше ttl, сносятся — таблица/view движка,
- * parquet-префикс озера, запись снапшота и учёт интервалов.
+ * ни одно окружение и которые осиротели раньше, чем ttl назад, сносятся —
+ * таблица/view движка, parquet-префикс озера, запись снапшота и учёт
+ * интервалов.
  *
- * ttl отсчитывается от created_at снапшота — упрощение F2: точная метрика
- * «когда осиротел» требует отметки при промоушене (F3). ttl по умолчанию
- * 7 дней — достаточно, чтобы мгновенно откатиться переключением view.
+ * ttl отсчитывается от orphaned_at — отметки, которую промоушен ставит
+ * при потере последней ссылки и снимает при возврате (откат на старую
+ * версию обнуляет счётчик). Для записей без отметки (ни разу не
+ * промоутились — например, apply упал до промоушена) — от created_at.
+ * ttl по умолчанию 7 дней — достаточно, чтобы мгновенно откатиться
+ * переключением view.
  */
 
 export interface JanitorOptions {
@@ -49,7 +53,8 @@ export const janitor = (
     for (const snapshot of yield* store.listSnapshots()) {
       if (referenced.has(snapshot.fingerprint)) continue
       const label = `${snapshot.name}@${snapshot.fingerprint.slice(0, 8)}`
-      if (now - Date.parse(snapshot.createdAt) < ttlMs) {
+      const orphanedSince = snapshot.orphanedAt ?? snapshot.createdAt
+      if (now - Date.parse(orphanedSince) < ttlMs) {
         kept.push(label)
         continue
       }

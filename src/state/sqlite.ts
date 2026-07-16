@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS snapshots (
   canonical_ast TEXT NOT NULL DEFAULT '',
   kind          TEXT NOT NULL,
   created_at    TEXT NOT NULL,
+  orphaned_at   TEXT,
   PRIMARY KEY (name, fingerprint)
 );
 CREATE TABLE IF NOT EXISTS environments (
@@ -72,6 +73,12 @@ export const SqliteStateLive = (
             } catch {
               // колонка уже есть
             }
+            // миграция баз, созданных до появления orphaned_at (F3)
+            try {
+              db.exec(`ALTER TABLE snapshots ADD COLUMN orphaned_at TEXT`)
+            } catch {
+              // колонка уже есть
+            }
             return db
           },
           catch: (cause) => new StateError({ operation: "open", cause }),
@@ -108,7 +115,8 @@ export const SqliteStateLive = (
             const row = db
               .query(
                 `SELECT name, fingerprint, rendered_sql AS renderedSql,
-                        canonical_ast AS canonicalAst, kind, created_at AS createdAt
+                        canonical_ast AS canonicalAst, kind, created_at AS createdAt,
+                        orphaned_at AS orphanedAt
                  FROM snapshots WHERE name = ?1 AND fingerprint = ?2`,
               )
               .get(name, fingerprint) as SnapshotRecord | null
@@ -128,7 +136,8 @@ export const SqliteStateLive = (
             return db
               .query(
                 `SELECT name, fingerprint, rendered_sql AS renderedSql,
-                        canonical_ast AS canonicalAst, kind, created_at AS createdAt
+                        canonical_ast AS canonicalAst, kind, created_at AS createdAt,
+                        orphaned_at AS orphanedAt
                  FROM snapshots ORDER BY name, created_at`,
               )
               .all() as ReadonlyArray<SnapshotRecord>
@@ -169,6 +178,19 @@ export const SqliteStateLive = (
                   for (const entry of entries) {
                     insert.run(env, entry.name, entry.fingerprint, now)
                   }
+                  // ссылочность меняется только здесь — тут же и учёт сиротства:
+                  // потерявшие последнюю ссылку получают отметку, вернувшиеся
+                  // (откат на старую версию) — теряют её (SPEC §5.4)
+                  db.query(
+                    `UPDATE snapshots SET orphaned_at = ?1
+                     WHERE orphaned_at IS NULL
+                       AND fingerprint NOT IN (SELECT fingerprint FROM environments)`,
+                  ).run(now)
+                  db.query(
+                    `UPDATE snapshots SET orphaned_at = NULL
+                     WHERE orphaned_at IS NOT NULL
+                       AND fingerprint IN (SELECT fingerprint FROM environments)`,
+                  ).run()
                 })
                 replace()
               }),

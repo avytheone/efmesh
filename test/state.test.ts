@@ -81,6 +81,29 @@ describe("SqliteState", () => {
     expect(other).toHaveLength(1)
   })
 
+  test("orphaned_at: промоушен ставит отметку сироте и снимает при возврате", async () => {
+    const phases = await withStore((store) =>
+      Effect.gen(function* () {
+        const base = { name: "med.a", renderedSql: "SELECT 1", canonicalAst: "{}", kind: "full" }
+        yield* store.upsertSnapshot({ ...base, fingerprint: "f1" })
+        yield* store.promote("dev", [{ name: "med.a", fingerprint: "f1" }])
+        const referenced = yield* store.getSnapshot("med.a", "f1")
+
+        yield* store.upsertSnapshot({ ...base, fingerprint: "f2" })
+        yield* store.promote("dev", [{ name: "med.a", fingerprint: "f2" }])
+        const orphaned = yield* store.getSnapshot("med.a", "f1")
+
+        // откат на старую версию — отметка снимается, счётчик ttl обнулён
+        yield* store.promote("dev", [{ name: "med.a", fingerprint: "f1" }])
+        const restored = yield* store.getSnapshot("med.a", "f1")
+        return { referenced, orphaned, restored }
+      }),
+    )
+    expect(phases.referenced?.orphanedAt).toBeNull()
+    expect(phases.orphaned?.orphanedAt).toMatch(/^\d{4}-/)
+    expect(phases.restored?.orphanedAt).toBeNull()
+  })
+
   test("журнал планов пишется и читается по порядку", async () => {
     const plans = await withStore((store) =>
       Effect.gen(function* () {
