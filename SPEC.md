@@ -1,84 +1,85 @@
-# EFMESH — спецификация
+# EFMESH — specification
 
-**efmesh** — фреймворк трансформации данных в духе sqlmesh, но на TypeScript, Bun и Effect v4.
-Не порт sqlmesh, а перенос его *идей* на другую почву: там, где sqlmesh опирается на Python-макросы
-и Jinja, efmesh опирается на систему типов TypeScript и на Effect как рантайм.
+**efmesh** is a data transformation framework in the spirit of sqlmesh, but on TypeScript, Bun and Effect v4.
+It is not a port of sqlmesh, but a transfer of its *ideas* onto different ground: where sqlmesh leans on Python macros
+and Jinja, efmesh leans on the TypeScript type system and on Effect as its runtime.
 
-Это архитектурный документ: решения, инварианты и открытые вопросы.
-Знакомство с проектом и справка пользователя — в [README](./README.md),
-история изменений — в [CHANGELOG](./CHANGELOG.md).
+This is an architecture document: decisions, invariants and open questions.
+An introduction to the project and the user's guide are in the [README](./README.md),
+the change history is in the [CHANGELOG](./CHANGELOG.md).
 
-Статус: v0.2 — реализация прошла фазы F0–F5 (§13), версия пакета
-0.1.0-beta.1; реализованное помечено в тексте уточнениями «*Реализация Fn*».
-
----
-
-## 1. Зачем
-
-dbt и sqlmesh решают реальную задачу — версионируемые SQL-трансформации с зависимостями,
-инкрементальностью и дешёвыми dev-окружениями. Но оба живут в Python-экосистеме:
-шаблоны на Jinja, макросы на Python, типов нет, интеграция в TypeScript-бэкенд — через subprocess.
-
-efmesh делает то же самое для команды, которая уже живёт в TypeScript и Effect:
-
-- **Модель — это TypeScript-модуль.** Никакого Jinja. Макрос — обычная функция.
-  Ссылка на другую модель — импорт: переименовал модель — компилятор покажет все места.
-- **Схема модели — это Effect Schema.** Колонки типизированы, ссылки на колонки
-  проверяются на этапе компиляции, а соответствие объявленной схемы фактическому
-  результату запроса — на этапе плана.
-- **Всё — Effect.** Типизированные ошибки, Layer для подмены движков, Stream для бэкфилла,
-  Metric/Tracer из коробки. efmesh можно встроить в существующее Effect-приложение
-  как библиотеку — CLI лишь тонкая обёртка.
-- **Bun.** Мгновенный старт CLI, `bun test` для тестов моделей, `bun build --compile`
-  для единого бинарника.
-- **DuckDB как первый движок.** Не просто «локальная аналитика»: httpfs и ATTACH
-  превращают его в лёгкую федерацию (parquet на S3, чужой Postgres, JSON по HTTPS),
-  а материализация в parquet-файлы даёт озеро без отдельной инфраструктуры (§3.3, §9.3).
-
-### Не-цели
-
-- Тяжёлый ингест (EL): очереди, CDC, ретраи по чужим API — не наша забота.
-  Но лёгкое чтение внешнего мира через федерацию DuckDB (parquet/S3, ATTACH-базы,
-  JSON по HTTPS) — законный источник для `external`-моделей: сырьё не обязано
-  заранее лежать «в базе».
-- Оркестрация общего назначения: не замена Airflow/Temporal. Есть свой планировщик
-  по cron, но он про интервалы моделей, не про произвольные пайплайны.
-- BI и визуализация. Максимум — `efmesh graph --html` для отладки DAG.
-- Транспиляция между диалектами SQL (киллер-фича sqlglot). Честно признаём:
-  повторить sqlglot в TS нереалистично. Диалект — свойство проекта, не модели (§9).
+Status: v0.2 — implementation has passed phases F0–F6 (§13), published as
+`@avytheone/efmesh` (npm, dist-tag `beta`); what is implemented is marked
+in the text with "*Implemented in Fn*" notes.
 
 ---
 
-## 2. Понятийное ядро
+## 1. Why
 
-Пять понятий, всё остальное — производные:
+dbt and sqlmesh solve a real problem — versioned SQL transformations with dependencies,
+incrementality and cheap dev environments. But both live in the Python ecosystem:
+Jinja templates, Python macros, no types, integration into a TypeScript backend through a subprocess.
 
-| Понятие | Что это |
+efmesh does the same for a team that already lives in TypeScript and Effect:
+
+- **A model is a TypeScript module.** No Jinja. A macro is an ordinary function.
+  A reference to another model is an import: rename the model and the compiler shows you every place.
+- **A model's schema is an Effect Schema.** Columns are typed, references to columns
+  are checked at compile time, and the agreement between the declared schema and the actual
+  query result is checked at plan time.
+- **Everything is Effect.** Typed errors, Layer for swapping engines, Stream for backfill,
+  Metric/Tracer out of the box. efmesh can be embedded into an existing Effect application
+  as a library — the CLI is only a thin wrapper.
+- **Bun.** Instant CLI startup, `bun test` for model tests, `bun build --compile`
+  for a single binary.
+- **DuckDB as the first engine.** Not just "local analytics": httpfs and ATTACH
+  turn it into a lightweight federation (parquet on S3, someone else's Postgres, JSON over HTTPS),
+  and materialization into parquet files gives you a lake without separate infrastructure (§3.3, §9.3).
+
+### Non-goals
+
+- Heavy ingest (EL): queues, CDC, retries against third-party APIs — not our concern.
+  But lightweight reading of the outside world through DuckDB federation (parquet/S3, ATTACH databases,
+  JSON over HTTPS) is a legitimate source for `external` models: the raw material does not have to
+  already sit "in the database".
+- General-purpose orchestration: not a replacement for Airflow/Temporal. There is our own scheduler
+  by cron, but it is about model intervals, not arbitrary pipelines.
+- BI and visualization. At most — `efmesh graph --html` for debugging the DAG.
+- Transpilation between SQL dialects (sqlglot's killer feature). We admit it honestly:
+  reproducing sqlglot in TS is unrealistic. Dialect is a property of the project, not the model (§9).
+
+---
+
+## 2. Conceptual core
+
+Five concepts, everything else is derived:
+
+| Concept | What it is |
 |---|---|
-| **Модель** | Именованная трансформация: SQL-запрос + метаданные (вид, cron, схема, аудиты). Материализуется в таблицу или view. |
-| **Снапшот** | Версия модели, идентифицируемая fingerprint'ом — хэшем канонизированного SQL и метаданных. Каждому снапшоту соответствует своя физическая таблица. |
-| **Интервал** | Полуинтервал времени `[start, end)`, для которого данные снапшота посчитаны. Учёт заполненных интервалов — основа инкрементальности и бэкфилла. |
-| **Окружение** | Именованный набор view (`dev`, `prod`, `feature_x`), указывающих на физические таблицы снапшотов. Виртуальное: создание окружения — это создание view, не копирование данных. |
-| **План** | Diff между локальными определениями моделей и состоянием окружения + перечень интервалов к пересчёту. Просмотрел → применил. |
+| **Model** | A named transformation: a SQL query + metadata (kind, cron, schema, audits). Materialized into a table or view. |
+| **Snapshot** | A version of a model, identified by a fingerprint — a hash of the canonicalized SQL and metadata. Each snapshot has its own physical table. |
+| **Interval** | A half-open time interval `[start, end)` for which the snapshot's data has been computed. Tracking filled intervals is the basis of incrementality and backfill. |
+| **Environment** | A named set of views (`dev`, `prod`, `feature_x`) pointing at the physical tables of snapshots. Virtual: creating an environment means creating views, not copying data. |
+| **Plan** | The diff between local model definitions and the state of an environment + the list of intervals to recompute. Reviewed → applied. |
 
-Ключевая механика (взята у sqlmesh без изменений, потому что она правильная):
+The key mechanic (taken from sqlmesh unchanged, because it is right):
 
 ```
-физический слой:  _efmesh.med__stays__a3f9c1            ← таблица по fingerprint
-                  lake/med/stays/fp=a3f9c1/…/*.parquet  ← или parquet-партиции (§3.3)
-виртуальный слой: dev__med.stays → view → физика a3f9c1
-                  med.stays      → view → физика 88b2e0   (prod = родные схемы)
+physical layer:  _efmesh.med__stays__a3f9c1            ← table by fingerprint
+                 lake/med/stays/fp=a3f9c1/…/*.parquet  ← or parquet partitions (§3.3)
+virtual layer:   dev__med.stays → view → physical a3f9c1
+                 med.stays      → view → physical 88b2e0   (prod = native schemas)
 ```
 
-Не изменил модель — dev и prod смотрят на **одну и ту же** физическую таблицу.
-Изменил — в dev появляется новая физическая таблица, prod не тронут.
-Промоушен в prod — переключение view, без копирования данных и без пересчёта.
+If you did not change a model — dev and prod look at the **same** physical table.
+If you did — a new physical table appears in dev, prod is untouched.
+Promotion to prod is a view swap, with no data copying and no recomputation.
 
 ---
 
-## 3. Определение модели
+## 3. Model definition
 
-Модель — TS-модуль, экспортирующий результат `defineModel`:
+A model is a TS module exporting the result of `defineModel`:
 
 ```ts
 import { defineModel, kind, audit } from "efmesh"
@@ -89,7 +90,7 @@ export const stays = defineModel({
   name: "med.stays",
   kind: kind.incrementalByTimeRange({ timeColumn: "moved_at" }),
   cron: "@daily",
-  grain: ["stay_id"],                       // логический первичный ключ
+  grain: ["stay_id"],                       // logical primary key
   schema: Schema.Struct({
     stay_id:  Schema.String,
     dept:     Schema.String,
@@ -97,7 +98,7 @@ export const stays = defineModel({
     duration: Schema.Number,
   }),
   audits: [audit.notNull("stay_id"), audit.unique("stay_id")],
-  description: "Пребывания пациента в отделении, склеенные из движений",
+  description: "Patient stays in a department, stitched together from movements",
 }, (ctx) => ctx.sql`
   SELECT
     ${ctx.cols(moves, "move_id", "dept")},
@@ -109,432 +110,432 @@ export const stays = defineModel({
 `)
 ```
 
-Что здесь важно:
+What matters here:
 
-- **`ctx.ref(moves)`** — ссылка на модель как на значение, не строку.
-  Рендерится в имя view текущего окружения (или в CTE в тестах).
-  Из этих ссылок efmesh собирает DAG — никакого парсинга имён из текста запроса
-  для построения зависимостей не нужно.
-- **`ctx.cols(moves, ...)`** — колонки проверяются компилятором против `moves.schema`.
-  Опечатка в имени колонки = ошибка типов, а не падение в проде.
-- **`ctx.start` / `ctx.end`** — границы обрабатываемого интервала. Подставляются
-  как *bound parameters* при выполнении, а в текст канонизированного SQL попадают
-  как плейсхолдеры — поэтому fingerprint не зависит от конкретных дат.
-- **Тело — чистая функция.** Рендер должен быть детерминированным: `Date.now()`,
-  `Math.random()`, чтение env внутри тела запрещены (ломают стабильность fingerprint).
-  Всё изменчивое приходит через `ctx`.
+- **`ctx.ref(moves)`** — a reference to a model as a value, not a string.
+  It renders into the view name of the current environment (or into a CTE in tests).
+  From these references efmesh assembles the DAG — no parsing of names out of the query
+  text is needed to build dependencies.
+- **`ctx.cols(moves, ...)`** — columns are checked by the compiler against `moves.schema`.
+  A typo in a column name is a type error, not a production failure.
+- **`ctx.start` / `ctx.end`** — the bounds of the interval being processed. They are substituted
+  as *bound parameters* at execution time, and into the canonicalized SQL text they go
+  as placeholders — so the fingerprint does not depend on concrete dates.
+- **The body is a pure function.** The render must be deterministic: `Date.now()`,
+  `Math.random()`, reading env inside the body are forbidden (they break fingerprint stability).
+  Everything mutable arrives through `ctx`.
 
-### 3.1 Виды моделей (kind)
+### 3.1 Model kinds (kind)
 
-| Вид | Семантика | Фаза |
+| Kind | Semantics | Phase |
 |---|---|---|
-| `full` | Полный пересчёт таблицы при каждом запуске | F0 |
-| `view` | Не материализуется, только view поверх запроса | F0 |
-| `incrementalByTimeRange({ timeColumn, batchSize?, lookback? })` | Пересчёт по интервалам времени; `lookback` — сколько прошлых интервалов пересчитывать заново (поздно приезжающие данные) | F1 |
-| `incrementalByUniqueKey({ key })` | Upsert по ключу | F2 |
-| `seed({ file })` | Данные из CSV/JSON-файла, валидируются через `schema` | F2 |
-| `external` | Внешний источник (сырьё): таблица движка, parquet/CSV/JSON по пути или URL, таблица ATTACH-базы. Не материализуется, но участвует в DAG и lineage, схема объявляется | F1 |
-| `embedded` | Подставляется в потребителей как CTE, без материализации | F3 |
-| `scdType2({ key, validFrom, validTo })` | Медленно меняющиеся измерения | F3 |
+| `full` | Full recomputation of the table on every run | F0 |
+| `view` | Not materialized, only a view over the query | F0 |
+| `incrementalByTimeRange({ timeColumn, batchSize?, lookback? })` | Recomputation by time intervals; `lookback` — how many past intervals to recompute (late-arriving data) | F1 |
+| `incrementalByUniqueKey({ key })` | Upsert by key | F2 |
+| `seed({ file })` | Data from a CSV/JSON file, validated via `schema` | F2 |
+| `external` | An external source (raw material): an engine table, a parquet/CSV/JSON file by path or URL, a table in an ATTACH database. Not materialized, but participates in the DAG and lineage, its schema is declared | F1 |
+| `embedded` | Inlined into consumers as a CTE, without materialization | F3 |
+| `scdType2({ key, validFrom, validTo })` | Slowly changing dimensions | F3 |
 
-### 3.2 Проверка контракта схемы
+### 3.2 Schema contract check
 
-Объявленная `schema` — не документация, а контракт. Перед сборкой каждого
-снапшота (на apply, когда физика родителей уже существует) efmesh выполняет
-`DESCRIBE <запрос>` (DuckDB отдаёт имена и типы, не выполняя запрос), сравнивает
-фактические типы колонок с объявленными и падает с `SchemaMismatchError`, если
-разошлись. Имена сверяются строго (недостающие и лишние колонки), типы — по
-семействам (`Schema.Number` покрывает и INTEGER, и DOUBLE; `DateTimeUtc` —
-все TIMESTAMP-варианты). Это ловит дрейф типов до бэкфилла, а не после.
+The declared `schema` is not documentation but a contract. Before building each
+snapshot (at apply, when the physical storage of the parents already exists) efmesh runs
+`DESCRIBE <query>` (DuckDB returns names and types without executing the query), compares
+the actual column types with the declared ones and fails with `SchemaMismatchError` if
+they diverge. Names are checked strictly (missing and extra columns), types — by
+families (`Schema.Number` covers both INTEGER and DOUBLE; `DateTimeUtc` — all
+TIMESTAMP variants). This catches type drift before the backfill, not after.
 
-### 3.3 Цель материализации
+### 3.3 Materialization target
 
-Куда складывать физический слой — свойство модели (по умолчанию берётся из конфига):
+Where to put the physical layer is a property of the model (by default taken from the config):
 
-- **`target: "table"`** — нативная таблица движка.
-- **`target: "parquet"`** — озеро: снапшот материализуется в parquet-файлы
-  (`<lake>/med/stays/fp=a3f9c1/interval=2026-01-01/*.parquet`), view поверх
-  `read_parquet('…/fp=a3f9c1/**')`. Путь озера — локальная директория или S3 (httpfs).
-- **`target: "ducklake"`** *(F4, §14.5)* — таблица-на-fingerprint в DuckLake-каталоге
-  (`ATTACH 'ducklake:sqlite:<catalog>'` под алиасом `_efmesh_ducklake`,
-  конфиг `ducklake: { catalog, dataPath? }`). Версионность остаётся нашей
-  (fingerprint + учёт интервалов); снапшоты и time travel DuckLake — бонус,
-  не второй владелец истории. DELETE+INSERT, ALTER (forward-only) и
-  транзакции работают в каталоге как есть; janitor чистит и его. DuckDB-only.
-  Потребители вне efmesh обязаны сами сделать ATTACH — view окружений
-  ссылаются на таблицы каталога по алиасу.
+- **`target: "table"`** — a native engine table.
+- **`target: "parquet"`** — a lake: the snapshot is materialized into parquet files
+  (`<lake>/med/stays/fp=a3f9c1/interval=2026-01-01/*.parquet`), a view over
+  `read_parquet('…/fp=a3f9c1/**')`. The lake path is a local directory or S3 (httpfs).
+- **`target: "ducklake"`** *(F4, §14.5)* — a table-per-fingerprint in a DuckLake catalog
+  (`ATTACH 'ducklake:sqlite:<catalog>'` under the alias `_efmesh_ducklake`,
+  config `ducklake: { catalog, dataPath? }`). Versioning stays ours
+  (fingerprint + interval tracking); DuckLake's snapshots and time travel are a bonus,
+  not a second owner of history. DELETE+INSERT, ALTER (forward-only) and
+  transactions work in the catalog as is; the janitor cleans it too. DuckDB-only.
+  Consumers outside efmesh must ATTACH themselves — the environments' views
+  reference the catalog's tables by alias.
 
-Инкрементальность efmesh ложится на parquet-озеро без единой новой концепции:
-**интервал = партиция**. Пересчёт интервала — запись файлов его партиции заново;
-учёт интервалов (§6) и здесь остаётся источником правды, поэтому неатомарность
-перезаписи префикса на S3 не страшна — недописанный интервал просто не помечен
-`done` и будет пересчитан.
+efmesh's incrementality maps onto a parquet lake without a single new concept:
+**an interval = a partition**. Recomputing an interval means rewriting its partition's files;
+interval tracking (§6) remains the source of truth here too, so the non-atomicity
+of overwriting an S3 prefix is not scary — an under-written interval is simply not marked
+`done` and will be recomputed.
 
 ---
 
-## 4. Снапшоты и fingerprint
+## 4. Snapshots and fingerprint
 
-Fingerprint снапшота = хэш от:
+A snapshot's fingerprint = a hash of:
 
-1. **канонизированного SQL** — запрос рендерится с плейсхолдерами вместо интервалов,
-   парсится в AST, AST нормализуется (регистр ключевых слов, пробелы, порядок
-   неупорядоченных элементов) и депарсится обратно. Переформатирование запроса
-   не меняет fingerprint;
-2. метаданных, влияющих на данные: `kind`, `grain`, `timeColumn`, `schema`;
-3. fingerprint'ов прямых зависимостей (транзитивность: изменение родителя
-   меняет версию потомка — если изменение breaking, см. §5.2).
+1. **the canonicalized SQL** — the query is rendered with placeholders instead of intervals,
+   parsed into an AST, the AST is normalized (keyword case, whitespace, order of
+   unordered elements) and deparsed back. Reformatting the query
+   does not change the fingerprint;
+2. metadata affecting the data: `kind`, `grain`, `timeColumn`, `schema`;
+3. the fingerprints of direct dependencies (transitivity: changing a parent
+   changes the child's version — if the change is breaking, see §5.2).
 
-`cron`, `description`, `owner`, аудиты в fingerprint **не входят** — их изменение
-это metadata-only change без пересчёта.
+`cron`, `description`, `owner`, audits are **not** part of the fingerprint — changing them
+is a metadata-only change without recomputation.
 
-Физическая таблица: `_efmesh.<schema>__<name>__<fp8>`, где `fp8` — первые
-8 символов fingerprint. Служебная схема — именно `_efmesh` с подчёркиванием:
-DuckDB называет каталог по имени файла базы, и для `efmesh.duckdb` ссылка
-`efmesh.x` неоднозначна (каталог или схема) — Binder Error.
+Physical table: `_efmesh.<schema>__<name>__<fp8>`, where `fp8` is the first
+8 characters of the fingerprint. The service schema is exactly `_efmesh` with an underscore:
+DuckDB names the catalog after the database file name, and for `efmesh.duckdb` the reference
+`efmesh.x` is ambiguous (catalog or schema) — a Binder Error.
 
-**Стабильность fingerprint — контракт (F6).** Отпечаток зависит от
-канонизации движка (json_serialize_sql DuckDB / libpg_query) и состава
-payload: их изменение молча пере-фингерпринтит все модели пользователя и
-вынуждает полный ребилд склада. Поэтому: (1) канонизация заморожена
-golden-тестами (`test/fingerprint-golden.test.ts`) — красный тест при
-апгрейде `@duckdb/node-api`/`libpg-query` означает дрейф канона, и это
-повод для решения, а не для обновления хэшей; (2) снапшот несёт
-`fingerprint_version` (версия схемы стора 3); (3) осознанная смена
-алгоритма = инкремент `FINGERPRINT_VERSION` + история миграции — план,
-встретив снапшот другой версии, честно останавливается
-(`FingerprintVersionError`), а не показывает «всё breaking».
+**Fingerprint stability is a contract (F6).** The fingerprint depends on
+the engine's canonicalization (DuckDB's json_serialize_sql / libpg_query) and the
+composition of the payload: changing them silently re-fingerprints all of the user's models and
+forces a full rebuild of the warehouse. Therefore: (1) canonicalization is frozen
+by golden tests (`test/fingerprint-golden.test.ts`) — a red test on an
+upgrade of `@duckdb/node-api`/`libpg-query` means canon drift, and that is
+grounds for a decision, not for updating the hashes; (2) a snapshot carries
+`fingerprint_version` (state store schema version 3); (3) a deliberate change
+of the algorithm = an increment of `FINGERPRINT_VERSION` + a migration history — a plan,
+on encountering a snapshot of another version, honestly stops
+(`FingerprintVersionError`), rather than showing "everything breaking".
 
 ---
 
-## 5. План: diff и применение
+## 5. Plan: diff and application
 
-### 5.1 Что делает `efmesh plan <env>`
+### 5.1 What `efmesh plan <env>` does
 
-1. Загружает все модели проекта (импорт TS-модулей через Bun), строит DAG.
-2. Считает fingerprint каждой модели, сравнивает с состоянием окружения.
-3. Категоризирует изменения (§5.2).
-4. Считает недостающие интервалы: для новых снапшотов — от `start` проекта
-   (или модели) до текущего момента; для существующих — дыры в учёте.
-5. Показывает человеку: какие модели изменились, как категоризировано,
-   сколько интервалов будет пересчитано, текстовый diff SQL.
-6. `efmesh apply` показывает тот же план и применяет его: создаёт физические
-   таблицы, гонит бэкфилл, переключает view. *Реализация F4: в TTY план
-   применяется только после явного «y» (y/yes/д/да; `--yes`/`-y` пропускает
-   вопрос), применяется ровно показанный план без пересчёта; не-TTY (CI,
-   пайпы) едет без вопроса.*
+1. Loads all project models (importing TS modules via Bun), builds the DAG.
+2. Computes each model's fingerprint, compares it with the environment's state.
+3. Categorizes the changes (§5.2).
+4. Computes the missing intervals: for new snapshots — from the project's `start`
+   (or the model's) to the current moment; for existing ones — the holes in tracking.
+5. Shows the human: which models changed, how they were categorized,
+   how many intervals will be recomputed, a textual SQL diff.
+6. `efmesh apply` shows the same plan and applies it: creates physical
+   tables, runs the backfill, swaps the views. *Implemented in F4: in a TTY the plan
+   is applied only after an explicit "y" (y/yes/д/да; `--yes`/`-y` skips the
+   question), exactly the shown plan is applied without recomputation; non-TTY (CI,
+   pipes) proceeds without asking.*
 
-### 5.2 Категории изменений
+### 5.2 Change categories
 
-| Категория | Как определяется | Что пересчитывается |
+| Category | How it is determined | What gets recomputed |
 |---|---|---|
-| **breaking** | По diff AST: удалили/переименовали колонку, изменили выражение существующей, изменили WHERE/JOIN | Модель + все потомки |
-| **non-breaking** | Добавили колонку, добавили независимый CTE | Только сама модель |
-| **forward-only** | Явный флаг пользователя (`--forward-only <model>,…`) или каскад: собственный AST не менялся, а все изменившиеся родители сами forward-only | Ничего задним числом: новая версия наследует физическую таблицу и done-интервалы старой (`physical_fp` снапшота), новые колонки добавляются `ALTER`-ом (история получает NULL), удаление колонок реюзом не выражается — ошибка. Только `incrementalByTimeRange` — у остальных видов «задним числом» не бывает по построению |
-| **metadata-only** | Изменились поля вне fingerprint | Ничего |
+| **breaking** | By the AST diff: dropped/renamed a column, changed an existing expression, changed WHERE/JOIN | The model + all descendants |
+| **non-breaking** | Added a column, added an independent CTE | Only the model itself |
+| **forward-only** | An explicit user flag (`--forward-only <model>,…`) or a cascade: the model's own AST did not change, and all changed parents are themselves forward-only | Nothing retroactively: the new version inherits the physical table and done-intervals of the old one (the snapshot's `physical_fp`), new columns are added via `ALTER` (history gets NULL), dropping columns cannot be expressed by reuse — an error. Only `incrementalByTimeRange` — for the other kinds "retroactively" does not exist by construction |
+| **metadata-only** | Fields outside the fingerprint changed | Nothing |
 
-Категоризация автоматическая (сравнение AST-выражений по колонкам), с возможностью
-ручного override в диалоге плана. При сомнении efmesh консервативен: не смог
-доказать non-breaking — значит breaking. *Уточнение F2/F3: non-breaking
-распознаётся как строго суффиксное расширение select_list при нетронутом
-остальном дереве (INSERT потомков позиционный); реюз физики — не автоматика
-non-breaking, а явный forward-only.*
+Categorization is automatic (comparison of AST expressions by column), with the option of
+a manual override in the plan dialog. When in doubt efmesh is conservative: if it could not
+prove non-breaking — then it is breaking. *Clarification in F2/F3: non-breaking
+is recognized as a strictly suffix extension of the select_list with the rest of
+the tree untouched (the descendants' INSERT is positional); physical reuse is not
+automatic non-breaking, but an explicit forward-only.*
 
-### 5.3 Бэкфилл
+### 5.3 Backfill
 
-- Интервалы к пересчёту группируются в батчи (`batchSize` модели).
-- Исполнение — параллельные батчи в пределах модели (`concurrency`, по
-  умолчанию 4): интервалы не пересекаются, каждый батч — своя транзакция
-  на своём соединении пула. Осмыслено на Postgres (F3); DuckDB держит одно
-  соединение — там бэкфилл последовательный, транзакции сериализуются
-  семафором адаптера.
-- **Межмодельная DAG-конкурентность (F4):** сборка и бэкфилл моделей идут
-  не последовательным топологическим циклом, а по готовности — каждая
-  модель плана получает Deferred-гейт и стартует, как только готовы её
-  родители из этого же плана; независимые ветки строятся параллельно
-  (`modelConcurrency`, по умолчанию 4; CLI `--jobs`). Упавший родитель
-  не открывает гейт — потомки не строятся. На DuckDB конкурентность
-  честно = 1: одно соединение, чужие стейтменты вклинивались бы в
-  BEGIN/COMMIT транзакции.
-- Каждый интервал — транзакция: `DELETE` диапазона + `INSERT` (или `MERGE` для
-  unique-key). Упавший интервал не отравляет соседей; ретраи через `Schedule`
-  с экспоненциальной паузой, после исчерпания — интервал помечается `failed`,
-  план завершается ошибкой с перечнем. *Реализация F5: opt-in —
+- Intervals to recompute are grouped into batches (the model's `batchSize`).
+- Execution — parallel batches within a model (`concurrency`, default 4):
+  intervals do not overlap, each batch is its own transaction
+  on its own pool connection. Meaningful on Postgres (F3); DuckDB holds one
+  connection — there the backfill is sequential, transactions are serialized
+  by the adapter's semaphore.
+- **Inter-model DAG concurrency (F4):** building and backfilling models proceed
+  not as a sequential topological loop, but by readiness — each
+  model in the plan gets a Deferred gate and starts as soon as its
+  parents from this same plan are ready; independent branches are built in parallel
+  (`modelConcurrency`, default 4; CLI `--jobs`). A failed parent
+  does not open the gate — descendants are not built. On DuckDB the concurrency is
+  honestly = 1: one connection, other statements would wedge into the
+  BEGIN/COMMIT of a transaction.
+- Each interval is a transaction: `DELETE` of the range + `INSERT` (or `MERGE` for
+  unique-key). A failed interval does not poison its neighbors; retries via `Schedule`
+  with exponential backoff, after exhaustion — the interval is marked `failed`,
+  the plan ends with an error listing them. *Implemented in F5: opt-in —
   `ApplyOptions.retry {attempts, baseDelayMs}` / CLI `--retries N`;
-  ретраится только транзакционная запись батча (повтор безопасен),
-  аудиты не ретраятся — их провал детерминирован.*
-- Прогресс пишется в state store поинтервально: прерванный бэкфилл продолжается
-  с места остановки, а не с нуля.
+  only the transactional write of a batch is retried (a repeat is safe),
+  audits are not retried — their failure is deterministic.*
+- Progress is written to the state store per interval: an interrupted backfill resumes
+  from where it stopped, not from scratch.
 
-### 5.4 Промоушен и janitor
+### 5.4 Promotion and janitor
 
-Промоушен окружения — транзакционная замена набора view (`CREATE OR REPLACE VIEW`).
-Физика (таблицы и parquet-префиксы), на которую больше не ссылается ни одно окружение, живёт ещё
-`ttl` (по умолчанию 7 дней — чтобы можно было мгновенно откатиться переключением
-view) и затем убираются командой `efmesh janitor`. ttl отсчитывается от
-`orphaned_at` — отметки, которую промоушен ставит при потере последней ссылки
-и снимает при возврате (откат обнуляет счётчик). Физика, разделяемая
-несколькими версиями (forward-only), сносится только с последним
-использующим её снапшотом.
+Promoting an environment is a transactional swap of a set of views (`CREATE OR REPLACE VIEW`).
+Physical storage (tables and parquet prefixes) that no environment references any more lives another
+`ttl` (default 7 days — so you can instantly roll back by swapping the
+views) and is then removed by the `efmesh janitor` command. The ttl is counted from
+`orphaned_at` — a mark that promotion sets when the last reference is lost
+and clears when it returns (a rollback resets the counter). Physical storage shared by
+several versions (forward-only) is removed only together with the last
+snapshot using it.
 
 ---
 
-## 6. Состояние
+## 6. State
 
-Всё состояние — в state store (по умолчанию — SQLite-файл через `bun:sqlite` рядом
-с проектом; для командной/прод-работы — схема `efmesh_state` в Postgres,
-`state: { url: "postgres://…" }` в конфиге; семантика и раскладка идентичны,
-метки времени — ISO UTC текстом в обоих бэкендах). Сам DuckDB
-на роль state store не годится: он однописательский, а состояние должно переживать
-конкурентные запуски из разных процессов. Таблицы:
+All state is in the state store (by default — a SQLite file via `bun:sqlite` next
+to the project; for team/production work — the `efmesh_state` schema in Postgres,
+`state: { url: "postgres://…" }` in the config; the semantics and layout are identical,
+timestamps are ISO UTC text in both backends). DuckDB itself
+is not fit for the state store role: it is single-writer, and the state must survive
+concurrent runs from different processes. Tables:
 
 ```
 snapshots     (name, fingerprint, definition_json, created_at)
 intervals     (snapshot_fp, start_ts, end_ts, status: done|failed, updated_at)
 environments  (env, name, snapshot_fp, promoted_at)
-plans         (id, env, summary_json, applied_at, applied_by)   -- журнал аудита
-meta          (version)                                          -- версия схемы (F4)
+plans         (id, env, summary_json, applied_at, applied_by)   -- audit journal
+meta          (version)                                          -- schema version (F4)
 ```
 
-`applied_by` (F5, версия схемы 2) — кто применил план: `ApplyOptions.appliedBy`
-или ОС-пользователь; записи доверсионного журнала читаются с пустым автором.
+`applied_by` (F5, schema version 2) — who applied the plan: `ApplyOptions.appliedBy`
+or the OS user; pre-versioned journal records are read with an empty author.
 
-Схема стора версионирована (F4): свежий стор бутстрапится на текущую
-`STATE_VERSION` сам; существующий со схемой старше (включая доверсионные)
-открытие не проходит — `StateSchemaError` с подсказкой. Догоняет явный
-`efmesh migrate` — молча менять чужие данные при открытии нельзя.
+The store schema is versioned (F4): a fresh store bootstraps itself to the current
+`STATE_VERSION`; an existing one with an older schema (including pre-versioned) fails
+to open — `StateSchemaError` with a hint. An explicit
+`efmesh migrate` catches it up — silently changing someone else's data on open is not allowed.
 
-Инварианты:
+Invariants:
 
-- Учёт интервалов — единственный источник правды о том, что посчитано.
-  Физическая таблица без записей в `intervals` считается пустой.
-- Запись в state store — только через транзакции state store; efmesh никогда
-  не смешивает в одной транзакции данные и состояние, если движок данных
-  и state store — разные базы (двухфазности нет, есть идемпотентность:
-  пересчёт интервала безопасен всегда).
-
----
-
-## 7. Запуск по расписанию
-
-`efmesh run <env>` — один тик планировщика:
-
-1. Для каждой модели, у которой наступил новый интервал, — посчитать его
-   (плюс `lookback` прошлых). *Уточнение F2: отдельного `cron`-поля нет —
-   роль расписания играет зерно интервала (`interval: "day" | "hour"`);
-   `run` никогда не применяет изменения моделей (это plan/apply с человеком
-   у руля) и отказывается работать при структурных изменениях.*
-2. Порядок и конкурентность — как в бэкфилле (§5.3).
-3. Аудиты — после каждого посчитанного интервала (§8).
-
-`run` идемпотентен и безопасен для cron/systemd-таймера: параллельный запуск
-отсекается блокировкой в state store — таблица `locks` с ttl (протухший лок
-упавшего процесса перехватывается), одинаково в SQLite и Postgres.
-*Уточнение F5 (§14.6 закрыт): лок один на окружение (`env:<имя>`) и общий
-для `run` и `apply` — мутации окружения из разных процессов взаимно
-исключаются; у `janitor` свой глобальный лок.*
-Долгоживущий демон не нужен,
-но для встраивания в Effect-приложение есть `Runner.daemon` — `Effect`, крутящий
-тики по `Schedule.cron` внутри вашего рантайма.
+- Interval tracking is the single source of truth about what has been computed.
+  A physical table with no records in `intervals` is considered empty.
+- Writing to the state store — only through state store transactions; efmesh never
+  mixes data and state in one transaction if the data engine
+  and the state store are different databases (there is no two-phase commit, there is idempotency:
+  recomputing an interval is always safe).
 
 ---
 
-## 8. Качество: аудиты и тесты
+## 7. Scheduled runs
 
-**Аудит** — SQL-предикат над результатом, выполняется после загрузки интервала.
-Возвращает нарушающие строки; непустой результат = `AuditFailure`.
+`efmesh run <env>` — a single scheduler tick:
+
+1. For each model that has a new interval due — compute it
+   (plus `lookback` past ones). *Clarification in F2: there is no separate `cron` field —
+   the role of the schedule is played by the interval's grain (`interval: "day" | "hour"`);
+   `run` never applies model changes (that is plan/apply with a human
+   at the wheel) and refuses to work when there are structural changes.*
+2. Order and concurrency — as in the backfill (§5.3).
+3. Audits — after each computed interval (§8).
+
+`run` is idempotent and safe for a cron/systemd timer: a parallel run
+is cut off by a lock in the state store — a `locks` table with a ttl (a stale lock
+of a crashed process is reclaimed), the same in SQLite and Postgres.
+*Clarification in F5 (§14.6 closed): the lock is one per environment (`env:<name>`) and shared
+between `run` and `apply` — mutations of an environment from different processes mutually
+exclude each other; the `janitor` has its own global lock.*
+A long-lived daemon is not needed,
+but for embedding into an Effect application there is `Runner.daemon` — an `Effect` that spins
+ticks by `Schedule.cron` inside your runtime.
+
+---
+
+## 8. Quality: audits and tests
+
+An **audit** is a SQL predicate over the result, run after an interval is loaded.
+It returns the violating rows; a non-empty result = `AuditFailure`.
 
 ```ts
 audits: [
   audit.notNull("stay_id"),
   audit.unique("stay_id"),
-  audit.accepted("dept", ["ОРИТ", "терапия", "хирургия"]),
-  audit.custom("положительная длительность", (ctx) => ctx.sql`
+  audit.accepted("dept", ["ICU", "therapy", "surgery"]),
+  audit.custom("positive duration", (ctx) => ctx.sql`
     SELECT * FROM ${ctx.self} WHERE duration < 0
   `),
 ]
 ```
 
-Аудит бывает `blocking` (по умолчанию: интервал помечается failed, view не
-промоутится) и `warn` (метрика + лог, конвейер едет дальше).
+An audit is either `blocking` (default: the interval is marked failed, the view is not
+promoted) or `warn` (a metric + a log, the pipeline moves on).
 
-Помимо прогона в apply, есть автономный `efmesh audit <env>` (F4): проверяет
-то, что окружение отдаёт потребителям СЕЙЧАС — view-слой целиком, а не
-свежезагруженный интервал. Ловит деградацию задним числом (поздние данные,
-правку физики мимо efmesh, дрейф external); ничего не меняет и не помечает,
-отчёт целиком, ненулевой exit при blocking-нарушениях.
+Besides running at apply, there is a standalone `efmesh audit <env>` (F4): it checks
+what the environment serves to consumers RIGHT NOW — the whole view layer, not the
+freshly loaded interval. It catches after-the-fact degradation (late data,
+edits to physical storage bypassing efmesh, external drift); it changes and marks nothing,
+the report is complete, a non-zero exit on blocking violations.
 
-**Тест** — юнит-тест запроса на фикстурах, живёт в `bun test`:
+A **test** is a unit test of the query on fixtures, living in `bun test`:
 
 ```ts
 import { testModel } from "efmesh/testing"
 
 testModel(stays, {
   inputs: { [moves.name]: [
-    { move_id: "1", case_id: "c1", dept: "ОРИТ", moved_at: "2026-01-01T10:00Z" },
-    { move_id: "2", case_id: "c1", dept: "терапия", moved_at: "2026-01-02T10:00Z" },
+    { move_id: "1", case_id: "c1", dept: "ICU", moved_at: "2026-01-01T10:00Z" },
+    { move_id: "2", case_id: "c1", dept: "therapy", moved_at: "2026-01-02T10:00Z" },
   ]},
   interval: ["2026-01-01", "2026-01-03"],
-  expect: [{ stay_id: "1", dept: "ОРИТ", duration: 86400 }],
+  expect: [{ stay_id: "1", dept: "ICU", duration: 86400 }],
 })
 ```
 
-Механика: `ctx.ref` в тестовом режиме рендерится в CTE с `VALUES` из фикстур
-(валидированных через Schema модели-источника!), запрос выполняется на
-одноразовом in-memory DuckDB — мгновенно, без docker и внешней инфраструктуры, —
-результат сравнивается с ожидаемым. Фикстуры с невалидными по Schema данными
-не компилируются — тест не может врать о форме входа.
+The mechanics: `ctx.ref` in test mode renders into a CTE with `VALUES` from the fixtures
+(validated via the source model's Schema!), the query runs on a
+throwaway in-memory DuckDB — instantly, without docker or external infrastructure — and the
+result is compared with the expected one. Fixtures with data invalid by Schema
+do not compile — a test cannot lie about the shape of the input.
 
 ---
 
-## 9. Движки и парсинг SQL
+## 9. Engines and SQL parsing
 
-### 9.1 Адаптер движка — Effect-сервис
+### 9.1 The engine adapter — an Effect service
 
 ```ts
 interface Engine {
   readonly dialect: "duckdb" | "postgres"
   readonly query: (sql: string) => Effect<Rows, EngineError>
   readonly execute: (sql: string) => Effect<void, EngineError>
-  /** Набор стейтментов одной транзакцией: на пуле соединений BEGIN/COMMIT
-      отдельными execute разъехались бы по разным соединениям. */
+  /** A set of statements in one transaction: on a connection pool, BEGIN/COMMIT
+      via separate execute calls would scatter across different connections. */
   readonly transaction: (statements: ReadonlyArray<string>) => Effect<void, EngineError>
-  readonly describe: (sql: string) => Effect<ColumnTypes, EngineError>       // для §3.2
-  readonly canonicalize: (sql: string) => Effect<string, EngineError | SqlParseError> // для §9.2
+  readonly describe: (sql: string) => Effect<ColumnTypes, EngineError>       // for §3.2
+  readonly canonicalize: (sql: string) => Effect<string, EngineError | SqlParseError> // for §9.2
 }
 ```
 
-Подключается через `Layer`. Первый движок — **DuckDB** (поверх `@duckdb/node-api`),
-второй — **Postgres** (F3, поверх встроенного `Bun.SQL` с пулом;
-`describe` — временный view + `pg_attribute` на одном соединении).
-DuckDB-специфика (seed, parquet-цель, external по файлам/URL, export в
-ATTACH) на других движках честно падает `EngineFeatureError` до любых
-действий. DuckDB выбран первым не только за скорость и нулевую
-инфраструктуру: httpfs, ATTACH и parquet делают его одновременно движком,
-федератором и озером (§9.3). State store — отдельный сервис с тем же паттерном.
+It is wired in through a `Layer`. The first engine is **DuckDB** (on top of `@duckdb/node-api`),
+the second is **Postgres** (F3, on top of the built-in `Bun.SQL` with a pool;
+`describe` — a temporary view + `pg_attribute` on one connection).
+DuckDB specifics (seed, parquet target, external by files/URL, export to
+ATTACH) fail honestly on other engines with `EngineFeatureError` before any
+action. DuckDB was chosen first not only for speed and zero
+infrastructure: httpfs, ATTACH and parquet make it simultaneously an engine,
+a federator and a lake (§9.3). The state store is a separate service with the same pattern.
 
-### 9.2 Парсинг
+### 9.2 Parsing
 
-Для канонизации (§4), diff-категоризации (§5.2) и lineage нужен настоящий парсер —
-и это обязанность адаптера: каждый движок парсит свой диалект сам, самодельного
-«парсера всех SQL» в efmesh нет.
+For canonicalization (§4), diff categorization (§5.2) and lineage a real parser is needed —
+and that is the adapter's responsibility: each engine parses its own dialect itself,
+there is no home-grown "parser of all SQL" in efmesh.
 
-- **DuckDB** отдаёт AST собственным парсером: `json_serialize_sql()` /
-  `json_deserialize_sql()`. Канонизация — round-trip сериализации: стопроцентная
-  точность диалекта, включая его расширения (`read_parquet`, `GROUP BY ALL`,
-  list-типы), ноль сторонних зависимостей. Ограничение: сериализуются только
-  SELECT-стейтменты — а тело модели ровно им и является.
-- **Postgres** (F3, реализовано) — libpg_query в WASM, парсер самого Postgres:
-  дерево разбора с вычищенными `location` формат-инвариантно; плейсхолдеры
-  `$start`/`$end` канонического рендера детерминированно замещаются `$1`/`$2`
-  (bare `$имя` — не синтаксис Postgres).
+- **DuckDB** returns an AST with its own parser: `json_serialize_sql()` /
+  `json_deserialize_sql()`. Canonicalization is a round-trip of serialization: hundred-percent
+  dialect accuracy, including its extensions (`read_parquet`, `GROUP BY ALL`,
+  list types), zero third-party dependencies. Limitation: only
+  SELECT statements are serialized — and a model's body is exactly that.
+- **Postgres** (F3, implemented) — libpg_query in WASM, the parser of Postgres itself:
+  a parse tree with `location`s stripped out is format-invariant; the placeholders
+  `$start`/`$end` of the canonical render are deterministically replaced with `$1`/`$2`
+  (bare `$name` is not Postgres syntax).
 
-Транспиляции между диалектами **нет** (не-цель): проект пишется под диалект
-своего движка. Это честное сужение относительно sqlmesh (sqlglot) в обмен
-на точность и простоту.
+There is **no** transpilation between dialects (a non-goal): a project is written for the dialect
+of its engine. This is an honest narrowing relative to sqlmesh (sqlglot) in exchange
+for accuracy and simplicity.
 
-### 9.3 Федерация: чтение и запись наружу
+### 9.3 Federation: reading and writing outward
 
-DuckDB закрывает три сценария, ради которых он и выбран первым движком:
+DuckDB covers the three scenarios for which it was chosen as the first engine:
 
-- **Озеро на parquet.** Цель материализации `parquet` (§3.3): физический слой —
-  файлы локально или на S3, view поверх `read_parquet`. Склад без склада.
-- **Чтение чужих систем.** `external`-модели поверх `read_parquet`/`read_csv`/
-  `read_json` — в том числе по HTTPS, так что «дёрнуть REST API, отдающий JSON»
-  ложится сюда же, — и поверх таблиц ATTACH-баз (Postgres, MySQL, SQLite).
-  Про детерминизм: внешний источник меняется между запусками, это нормально
-  (как любое сырьё) — в fingerprint входит только *определение* источника,
-  не его содержимое; свежесть управляется интервалами и cron.
-- **Запись наружу.** Экспорт результата модели в ATTACH-базу — например, готовая
-  витрина уезжает в рабочий Postgres приложения:
-  `export: { attach: "app_pg", table: "public.stays" }`. Экспорт выполняется
-  после аудитов и только для промоутнутого снапшота — наружу не может уехать
-  непроверенное. Фаза F2.
+- **A lake on parquet.** The `parquet` materialization target (§3.3): the physical layer is
+  files locally or on S3, a view over `read_parquet`. A warehouse without a warehouse.
+- **Reading other systems.** `external` models over `read_parquet`/`read_csv`/
+  `read_json` — including over HTTPS, so "hit a REST API returning JSON"
+  fits here too — and over the tables of ATTACH databases (Postgres, MySQL, SQLite).
+  On determinism: an external source changes between runs, and that is normal
+  (like any raw material) — only the *definition* of the source enters the fingerprint,
+  not its content; freshness is governed by intervals and cron.
+- **Writing outward.** Exporting a model's result into an ATTACH database — for example, a finished
+  mart heads into the application's working Postgres:
+  `export: { attach: "app_pg", table: "public.stays" }`. The export runs
+  after the audits and only for a promoted snapshot — nothing unverified can head
+  outward. Phase F2.
 
 ### 9.4 Lineage
 
-Из AST + разрешённых `ctx.ref` строится колоночный lineage (F3, реализовано):
-`efmesh lineage med.stays.duration` → цепочка до сырьевых колонок
-`external`/`seed`-моделей. Точность best-effort: выражение колонки берётся
-из канонического AST, `COLUMN_REF` сопоставляются схемам родителей по имени
-(квалификаторы и алиасы CTE не разворачиваются), `SELECT *` — сквозной
-проброс. Так как зависимости моделей известны из `ref`, а не из парсинга
-имён, граф моделей точен всегда — приблизителен только колоночный уровень.
+From the AST + resolved `ctx.ref`s a column-level lineage is built (F3, implemented):
+`efmesh lineage med.stays.duration` → the chain down to the raw columns
+of `external`/`seed` models. Accuracy is best-effort: a column's expression is taken
+from the canonical AST, `COLUMN_REF`s are matched to the parents' schemas by name
+(qualifiers and CTE aliases are not unfolded), `SELECT *` — a pass-through
+propagation. Since model dependencies are known from `ref`, not from parsing
+names, the model graph is always exact — only the column level is approximate.
 
 ---
 
-## 10. Effect-архитектура
+## 10. The Effect architecture
 
-Слои (снизу вверх):
+Layers (bottom to top):
 
 ```
 EngineAdapter (DuckDB | Postgres)        StateStore (SQLite | PG)
         └──────────────┬──────────────────────┘
-                   Snapshotter  (fingerprint, канонизация)
-                   IntervalLedger (учёт интервалов)
+                   Snapshotter  (fingerprint, canonicalization)
+                   IntervalLedger (interval tracking)
                         │
-                     Planner   (diff, категоризация, план)
-                     Executor  (бэкфилл: Stream + DAG-конкурентность)
+                     Planner   (diff, categorization, plan)
+                     Executor  (backfill: Stream + DAG concurrency)
                      Auditor
                         │
-                  Efmesh (фасад: plan / apply / run / test)
+                  Efmesh (facade: plan / apply / run / test)
                         │
-              CLI (тонкая обёртка)   |   ваш Effect-код (библиотечное встраивание)
+              CLI (thin wrapper)   |   your Effect code (library embedding)
 ```
 
-Принципы:
+Principles:
 
-- **Типизированные ошибки** на каждом уровне: `ParseError | SchemaMismatchError |
-  PlanConflictError | AuditFailure | IntervalFailure | EngineError`. Никаких
-  `throw` — вся обработка через канал ошибок Effect.
-- **Один владелец жизненного цикла**: ресурсы (пулы соединений, WASM-инстанс
-  парсера) — `Scope`/`Layer`, teardown гарантирован.
-- **Наблюдаемость из коробки**: span на каждую модель/интервал, `Metric` —
+- **Typed errors** at every level: `ParseError | SchemaMismatchError |
+  PlanConflictError | AuditFailure | IntervalFailure | EngineError`. No
+  `throw`s — all handling goes through Effect's error channel.
+- **A single lifecycle owner**: resources (connection pools, the parser's WASM
+  instance) — `Scope`/`Layer`, teardown is guaranteed.
+- **Observability out of the box**: a span per model/interval, `Metric`s —
   `efmesh_intervals_done_total`, `efmesh_interval_duration`, `efmesh_audit_failures_total`.
-- **Библиотека прежде CLI.** `Efmesh.plan(env)` — обычный `Effect`, который можно
-  запустить внутри любого приложения, снабдив слоями. CLI собирается на
-  Effect CLI-модуле и компилируется `bun build --compile` в один бинарник.
-  *Уточнение F5: бинарник собирается и работает (`--external` на чужие
-  платформы `@duckdb/node-bindings-*`), но standalone-исполняемые Bun
-  не резолвят bare-импорт `"efmesh"` из рантайм-загружаемого
-  `efmesh.config.ts` даже при живом node_modules — ограничение Bun,
-  не наше. Дистрибуция беты — пакетом (`bun add -d efmesh`), бинарник
-  подождёт апстрима.*
+- **Library before CLI.** `Efmesh.plan(env)` is an ordinary `Effect` that can be
+  run inside any application by supplying it with layers. The CLI is built on
+  the Effect CLI module and is compiled with `bun build --compile` into a single binary.
+  *Clarification in F5: the binary builds and works (`--external` for other
+  platforms' `@duckdb/node-bindings-*`), but standalone Bun executables
+  do not resolve the bare import `"efmesh"` from a runtime-loaded
+  `efmesh.config.ts` even with a live node_modules — a Bun limitation,
+  not ours. Beta distribution is by package (`bun add -d efmesh`), the binary
+  waits for upstream.*
 
-Целевая версия — **Effect v4**: один пакет `effect`, сервисы через
-`ServiceMap`/`Layer`, `Schema` из коробки. Пока v4 в движении, API-поверхность
-efmesh закладывается на стабильное подмножество (Effect/Layer/Schema/Stream/
-Schedule/Metric/Scope), точечные адаптации — при финализации v4.
+The target version is **Effect v4**: one `effect` package, services via
+`ServiceMap`/`Layer`, `Schema` out of the box. While v4 is in motion, efmesh's API
+surface is laid on the stable subset (Effect/Layer/Schema/Stream/
+Schedule/Metric/Scope), with point adaptations — at the finalization of v4.
 
 ---
 
 ## 11. CLI
 
 ```
-efmesh init [dir]               — скаффолд проекта (конфиг, модели-пример, seed)
+efmesh init [dir]               — scaffold a project (config, example models, seed)
 efmesh plan <env> [--forward-only <model>,…]
-efmesh apply <env> [--yes] [--jobs N] [--retries N] [--forward-only …]  — план + подтверждение + применение
-efmesh run  <env> [--jobs N] [--retries N]  — тик планировщика
-efmesh audit <env> [--model a,b] — аудиты view-слоя окружения, ничего не меняя
-efmesh render <model> [--env]   — показать итоговый SQL (для отладки)
-efmesh diff <envA> <envB>       — чем окружения отличаются
+efmesh apply <env> [--yes] [--jobs N] [--retries N] [--forward-only …]  — plan + confirmation + application
+efmesh run  <env> [--jobs N] [--retries N]  — a scheduler tick
+efmesh audit <env> [--model a,b] — audits of the environment's view layer, changing nothing
+efmesh render <model> [--env]   — show the final SQL (for debugging)
+efmesh diff <envA> <envB>       — how the environments differ
 efmesh lineage <model[.column]>
-efmesh graph [--html]           — DAG моделей
-efmesh janitor [--ttl 7]        — уборка осиротевших физических таблиц
-efmesh migrate                  — догнать схему state store до текущей версии
+efmesh graph [--html]           — the model DAG
+efmesh janitor [--ttl 7]        — cleanup of orphaned physical tables
+efmesh migrate                  — catch the state store schema up to the current version
 ```
 
-Конфиг — `efmesh.config.ts` (не YAML): типизирован, собирает `Layer` движка
-и state store, задаёт окружения, `start` проекта, ttl, конкурентность.
+The config is `efmesh.config.ts` (not YAML): typed, it assembles the `Layer` of the engine
+and the state store, defines environments, the project's `start`, the ttl, concurrency.
 
 ---
 
-## 12. Структура проекта пользователя
+## 12. The user's project structure
 
 ```
 my-warehouse/
   efmesh.config.ts
   models/
-    sources.ts          — external-модели (сырьё) с их Schema
+    sources.ts          — external models (raw material) with their Schema
     med/
       moves.ts
       stays.ts
@@ -544,118 +545,118 @@ my-warehouse/
     stays.test.ts       — bun test
 ```
 
-Discovery моделей — по glob из конфига + проверка, что каждый экспорт
-`defineModel` достижим; дубликаты имён — ошибка загрузки. *Реализовано (F5):
-`discovery: glob | glob[]` в конфиге (маски относительно конфига), все
-экспорты-модели найденных файлов попадают в проект; реэкспорт того же
-объекта — не дубликат, два разных определения с одним именем —
-`DiscoveryConflictError` с обоими файлами; совместимо с явным `models`.*
+Model discovery — by glob from the config + a check that each `defineModel`
+export is reachable; duplicate names are a load error. *Implemented (F5):
+`discovery: glob | glob[]` in the config (masks relative to the config), all
+model exports of the found files enter the project; re-exporting the same
+object is not a duplicate, two different definitions with one name —
+`DiscoveryConflictError` with both files; compatible with an explicit `models`.*
 
 ---
 
-## 13. Фазы
+## 13. Phases
 
-- **F0 — скелет (вертикальный срез).** `defineModel`, `full`/`view`, рендер и
-  `ctx.ref`, DuckDB-адаптер (нативные таблицы), state store на `bun:sqlite`,
-  `plan`/`apply` без категоризации (всё breaking), физический+виртуальный слой,
+- **F0 — the skeleton (vertical slice).** `defineModel`, `full`/`view`, render and
+  `ctx.ref`, the DuckDB adapter (native tables), the state store on `bun:sqlite`,
+  `plan`/`apply` without categorization (everything breaking), the physical+virtual layer,
   `render`, `graph`.
-  Стоп-условие: две связанные модели проходят plan→apply→изменение→plan→apply,
-  prod не пересчитывается при промоушене.
-- **F1 — инкрементальность и озеро.** `incrementalByTimeRange`, учёт интервалов,
-  бэкфилл со Stream и DAG-конкурентностью, fingerprint по канонизированному AST
-  (`json_serialize_sql`), `external` (таблицы, файлы/URL, ATTACH-чтение),
-  контракт схемы (§3.2), цель материализации `parquet` — локально и на S3 (httpfs),
-  прерывание/продолжение бэкфилла.
-- **F2 — качество и эксплуатация.** Аудиты, `testModel` (in-memory DuckDB),
-  `run` по cron + блокировка + `Runner.daemon`, категоризация
-  breaking/non-breaking по AST, `janitor` (таблицы и parquet-префиксы), `diff`,
-  метрики/спаны, `seed`, `incrementalByUniqueKey`, экспорт в ATTACH-базы (§9.3).
-- **F3 — широта.** Postgres-адаптер (libpg_query, state store в PG,
-  пул → параллельные батчи бэкфилла), lineage по колонкам, `forward-only`
-  (+ orphaned_at для janitor), `scdType2`, `embedded`, `graph --html`,
-  сырые `.sql`-модели (`defineSqlModel`, §14.1 закрыт). *Построено.*
-- **F4 — эксплуатационная зрелость.** Межмодельная DAG-конкурентность
-  apply (Deferred-гейты, `--jobs`, §5.3), `target: "ducklake"` (§14.5
-  закрыт), автономный `efmesh audit` (§8), `efmesh init`, версия схемы
-  state store + `efmesh migrate` (§6), интерактивное подтверждение плана
-  (§5.1). *Построено.*
-- **F5 — бета-гейт.** Межпроцессный лок на `apply` — общий env-лок с `run`
-  (§14.6 закрыт), discovery моделей по glob (§12), ретраи батча бэкфилла
-  со `Schedule.exponential` (§5.3), `applied_by` в журнале планов (версия
-  схемы стора 2), решение по nullability (§14.2 закрыт: контракт — имена
-  и типы, NULL — дело аудита), версия 0.1.0-beta; одиночный бинарник
-  уперся в ограничение Bun (§10) — дистрибуция пакетом. *Построено.*
-- **F6 — бета-гейт, часть 2 (перед тихой публикацией).** Пин effect
-  (peerDependency + drift-CI), fingerprint как контракт
-  (`FINGERPRINT_VERSION`, golden-тесты, схема стора 3), транзакционное
-  закрытие гонки janitor↔apply (claim + проверка живости в промоушене),
-  атомарные parquet-партиции, бэкап стора перед migrate, не-TTY apply
-  требует `--yes` (exit-код 2 = «ждёт человека»), whitelist публичного
-  API, английский README. *Построено. Опубликовано: npm
+  Stop condition: two related models pass plan→apply→change→plan→apply,
+  prod is not recomputed on promotion.
+- **F1 — incrementality and the lake.** `incrementalByTimeRange`, interval tracking,
+  backfill with Stream and DAG concurrency, fingerprint over the canonicalized AST
+  (`json_serialize_sql`), `external` (tables, files/URLs, ATTACH reading),
+  the schema contract (§3.2), the `parquet` materialization target — locally and on S3 (httpfs),
+  interruption/resumption of backfill.
+- **F2 — quality and operations.** Audits, `testModel` (in-memory DuckDB),
+  `run` by cron + a lock + `Runner.daemon`, breaking/non-breaking categorization
+  by AST, `janitor` (tables and parquet prefixes), `diff`,
+  metrics/spans, `seed`, `incrementalByUniqueKey`, export to ATTACH databases (§9.3).
+- **F3 — breadth.** The Postgres adapter (libpg_query, state store in PG,
+  a pool → parallel backfill batches), column lineage, `forward-only`
+  (+ orphaned_at for the janitor), `scdType2`, `embedded`, `graph --html`,
+  raw `.sql` models (`defineSqlModel`, §14.1 closed). *Built.*
+- **F4 — operational maturity.** Inter-model DAG concurrency for
+  apply (Deferred gates, `--jobs`, §5.3), `target: "ducklake"` (§14.5
+  closed), a standalone `efmesh audit` (§8), `efmesh init`, a state store schema
+  version + `efmesh migrate` (§6), interactive plan confirmation
+  (§5.1). *Built.*
+- **F5 — the beta gate.** A cross-process lock on `apply` — a shared env lock with `run`
+  (§14.6 closed), model discovery by glob (§12), backfill batch retries
+  with `Schedule.exponential` (§5.3), `applied_by` in the plan journal (store
+  schema version 2), a decision on nullability (§14.2 closed: the contract is names
+  and types, NULL is the audit's job), version 0.1.0-beta; the single binary
+  hit a Bun limitation (§10) — distribution by package. *Built.*
+- **F6 — the beta gate, part 2 (before the quiet publish).** Pinning effect
+  (peerDependency + drift CI), fingerprint as a contract
+  (`FINGERPRINT_VERSION`, golden tests, store schema 3), transactionally
+  closing the janitor↔apply race (claim + a liveness check in promotion),
+  atomic parquet partitions, a store backup before migrate, non-TTY apply
+  requiring `--yes` (exit code 2 = "awaiting a human"), a whitelist of the public
+  API, an English README. *Built. Published: npm
   `@avytheone/efmesh` (dist-tag beta) + github.com/avytheone/efmesh,
-  релизы по тегу через Trusted Publishing (OIDC, provenance).*
-- **0.2.0 — «оператор и команда».** Тема: efmesh в руках не-автора —
-  оператора ночного cron и команды с CI. (1) `efmesh status <env>`:
-  последний apply/тик, отставание интервалов, версия стора; (2) журнал
-  тиков `run` в сторе (исход, длительность — schema v4); (3) `--json`
-  у plan/audit/status для CI и ботов; (4) `plan --explain` — какой узел
-  AST изменился и почему такая категория; (5) override категоризации
-  флагом поверх explain (не интерактив — тестируемо и работает в CI);
-  (6) `diff --data` — сравнение данных двух окружений (дёшево на
-  DuckDB); (7) интеграционный тест перехвата лока под kill -9;
-  (8) кэш канонизации по хэшу текста модели (повторный plan на 2000
-  моделей — 0.6 с, почти целиком canonicalize). Проектная — в GitHub
-  Issues (milestone «0.2.0 — operator & team»); SPEC остаётся
-  архитектурным документом. Отложено: интервалы не по времени (§14.3) —
-  по первому реальному потребителю.
+  releases by tag via Trusted Publishing (OIDC, provenance).*
+- **0.2.0 — "operator and team".** Theme: efmesh in the hands of a non-author —
+  the operator of the nightly cron and a team with CI. (1) `efmesh status <env>`:
+  the last apply/tick, interval lag, store version; (2) a journal of
+  `run` ticks in the store (outcome, duration — schema v4); (3) `--json`
+  on plan/audit/status for CI and bots; (4) `plan --explain` — which AST
+  node changed and why that category; (5) a categorization override by
+  flag on top of explain (not interactive — testable and works in CI);
+  (6) `diff --data` — a comparison of the data of two environments (cheap on
+  DuckDB); (7) an integration test of lock reclaim under kill -9;
+  (8) a canonicalization cache by the model text hash (a repeat plan on 2000
+  models — 0.6 s, almost entirely canonicalize). The project one is in GitHub
+  Issues (milestone "0.2.0 — operator & team"); SPEC remains an
+  architecture document. Deferred: non-time-based intervals (§14.3) —
+  by the first real consumer.
 
 ---
 
-## 14. Открытые вопросы
+## 14. Open questions
 
-1. **Сырые `.sql`-файлы.** *Закрыт (F3):* `defineSqlModel({ file, refs })` —
-   тело в `.sql` с `@ref(имя)`/`@start`/`@end`, зависимости объявляются
-   значениями в `refs` (каждый `@ref` обязан быть объявлен, лишние — ошибка),
-   поэтому DAG, fingerprint и testModel работают как у обычных моделей.
-   Типизация колонок по-прежнему теряется — честная цена миграции.
-2. **Nullability в контракте.** *Закрыт (F5) решением:* `DESCRIBE <запрос>`
-   в DuckDB даёт имена и типы, но не nullability — контракт проверяет
-   имена и типы (семейства), обещание «не NULL» выражается аудитом
-   `audit.notNull` (blocking по умолчанию). `Schema.NullOr` в модели —
-   документация формы данных, не рантайм-гарантия.
-3. **Интервалы не по времени.** sqlmesh умеет `INCREMENTAL_BY_PARTITION`.
-   Нужно ли обобщать учёт с временных интервалов до произвольных партиций —
-   решить по первому реальному потребителю.
-4. **Мульти-движок в одном проекте.** ATTACH закрывает типовой случай без второго
-   адаптера (читать из PG, экспортировать в PG, считая всё в DuckDB); полноценный
-   мульти-движок — вне scope, но `EngineAdapter`-слой на модель этому не противоречит.
-5. **DuckLake.** *Закрыт (F4):* реализована третья цель материализации
-   `target: "ducklake"` (§3.3) — таблица-на-fingerprint в ATTACH-каталоге,
-   версионность остаётся нашей, снапшоты/time travel DuckLake — бонус.
-   Ровно по выводам пробы 2026-07-15: DuckLake — не замена нашей
-   версионности (второй владелец истории), а дополнительное место
-   физики; DELETE+INSERT, ALTER и транзакции работают в каталоге как есть.
-   SQLite-каталог не добавляет инфраструктуры; мультипроцессность
-   честно потребует Postgres-каталога — отложено до реального потребителя.
-6. **Конкурентность записи DuckDB.** *Закрыт (F5):* блокировка в state
-   store покрывает и apply — `run` и `apply` окружения идут под одним
-   локом `env:<имя>` (протухший перехватывается по ttl), у `janitor` свой
-   глобальный лок; в CLI лок охватывает план→подтверждение→применение.
-   Гонку janitor↔apply (воскрешение осиротевшего снапшота в момент сноса)
-   смягчает ttl осиротевшей физики.
+1. **Raw `.sql` files.** *Closed (F3):* `defineSqlModel({ file, refs })` —
+   the body in a `.sql` file with `@ref(name)`/`@start`/`@end`, dependencies declared
+   by values in `refs` (each `@ref` must be declared, extra ones are an error),
+   so the DAG, fingerprint and testModel work as for ordinary models.
+   Column typing is still lost — the honest price of migration.
+2. **Nullability in the contract.** *Closed (F5) by a decision:* `DESCRIBE <query>`
+   in DuckDB gives names and types, but not nullability — the contract checks
+   names and types (families), the promise "not NULL" is expressed by the
+   `audit.notNull` audit (blocking by default). `Schema.NullOr` in a model is
+   documentation of the data's shape, not a runtime guarantee.
+3. **Non-time-based intervals.** sqlmesh can do `INCREMENTAL_BY_PARTITION`.
+   Whether to generalize tracking from time intervals to arbitrary partitions —
+   to be decided by the first real consumer.
+4. **Multi-engine in one project.** ATTACH covers the typical case without a second
+   adapter (read from PG, export to PG, computing everything in DuckDB); a full-fledged
+   multi-engine is out of scope, but the per-model `EngineAdapter` layer does not contradict it.
+5. **DuckLake.** *Closed (F4):* the third materialization target
+   `target: "ducklake"` (§3.3) is implemented — a table-per-fingerprint in an ATTACH catalog,
+   versioning stays ours, DuckLake's snapshots/time travel are a bonus.
+   Exactly per the conclusions of the 2026-07-15 probe: DuckLake is not a replacement for our
+   versioning (a second owner of history), but an additional place for
+   physical storage; DELETE+INSERT, ALTER and transactions work in the catalog as is.
+   A SQLite catalog adds no infrastructure; multiprocess use
+   would honestly require a Postgres catalog — deferred until a real consumer.
+6. **DuckDB write concurrency.** *Closed (F5):* the lock in the state
+   store covers apply too — `run` and `apply` of an environment go under one
+   lock `env:<name>` (a stale one is reclaimed by ttl), the `janitor` has its own
+   global lock; in the CLI the lock spans plan→confirmation→application.
+   The janitor↔apply race (resurrecting an orphaned snapshot at the moment of removal)
+   is mitigated by the ttl of the orphaned physical storage.
 
 ---
 
-## 15. Сравнение (шпаргалка)
+## 15. Comparison (cheat sheet)
 
 | | dbt | sqlmesh | efmesh |
 |---|---|---|---|
-| Язык моделей | SQL + Jinja | SQL + Jinja/Python | SQL внутри TypeScript |
-| Зависимости | `ref('строка')` | парсинг SQL | импорт модуля, проверен компилятором |
-| Типизация колонок | нет | contracts (рантайм) | Effect Schema (компайл-тайм + план) |
-| Версионирование | нет (state-less) | снапшоты + fingerprint | снапшоты + fingerprint |
-| Dev-окружения | копии таблиц | виртуальные (view) | виртуальные (view) |
-| Инкрементальность | самописный `is_incremental()` | интервалы, автоучёт | интервалы, автоучёт |
-| Мульти-диалект | да | да (sqlglot) | нет — диалект движка (DuckDB первым) |
-| Озеро на parquet | адаптеры | адаптеры | родное: target `parquet`, интервал=партиция |
-| Встраивание | subprocess | Python API | Effect-библиотека |
+| Model language | SQL + Jinja | SQL + Jinja/Python | SQL inside TypeScript |
+| Dependencies | `ref('string')` | SQL parsing | module import, checked by the compiler |
+| Column typing | none | contracts (runtime) | Effect Schema (compile-time + plan) |
+| Versioning | none (state-less) | snapshots + fingerprint | snapshots + fingerprint |
+| Dev environments | table copies | virtual (views) | virtual (views) |
+| Incrementality | hand-rolled `is_incremental()` | intervals, auto-tracked | intervals, auto-tracked |
+| Multi-dialect | yes | yes (sqlglot) | no — the engine's dialect (DuckDB first) |
+| Parquet lake | adapters | adapters | native: `target: "parquet"`, interval = partition |
+| Embedding | subprocess | Python API | Effect library |

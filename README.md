@@ -110,7 +110,7 @@ models (TS modules)  ──►  DAG + fingerprints over canonical ASTs
 - **Virtual layer** — views `<env>__<schema>.<table>` (prod is just `<schema>.<table>`) pointing at physical storage. An environment is a set of pointers; promotion and rollback are view swaps.
 - **The interval ledger** is the single source of truth about what has been computed: an interrupted backfill resumes where it stopped; recomputing an interval is a transactional DELETE+INSERT of the range — no duplicates.
 
-Full architecture, invariants and decisions: [SPEC.md](./SPEC.md) (in Russian).
+Full architecture, invariants and decisions: [SPEC.md](./SPEC.md).
 
 ## Data quality
 
@@ -204,10 +204,10 @@ Next up: categorization override in the plan dialog, non-time-based intervals. K
 
 ## Documentation
 
-- [SPEC.md](./SPEC.md) — the architecture spec: decisions, invariants, open questions (in Russian);
-- [CHANGELOG.md](./CHANGELOG.md) — release history (in Russian);
+- [SPEC.md](./SPEC.md) — the architecture spec: decisions, invariants, open questions;
+- [CHANGELOG.md](./CHANGELOG.md) — release history;
 - [examples/hospital](./examples/hospital/) — a live example with every model kind;
-- [CONTRIBUTING.md](./CONTRIBUTING.md) — build, test and PR guide (in Russian; PRs and issues in English are welcome).
+- [CONTRIBUTING.md](./CONTRIBUTING.md) — build, test and PR guide.
 
 ## License
 
