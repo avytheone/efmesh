@@ -88,6 +88,20 @@ const parseJobs = (value: string): number | undefined => {
   return value !== "" && Number.isFinite(jobs) && jobs >= 1 ? Math.floor(jobs) : undefined
 }
 
+const retriesFlag = Flag.string("retries").pipe(
+  Flag.withDefault(""),
+  Flag.withDescription(
+    "Сколько раз ретраить упавший батч бэкфилла (экспоненциальная пауза; по умолчанию 0)",
+  ),
+)
+
+const parseRetries = (value: string): { readonly attempts: number } | undefined => {
+  const attempts = Number(value)
+  return value !== "" && Number.isFinite(attempts) && attempts >= 1
+    ? { attempts: Math.floor(attempts) }
+    : undefined
+}
+
 const parseForwardOnly = (value: string): ReadonlyArray<string> | undefined => {
   const names = value
     .split(",")
@@ -167,13 +181,15 @@ const applyCommand = Command.make(
     config: configFlag,
     forwardOnly: forwardOnlyFlag,
     jobs: jobsFlag,
+    retries: retriesFlag,
     yes: yesFlag,
   },
-  ({ config, env, forwardOnly, jobs, yes }) =>
+  ({ config, env, forwardOnly, jobs, retries, yes }) =>
     Effect.gen(function* () {
       const loaded = yield* loadConfig(config)
       const names = parseForwardOnly(forwardOnly)
       const modelConcurrency = parseJobs(jobs)
+      const retry = parseRetries(retries)
       // план и применение — под одним слоем и одним межпроцессным локом:
       // применяется ровно тот план, который показан и подтверждён, и никто
       // (второй apply, cron с run) не вклинится между ними (SPEC §14.6);
@@ -193,6 +209,7 @@ const applyCommand = Command.make(
           ...(loaded.ducklake !== undefined ? { ducklake: loaded.ducklake } : {}),
           ...(loaded.attach !== undefined ? { attach: loaded.attach } : {}),
           ...(modelConcurrency !== undefined ? { modelConcurrency } : {}),
+          ...(retry !== undefined ? { retry } : {}),
         })
         yield* Console.log(
           applied.built.length > 0
@@ -226,16 +243,18 @@ const renderCommand = Command.make(
 
 const runCommand = Command.make(
   "run",
-  { env: Argument.string("env"), config: configFlag, jobs: jobsFlag },
-  ({ config, env, jobs }) =>
+  { env: Argument.string("env"), config: configFlag, jobs: jobsFlag, retries: retriesFlag },
+  ({ config, env, jobs, retries }) =>
     Effect.gen(function* () {
       const loaded = yield* loadConfig(config)
       const modelConcurrency = parseJobs(jobs)
+      const retry = parseRetries(retries)
       const applied = yield* run(env, loaded.models, {
         ...(loaded.lake !== undefined ? { lakePath: loaded.lake.path } : {}),
         ...(loaded.ducklake !== undefined ? { ducklake: loaded.ducklake } : {}),
         ...(loaded.attach !== undefined ? { attach: loaded.attach } : {}),
         ...(modelConcurrency !== undefined ? { modelConcurrency } : {}),
+        ...(retry !== undefined ? { retry } : {}),
       }).pipe(Effect.provide(configLayers(loaded)))
       yield* Console.log(
         applied.built.length > 0

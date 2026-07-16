@@ -1,5 +1,5 @@
 import { mkdirSync } from "node:fs"
-import { Clock, Data, Deferred, Effect } from "effect"
+import { Clock, Data, Deferred, Effect, Schedule } from "effect"
 import { AuditFailure } from "../core/audit.ts"
 import type { SeedReadError } from "../core/errors.ts"
 import type { GraphError, ModelGraph } from "../core/graph.ts"
@@ -83,6 +83,14 @@ export interface ApplyOptions {
    * последовательно, иначе чужие стейтменты вклинивались бы в BEGIN/COMMIT.
    */
   readonly modelConcurrency?: number
+  /**
+   * Ретраи упавшего батча бэкфилла (SPEC §5.3): Schedule.exponential от
+   * baseDelayMs (по умолчанию 500 мс), не больше attempts повторов. Батч
+   * транзакционен (DELETE+INSERT в одной транзакции, COPY перезаписывает
+   * партицию целиком) — повтор безопасен. Аудиты не ретраятся: провал
+   * аудита детерминирован, это не транзиентный сбой.
+   */
+  readonly retry?: { readonly attempts: number; readonly baseDelayMs?: number }
 }
 
 /** Модель просит экспорт в ATTACH-алиас, которого нет в конфиге. */
@@ -103,6 +111,17 @@ const transactional = (
   engine: Engine,
   statements: ReadonlyArray<string>,
 ): Effect.Effect<void, EngineError> => engine.transaction(statements)
+
+/** Ретраи транзиентного сбоя записи батча; без retry в опциях — как было. */
+const withBatchRetry =
+  (retry: ApplyOptions["retry"]) =>
+  <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
+    retry === undefined || retry.attempts <= 0
+      ? effect
+      : Effect.retry(effect, {
+          times: retry.attempts,
+          schedule: Schedule.exponential(retry.baseDelayMs ?? 500),
+        })
 
 /** Для s3://-путей mkdir не нужен (и невозможен) — httpfs пишет напрямую. */
 const ensureDir = (path: string): Effect.Effect<void> =>
@@ -190,6 +209,7 @@ const backfillIntoTable = (
   target: string,
   resolveRef: (ref: string) => string,
   concurrency: number,
+  retry: ApplyOptions["retry"],
 ): Effect.Effect<void, EngineError | StateError | AuditFailure> =>
   Effect.gen(function* () {
     if (model.kind._tag !== "incrementalByTimeRange") return
@@ -212,7 +232,7 @@ const backfillIntoTable = (
         yield* transactional(engine, [
           `DELETE FROM ${target} WHERE ${quoteIdent(kind.timeColumn)} >= ${start} AND ${quoteIdent(kind.timeColumn)} < ${end}`,
           `INSERT INTO ${target} (${columns}) SELECT ${columns} FROM (${body}) q`,
-        ]).pipe(Effect.tapError(markFailed))
+        ]).pipe(withBatchRetry(retry), Effect.tapError(markFailed))
         // аудит свежезагруженного интервала — до отметки done (SPEC §8)
         yield* runAudits(
           engine,
@@ -246,6 +266,7 @@ const backfillIntoParquet = (
   action: PlanAction,
   prefix: string,
   resolveRef: (ref: string) => string,
+  retry: ApplyOptions["retry"],
 ): Effect.Effect<void, EngineError | StateError | AuditFailure> =>
   Effect.gen(function* () {
     if (model.kind._tag !== "incrementalByTimeRange") return
@@ -264,7 +285,7 @@ const backfillIntoParquet = (
         const file = `${partition.replaceAll(`'`, `''`)}/data.parquet`
         yield* engine
           .execute(`COPY (${body}) TO '${file}' (FORMAT PARQUET)`)
-          .pipe(Effect.tapError(markFailed))
+          .pipe(withBatchRetry(retry), Effect.tapError(markFailed))
         // аудит записанной партиции — до отметки done; провал = не done → перезапись
         yield* runAudits(engine, model, `(SELECT * FROM read_parquet('${file}'))`).pipe(
           Effect.tapError(markFailed),
@@ -549,7 +570,15 @@ export const applyPlan = (
               renderedSql: render(model.fragment, { resolveRef: (ref) => ref }),
               kind: model.kind._tag,
             })
-            yield* backfillIntoParquet(engine, store, model, action, prefix, resolveRef)
+            yield* backfillIntoParquet(
+              engine,
+              store,
+              model,
+              action,
+              prefix,
+              resolveRef,
+              options?.retry,
+            )
           } else {
             // пустой скелет с формой запроса; при resume уже существует
             const target = tableRef(model, action.physicalFingerprint)
@@ -578,6 +607,7 @@ export const applyPlan = (
               target,
               resolveRef,
               options?.concurrency ?? 4,
+              options?.retry,
             )
           }
           break
