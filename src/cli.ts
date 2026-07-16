@@ -19,6 +19,12 @@ import {
 } from "./plan/diff.ts"
 import { EngineAdapter } from "./engine/adapter.ts"
 import { ducklakeAttachSql } from "./plan/naming.ts"
+import {
+  listSchedules,
+  registerSchedule,
+  removeSchedule,
+  systemdUnits,
+} from "./plan/schedule.ts"
 import { renderGraphHtml } from "./plan/graph-html.ts"
 import { formatLineage, lineage, LineageError } from "./plan/lineage.ts"
 import { environmentStatus } from "./plan/status.ts"
@@ -549,6 +555,82 @@ const diffCommand = Command.make(
   Command.withDescription("Чем окружения отличаются: версии (state store) или --data (данные)"),
 )
 
+const scheduleCommand = Command.make(
+  "schedule",
+  {
+    env: Argument.string("env").pipe(Argument.withDefault("")),
+    config: configFlag,
+    cron: Flag.string("cron").pipe(
+      Flag.withDefault("@hourly"),
+      Flag.withDescription("Cron-выражение или никнейм (@hourly, @daily, …)"),
+    ),
+    remove: Flag.boolean("remove").pipe(
+      Flag.withDescription("Снять регистрацию окружения из OS-шедулера"),
+    ),
+    list: Flag.boolean("list").pipe(
+      Flag.withDescription("Показать efmesh-записи OS-шедулера"),
+    ),
+    printSystemd: Flag.boolean("print-systemd").pipe(
+      Flag.withDescription(
+        "Напечатать systemd user-юниты вместо cron (Persistent=true догоняет пропуски; спасение без cron-демона)",
+      ),
+    ),
+  },
+  ({ config, cron, env, list, printSystemd, remove }) =>
+    Effect.gen(function* () {
+      if (list) {
+        const entries = yield* listSchedules()
+        if (entries.length === 0) yield* Console.log("efmesh-записей в OS-шедулере нет")
+        for (const entry of entries) yield* Console.log(`  ${entry}`)
+        return
+      }
+      if (env === "") {
+        yield* Console.error("нужно окружение: efmesh schedule <env> [--cron …]")
+        return yield* Effect.sync(() => {
+          process.exitCode = 1
+        })
+      }
+      const configAbs = NodePath.resolve(process.cwd(), config)
+      const target = { project: NodePath.dirname(configAbs), config: configAbs, env }
+      if (printSystemd) {
+        const units = systemdUnits(target, cron)
+        yield* Console.log(`# ~/.config/systemd/user/${units.name}.service`)
+        yield* Console.log(units.service)
+        yield* Console.log(`# ~/.config/systemd/user/${units.name}.timer`)
+        yield* Console.log(units.timer)
+        yield* Console.log(
+          `# включить: systemctl --user daemon-reload && systemctl --user enable --now ${units.name}.timer`,
+        )
+        return
+      }
+      if (remove) {
+        const removed = yield* removeSchedule(target)
+        yield* Console.log(`снято: ${removed.title}`)
+        return
+      }
+      const registered = yield* registerSchedule(target, cron)
+      yield* Console.log(`зарегистрировано: ${registered.title} — «${cron}» (OS-шедулер)`)
+      yield* Console.log(`воркер: ${registered.worker}`)
+      yield* Console.log(
+        "журнал тиков: efmesh status " + env + "; NB: cron не догоняет пропущенные запуски — строже systemd-таймер (--print-systemd)",
+      )
+    }).pipe(
+      // reason — самое ценное (рецепт для оператора): наружу словами, не стектрейсом
+      Effect.catchTag("ScheduleError", (error) =>
+        Effect.gen(function* () {
+          yield* Console.error(`schedule: ${error.reason}`)
+          yield* Effect.sync(() => {
+            process.exitCode = 1
+          })
+        }),
+      ),
+    ),
+).pipe(
+  Command.withDescription(
+    "Зарегистрировать run <env> в OS-шедулере (Bun.cron: crontab/launchd/Task Scheduler)",
+  ),
+)
+
 const janitorCommand = Command.make(
   "janitor",
   {
@@ -769,6 +851,7 @@ export const rootCommand = Command.make("efmesh").pipe(
     graphCommand,
     lineageCommand,
     diffCommand,
+    scheduleCommand,
     janitorCommand,
     migrateCommand,
   ]),

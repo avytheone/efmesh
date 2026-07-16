@@ -173,6 +173,7 @@ export default defineConfig({
 | `efmesh graph [--html]` | the model DAG as text or a page |
 | `efmesh janitor [--ttl 7]` | remove orphaned physical storage older than ttl |
 | `efmesh migrate` | bring the state-store schema up to the current version |
+| `efmesh schedule <env>` | register `run <env>` in the OS scheduler via `Bun.cron` |
 
 `apply`/`run` flags: `--jobs N` — DAG concurrency (always 1 on DuckDB — single connection), `--retries N` — retries for transient batch failures (exponential backoff), `--yes`/`-y` — skip confirmation, `--forward-only <model>,…` — reuse physical storage and history.
 
@@ -198,6 +199,15 @@ rates among matched keys, schema drift between sides. `--sample P` (1–99)
 compares a deterministic share of keys — md5 buckets aligned across both
 sides, so sampling never fabricates only-in rows. `--model a,b` narrows,
 `--json` for CI.
+
+`schedule <env> [--cron '@hourly']` registers the `run` tick in the OS
+scheduler (crontab / launchd / Task Scheduler) via `Bun.cron` — idempotent
+by title, `--remove` unregisters, `--list` shows what's there. Honest
+caveats: OS cron runs in the local timezone and does not catch up on missed
+runs, and Arch-family Linux ships no cron daemon at all — `--print-systemd`
+emits user-unit files instead (`Persistent=true` catches up). Overlapping
+ticks are safe by construction: `run` takes the env lock and exits `2` when
+changes await a human.
 
 Exit codes: `0` — success, `1` — error, `2` — "awaiting a human": the plan needs confirmation in a non-TTY (add `--yes`), or `run` hit unapplied changes. In a non-TTY, `apply` with changes and no `--yes` refuses — efmesh will not silently roll out a plan nobody has seen.
 

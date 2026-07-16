@@ -562,7 +562,18 @@ efmesh lineage <model[.column]>
 efmesh graph [--html]           — the model DAG
 efmesh janitor [--ttl 7]        — cleanup of orphaned physical tables
 efmesh migrate                  — catch the state store schema up to the current version
+efmesh schedule <env> [--cron '@hourly'] [--remove] [--list] [--print-systemd]
 ```
+
+`schedule` (0.2.0, #10) registers the `run` tick in the OS scheduler via
+`Bun.cron` (>= 1.3.11; `engines.bun` pins it): crontab on Linux, launchd on
+macOS, Task Scheduler on Windows. A generated worker in `.efmesh/` shells out
+to this package's own CLI with absolute paths (no npm-name guessing), so the
+tick keeps the `run` semantics: env lock, exit 2 = awaiting a human, the tick
+journal. Idempotent by title `efmesh-<project>-<env>`. Caveats: OS cron uses
+the local timezone and never catches up on missed runs; Arch-family Linux
+ships no cron daemon — the command detects a missing `crontab` and points to
+`--print-systemd`, which emits user units with `Persistent=true` instead.
 
 The config is `efmesh.config.ts` (not YAML): typed, it assembles the `Layer` of the engine
 and the state store, defines environments, the project's `start`, the ttl, concurrency.

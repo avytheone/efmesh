@@ -42,6 +42,11 @@ the first version gathers them in full.
   deterministic share of keys (md5 buckets aligned across both sides — no
   false only-in rows); `--json` for CI (`dataDiffEnvironments` in the
   library API) (#6).
+- `efmesh schedule <env>` — register the `run` tick in the OS scheduler via
+  `Bun.cron` (crontab/launchd/Task Scheduler; `engines.bun >= 1.3.11`).
+  Idempotent by title; `--remove`, `--list`; on cron-less Linux
+  (Arch family) it detects the missing daemon and `--print-systemd` emits
+  user units with `Persistent=true` instead (#10).
 
 ## [0.1.0-beta.2] — 2026-07-16
 

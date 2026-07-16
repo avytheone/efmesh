@@ -58,6 +58,15 @@ export {
   type StatusReport,
 } from "./plan/status.ts"
 export { formatLineage, lineage, LineageError, type LineageNode } from "./plan/lineage.ts"
+export {
+  listSchedules,
+  registerSchedule,
+  removeSchedule,
+  ScheduleError,
+  scheduleTitle,
+  systemdUnits,
+  type ScheduleTarget,
+} from "./plan/schedule.ts"
 
 // — план и применение: типы результата и опций —
 export type {
