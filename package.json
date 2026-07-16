@@ -25,7 +25,8 @@
   "files": [
     "src",
     "SPEC.md",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "README.ru.md"
   ],
   "type": "module",
   "module": "src/index.ts",

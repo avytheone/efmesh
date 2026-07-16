@@ -1,40 +1,40 @@
-# Пример: движения пациентов по отделениям
+# Example: patient movements across hospital departments
 
-Маленький, но полный проект: все виды моделей и целей материализации
-на одном сюжете — выгрузка движений пациентов из КИС превращается
-в витрины нагрузки на отделения.
+A small but complete project: every model kind and materialization target
+on one storyline — a raw HIS export of patient movements becomes
+department-load marts.
 
 ## DAG
 
 ```
-raw.moves (external, parquet-выгрузка)     ref.departments (seed, CSV)
+raw.moves (external, parquet export)       ref.departments (seed, CSV)
         │
-   med.moves (incrementalByTimeRange, аудиты notNull/unique/accepted)
+   med.moves (incrementalByTimeRange; notNull/unique/accepted audits)
         │
-   med.stays (full: пребывание + момент следующего движения)
-        ├── med.dept_load  (view: заходы по отделениям)
-        ├── mart.stays     (target: "parquet" — витрина в озеро)
-        └── mart.dept_daily (target: "ducklake" — витрина в DuckLake-каталог)
+   med.stays (full: the stay + the moment of the next movement)
+        ├── med.dept_load   (view: visits per department)
+        ├── mart.stays      (target: "parquet" — a mart in the lake)
+        └── mart.dept_daily (target: "ducklake" — a mart in a DuckLake catalog)
 ```
 
-Модели находятся discovery по glob (`discovery: "models.ts"` в конфиге) —
-в [efmesh.config.ts](./efmesh.config.ts) они не перечислены.
+Models are found by glob discovery (`discovery: "models.ts"` in the
+config) — [efmesh.config.ts](./efmesh.config.ts) does not list them.
 
-## Запуск
+## Running
 
 ```sh
-bun seed.ts                                # сырьё: lake/raw/moves.parquet
-bun ../../src/bin.ts plan dev              # что будет сделано
-bun ../../src/bin.ts apply dev             # физика + бэкфилл + view-слой
-bun ../../src/bin.ts audit dev             # аудиты view-слоя
-bun ../../src/bin.ts apply prod --yes      # промоушен: view-swap без пересчёта
-bun ../../src/bin.ts run dev               # cron-тик: догнать новые интервалы
+bun seed.ts                                # raw data: lake/raw/moves.parquet
+bun ../../src/bin.ts plan dev              # what would be done
+bun ../../src/bin.ts apply dev             # physical tables + backfill + views
+bun ../../src/bin.ts audit dev             # audit the view layer
+bun ../../src/bin.ts apply prod --yes      # promotion: view swap, no recompute
+bun ../../src/bin.ts run dev               # cron tick: catch up on intervals
 ```
 
-Дальше стоит поиграть: поменяйте выражение в `med.stays` и посмотрите
-`plan` (breaking + каскад), допишите колонку в конец SELECT (non-breaking),
-поправьте `departments.csv` (новая версия seed по содержимому),
-снесите старую физику `janitor`-ом.
+Things worth playing with: change an expression in `med.stays` and look at
+`plan` (breaking + cascade), append a column to the end of a SELECT
+(non-breaking), edit `departments.csv` (a new seed version by content),
+collect old physical storage with the `janitor`.
 
-Файлы `efmesh.duckdb`, `efmesh.state.sqlite`, `ducklake.sqlite` и `lake/`
-создаются при работе и в git не попадают.
+`efmesh.duckdb`, `efmesh.state.sqlite`, `ducklake.sqlite` and `lake/` are
+created at runtime and stay out of git.

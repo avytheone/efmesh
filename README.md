@@ -1,10 +1,12 @@
 # efmesh
 
-> Трансформация данных в духе [sqlmesh](https://sqlmesh.com) — на TypeScript, [Bun](https://bun.sh) и [Effect](https://effect.website).
+> Data transformation in the spirit of [sqlmesh](https://sqlmesh.com) — on TypeScript, [Bun](https://bun.sh) and [Effect](https://effect.website).
 
 [![ci](https://github.com/avytheone/efmesh/actions/workflows/ci.yml/badge.svg)](https://github.com/avytheone/efmesh/actions/workflows/ci.yml) ![status](https://img.shields.io/badge/status-beta-orange) ![version](https://img.shields.io/badge/version-0.1.0--beta.1-blue) ![license](https://img.shields.io/badge/license-MIT-green) ![runtime](https://img.shields.io/badge/runtime-bun-black) ![effect](https://img.shields.io/badge/effect-v4-5C4EE5)
 
-Модели — обычные TypeScript-модули: тело на SQL, ссылки между моделями — импорты, форма данных — Effect Schema. efmesh считает fingerprint каждой модели по каноническому AST, хранит версии снапшотами, строит план как diff «проект против окружения» и применяет ровно его: физика пересчитывается только там, где что-то реально изменилось, а окружения (dev/prod/…) — виртуальные view поверх общей физики, промоушен в prod не стоит ни одного пересчёта.
+*Русская версия: [README.ru.md](./README.ru.md).*
+
+Models are plain TypeScript modules: SQL bodies, imports as dependencies, Effect Schema as the data shape. efmesh fingerprints every model by its canonical AST, keeps versions as snapshots, computes a plan as the diff between your project and an environment, and applies exactly that plan: physical tables are rebuilt only where something actually changed, while environments (dev/prod/…) are virtual views over shared physical storage — promoting to prod costs zero recomputation.
 
 ```ts
 import { Schema } from "effect"
@@ -17,7 +19,7 @@ export const moves = defineModel(
     kind: kind.incrementalByTimeRange({
       timeColumn: "moved_at",
       start: "2026-01-01T00:00:00Z",
-      lookback: 1, // хвост перечитывается — поздние данные подъезжают
+      lookback: 1, // the tail is re-read — late-arriving data catches up
     }),
     schema: Schema.Struct({ case_id: Schema.String, moved_at: Schema.DateTimeUtc }),
   },
@@ -29,87 +31,94 @@ export const moves = defineModel(
 )
 ```
 
-## Почему не dbt / sqlmesh
+## Why not dbt / sqlmesh
 
-|                        | dbt                   | sqlmesh                 | efmesh |
-|------------------------|-----------------------|-------------------------|--------|
-| Язык моделей           | SQL + Jinja           | SQL + Jinja/Python      | SQL внутри TypeScript |
-| Зависимости            | `ref('строка')`       | парсинг SQL             | импорт модуля — проверяет компилятор |
-| Типизация колонок      | нет                   | contracts (рантайм)     | Effect Schema: компайл-тайм + контракт перед сборкой |
-| Версионирование        | нет (state-less)      | снапшоты + fingerprint  | снапшоты + fingerprint |
-| Dev-окружения          | копии таблиц          | виртуальные (view)      | виртуальные (view) |
-| Инкрементальность      | самописный `is_incremental()` | интервалы, автоучёт | интервалы, автоучёт, resume |
-| Озеро на parquet       | адаптеры              | адаптеры                | родное: `target: "parquet"`, интервал = партиция |
+|                     | dbt                   | sqlmesh                | efmesh |
+|---------------------|-----------------------|------------------------|--------|
+| Model language      | SQL + Jinja           | SQL + Jinja/Python     | SQL inside TypeScript |
+| Dependencies        | `ref('string')`       | SQL parsing            | module imports — checked by the compiler |
+| Column typing       | no                    | contracts (runtime)    | Effect Schema: compile-time + a contract before every build |
+| Versioning          | none (state-less)     | snapshots + fingerprint | snapshots + fingerprint |
+| Dev environments    | table copies          | virtual (views)        | virtual (views) |
+| Incrementality      | hand-rolled `is_incremental()` | intervals, tracked | intervals, tracked, resumable |
+| Parquet lake        | adapters              | adapters               | native: `target: "parquet"`, interval = partition |
+| Multi-dialect       | yes                   | yes (sqlglot)          | **no** — your engine's dialect (DuckDB or Postgres) |
 
-Опечатка в `ref` у нас — ошибка компиляции, а не пустой прогон; переименованная колонка родителя ломает сборку потомка до того, как SQL уедет в базу.
+A typo in a `ref` is a compile error, not an empty run; renaming a parent's column breaks the child's build before any SQL reaches the database.
 
-## Возможности
+## Who this is for (and who it isn't)
 
-**Модели.** `full`, `view`, `embedded` (подзапрос без материализации), `incrementalByTimeRange` (интервальный учёт, бэкфилл батчами, lookback), `incrementalByUniqueKey` (upsert), `scdType2` (история строк, `valid_from`/`valid_to` ведёт efmesh), `defineExternal` (таблица, файлы parquet/csv/json, URL), `defineSeed` (справочник из CSV/JSON, содержимое в fingerprint), `defineSqlModel` (сырой `.sql`-файл с `@ref`/`@start`/`@end`).
+**For you**, if you are a TypeScript team on Bun, want a typed dbt/sqlmesh-style workflow on top of DuckDB or Postgres, and are fine living on a beta (efmesh is 0.1.x; Effect v4 is beta, pinned exactly as a peer dependency).
 
-**Цели материализации.** Нативная таблица движка, `parquet` (озеро: локально или s3://, интервал = партиция, view поверх `read_parquet`), `ducklake` (таблица-на-fingerprint в [DuckLake](https://ducklake.select)-каталоге — снапшоты и time travel каталога бонусом).
+**Not for you**, if you need: a Node runtime (Bun-only for now), multi-dialect or cloud DWHs (Snowflake/BigQuery are out of scope), 1.0-grade stability, or the Python ecosystem — take sqlmesh instead, honestly.
 
-**План и версии.** Fingerprint по каноническому AST (переформатирование SQL не триггерит пересборку), категоризация изменений breaking / non-breaking / indirect / forward-only, `--forward-only` — правка без переигрывания истории (новая версия наследует физику и done-интервалы, новые колонки — `ALTER`), подтверждение плана в TTY, журнал применений с `applied_by`.
+## Features
 
-**Качество.** Контракт схемы перед сборкой (`DESCRIBE` запроса против объявленной Schema), аудиты `notNull` / `unique` / `accepted` (blocking роняет apply, `warn` — логирует), автономный `efmesh audit` по view-слою окружения, `testModel` — юнит-тесты моделей на фикстурах в in-memory DuckDB.
+**Models.** `full`, `view`, `embedded` (inlined subquery, no materialization), `incrementalByTimeRange` (interval ledger, batched backfill, lookback), `incrementalByUniqueKey` (upsert), `scdType2` (row history, `valid_from`/`valid_to` managed by efmesh), `defineExternal` (tables, parquet/csv/json files, URLs), `defineSeed` (CSV/JSON reference data, content hash in the fingerprint), `defineSqlModel` (raw `.sql` files with `@ref`/`@start`/`@end`).
 
-**Эксплуатация.** `run` — идемпотентный тик планировщика для cron/systemd; `apply` и `run` окружения — под одним межпроцессным локом (протухший лок упавшего процесса перехватывается по ttl); DAG-конкурентность `--jobs` (модель стартует по готовности родителей); ретраи батчей `--retries`; janitor для осиротевшей физики; метрики и спаны из коробки; версионируемая схема state store + `efmesh migrate`.
+**Materialization targets.** Native engine tables, `parquet` (a lake, local or s3://, interval = partition, views over `read_parquet`), `ducklake` (table-per-fingerprint in a [DuckLake](https://ducklake.select) catalog — catalog snapshots and time travel come as a bonus).
 
-**Движки.** DuckDB (по умолчанию, включая федерацию httpfs/ATTACH) и Postgres (`Bun.SQL`-пул, canonicalize через libpg_query, параллельный бэкфилл). State store — SQLite рядом с проектом или схема в Postgres.
+**Plans and versions.** Fingerprints over canonical ASTs (reformatting SQL never triggers a rebuild — frozen by golden tests), change categorization breaking / non-breaking / indirect / forward-only, `--forward-only` applies a change without replaying history (the new version inherits physical storage and done-intervals; new columns via `ALTER`), plan confirmation in a TTY, an applied-plans journal with `applied_by`.
 
-## Быстрый старт
+**Data quality.** A schema contract before every build (`DESCRIBE` of the query against the declared Schema), `notNull` / `unique` / `accepted` audits (blocking fails the apply, `warn` logs), a standalone `efmesh audit` over an environment's view layer, and `testModel` — unit tests for models on fixtures in in-memory DuckDB.
 
-Пакет пока не опубликован в registry — ставится из git:
+**Operations.** `run` — an idempotent scheduler tick for cron/systemd; `apply` and `run` of an environment share one cross-process lock (stale locks of crashed processes are reclaimed by ttl); DAG concurrency `--jobs` (a model starts as soon as its parents are ready); batch retries `--retries`; a janitor for orphaned physical storage (removal is a transactional claim — the race against a concurrent apply is closed); Metric counters and spans on operations; a versioned state-store schema + `efmesh migrate` (with a store file backup).
+
+**Engines.** DuckDB (default, including httpfs/ATTACH federation) and Postgres (`Bun.SQL` pool, canonicalization via libpg_query, parallel backfill). State store: SQLite next to the project, or a schema in Postgres.
+
+## Quickstart
+
+Not yet published to a registry — install from git:
 
 ```sh
 bun add -d efmesh@git+https://github.com/avytheone/efmesh.git
 bunx efmesh init my-warehouse && cd my-warehouse
-bunx efmesh plan dev    # что будет сделано
-bunx efmesh apply dev   # физика, бэкфилл, view-слой
+bunx efmesh plan dev    # what would be done
+bunx efmesh apply dev   # physical tables, backfill, view layer
 ```
 
-`init` разворачивает рабочий скелет: `efmesh.config.ts`, модели-пример, seed. Дальше — правьте модели и гоняйте `plan`/`apply`; полный жизненный цикл:
+`init` scaffolds a working skeleton: `efmesh.config.ts`, example models, a seed. From there, edit models and iterate with `plan`/`apply`; the full lifecycle:
 
 ```sh
-bunx efmesh apply dev            # применить изменения в dev
-bunx efmesh audit dev            # аудиты того, что окружение отдаёт сейчас
-bunx efmesh apply prod --yes     # промоушен: view-swap, без пересчёта
-bunx efmesh run prod             # cron-тик: догнать новые интервалы
+bunx efmesh apply dev            # apply changes to dev
+bunx efmesh audit dev            # audit what the environment serves right now
+bunx efmesh apply prod --yes     # promotion: view swap, no recomputation
+bunx efmesh run prod             # cron tick: catch up on new intervals
 ```
 
-Живой пример: [examples/hospital](./examples/hospital/) — движения пациентов по отделениям, все виды моделей и целей.
+Live example: [examples/hospital](./examples/hospital/) — patient movements across hospital departments, every model kind and target.
 
-## Как это устроено
+## How it works
 
 ```
-модели (TS-модули)  ──►  DAG + fingerprint по каноническому AST
-                              │
-                    план = diff против state store
-                              │
-        apply: физика ── бэкфилл интервалов ── аудиты ── view-слой
-                              │
-              state store: снапшоты, интервалы, окружения, журнал
+models (TS modules)  ──►  DAG + fingerprints over canonical ASTs
+                               │
+                     plan = diff against the state store
+                               │
+      apply: physical tables ── interval backfill ── audits ── view layer
+                               │
+          state store: snapshots, intervals, environments, journal
 ```
 
-- **Физический слой** — таблицы `_efmesh.<модель>__<fp8>` (или parquet-префиксы/DuckLake): версия = таблица, старая живёт до janitor.
-- **Виртуальный слой** — view `<env>__<schema>.<таблица>` (prod — просто `<schema>.<таблица>`), указывающие на физику. Окружение — это набор указателей; промоушен и откат — переключение view.
-- **Учёт интервалов** — единственный источник правды о посчитанном: упавший бэкфилл продолжается с места остановки, пересчёт интервала — DELETE+INSERT диапазона в транзакции, без дублей.
+- **Physical layer** — tables `_efmesh.<model>__<fp8>` (or parquet prefixes / DuckLake): a version is a table; the old one lives until the janitor collects it.
+- **Virtual layer** — views `<env>__<schema>.<table>` (prod is just `<schema>.<table>`) pointing at physical storage. An environment is a set of pointers; promotion and rollback are view swaps.
+- **The interval ledger** is the single source of truth about what has been computed: an interrupted backfill resumes where it stopped; recomputing an interval is a transactional DELETE+INSERT of the range — no duplicates.
 
-Полная архитектура, инварианты и решения — в [SPEC.md](./SPEC.md).
+Full architecture, invariants and decisions: [SPEC.md](./SPEC.md) (in Russian).
 
-## Качество данных
+## Data quality
 
 ```ts
-// аудит: SQL-предикат нарушений; blocking роняет apply, warn — логирует
+// an audit is a SQL predicate over violations; blocking fails the apply, warn logs
 audits: [
   audit.notNull("case_id"),
   audit.unique("case_id", "moved_at"),
-  audit.warn(audit.accepted("dept", ["КПП", "ОРИТ", "терапия", "хирургия"])),
+  audit.warn(audit.accepted("dept", ["ICU", "surgery", "therapy"])),
 ]
 ```
 
 ```ts
-// юнит-тест модели: фикстуры → CTE → in-memory DuckDB → сверка (bun test)
+// a model unit test: fixtures → CTEs → in-memory DuckDB → comparison (bun test)
 import { testModel } from "efmesh/testing"
 
 test("stays", () =>
@@ -119,69 +128,71 @@ test("stays", () =>
   }))
 ```
 
-Объявленная `schema` — не документация, а контракт: перед сборкой efmesh делает `DESCRIBE` запроса и падает с `SchemaMismatchError`, если имена или типы колонок разошлись. NULL-гарантии выражаются аудитом `notNull`.
+The declared `schema` is a contract, not documentation: before every build efmesh runs `DESCRIBE` on the query and fails with `SchemaMismatchError` if column names or types diverge. NULL guarantees are expressed with the `notNull` audit.
 
-## Конфигурация
+## Configuration
 
-`efmesh.config.ts` — типизированный TS-модуль, никакого YAML:
+`efmesh.config.ts` is a typed TS module — no YAML:
 
 ```ts
 import { defineConfig } from "efmesh"
 
 export default defineConfig({
-  discovery: "models/**/*.ts",      // все экспорты-модели по glob; дубликат имени = ошибка
-  // models: [a, b, c],             // …или значениями (можно совместно с discovery)
+  discovery: "models/**/*.ts",      // every model export by glob; duplicate names = load error
+  // models: [a, b, c],             // …or by value (can be combined with discovery)
 
-  // движок: DuckDB-файл по умолчанию, Postgres — одной строкой
-  engine: { path: "efmesh.duckdb" },          // или { url: "postgres://…", max: 8 }
-  state: { path: "efmesh.state.sqlite" },     // или { url: "postgres://…" }
+  // engine: a DuckDB file by default; Postgres is one line
+  engine: { path: "efmesh.duckdb" },          // or { url: "postgres://…", max: 8 }
+  state: { path: "efmesh.state.sqlite" },     // or { url: "postgres://…" }
 
-  lake: { path: "lake" },                     // для target: "parquet"; локально или s3://
+  lake: { path: "lake" },                     // for target: "parquet"; local or s3://
   ducklake: { catalog: "ducklake.sqlite", dataPath: "lake/ducklake" },
-  attach: { reporting: { url: "reporting.duckdb" } },  // export-цели по алиасам
+  attach: { reporting: { url: "reporting.duckdb" } },  // export targets by alias
 })
 ```
 
 ## CLI
 
-| Команда | Что делает |
+| Command | What it does |
 |---|---|
-| `efmesh init [dir]` | скаффолд проекта: конфиг, модели-пример, seed |
-| `efmesh plan <env>` | diff проекта против окружения + недостающие интервалы, ничего не меняет |
-| `efmesh apply <env>` | план → подтверждение (TTY) → физика, бэкфилл, view-слой |
-| `efmesh run <env>` | тик планировщика: только новые интервалы, под локом; для cron |
-| `efmesh audit <env>` | аудиты view-слоя окружения — ловит деградацию задним числом |
-| `efmesh diff <envA> <envB>` | чем окружения отличаются |
-| `efmesh render <model> [--env]` | итоговый SQL модели |
-| `efmesh lineage <model[.col]>` | колоночный lineage до сырья |
-| `efmesh graph [--html]` | DAG моделей текстом или страницей |
-| `efmesh janitor [--ttl 7]` | снести осиротевшую физику старше ttl |
-| `efmesh migrate` | догнать схему state store до текущей версии |
+| `efmesh init [dir]` | scaffold a project: config, example models, a seed |
+| `efmesh plan <env>` | diff the project against an environment + missing intervals; changes nothing |
+| `efmesh apply <env>` | plan → confirmation (TTY) → physical tables, backfill, view layer |
+| `efmesh run <env>` | scheduler tick: new intervals only, under the lock; for cron |
+| `efmesh audit <env>` | audit the environment's view layer — catches after-the-fact degradation |
+| `efmesh diff <envA> <envB>` | how two environments differ |
+| `efmesh render <model> [--env]` | the final SQL of a model |
+| `efmesh lineage <model[.col]>` | column lineage down to the raw sources |
+| `efmesh graph [--html]` | the model DAG as text or a page |
+| `efmesh janitor [--ttl 7]` | remove orphaned physical storage older than ttl |
+| `efmesh migrate` | bring the state-store schema up to the current version |
 
-Флаги `apply`/`run`: `--jobs N` — DAG-конкурентность (на DuckDB всегда 1 — одно соединение), `--retries N` — ретраи транзиентных сбоев батча (экспоненциальная пауза), `--yes`/`-y` — без подтверждения, `--forward-only <model>,…` — реюз физики и истории.
+`apply`/`run` flags: `--jobs N` — DAG concurrency (always 1 on DuckDB — single connection), `--retries N` — retries for transient batch failures (exponential backoff), `--yes`/`-y` — skip confirmation, `--forward-only <model>,…` — reuse physical storage and history.
+
+Exit codes: `0` — success, `1` — error, `2` — "awaiting a human": the plan needs confirmation in a non-TTY (add `--yes`), or `run` hit unapplied changes. In a non-TTY, `apply` with changes and no `--yes` refuses — efmesh will not silently roll out a plan nobody has seen.
 
 ## Postgres
 
 ```ts
-engine: { url: "postgres://…" },  // canonicalize через libpg_query
-state:  { url: "postgres://…" },  // схема efmesh_state
+engine: { url: "postgres://…" },  // canonicalization via libpg_query
+state:  { url: "postgres://…" },  // schema efmesh_state
 ```
 
-Бэкфилл гонит батчи параллельно (пул соединений), независимые ветки DAG строятся одновременно. DuckDB-федерация (seed, parquet, external-файлы, export, ducklake) на Postgres честно падает `EngineFeatureError` — без тихой деградации.
+Backfill runs batches in parallel (connection pool); independent DAG branches build concurrently. DuckDB federation (seeds, parquet, external files, export, ducklake) fails honestly on Postgres with `EngineFeatureError` — no silent degradation.
 
-## Статус
+## Status
 
-**0.1.0-beta.1.** Ядро построено и прогнано на живом примере: фазы F0–F5 (см. [SPEC.md §13](./SPEC.md) и [CHANGELOG](./CHANGELOG.md)), 123 теста, включая живой Postgres-кластер. Effect v4 — beta-зависимость: API efmesh закладывается на стабильное подмножество, точечные адаптации возможны до финализации v4.
+**0.1.0-beta.1.** The core is built and exercised on a live example: phases F0–F6 ([SPEC.md §13](./SPEC.md), [CHANGELOG](./CHANGELOG.md)), 138 tests including a live Postgres cluster and golden tests freezing fingerprint stability. Effect v4 is a beta dependency: pinned exactly (peerDependencies); a weekly CI job tracks drift against fresh betas.
 
-Дальше по спеке: override категоризации в диалоге плана, интервалы не по времени, публикация в registry. Известное ограничение: одиночный бинарник `bun build --compile` собирается, но standalone-исполняемые Bun не резолвят импорт `"efmesh"` из рантайм-конфига — дистрибуция пакетом (SPEC §10).
+Next up: categorization override in the plan dialog, non-time-based intervals. Known limitation: a single `bun build --compile` binary builds, but standalone Bun executables can't resolve the `"efmesh"` import from a runtime-loaded config — distribution is via the package (SPEC §10).
 
-## Документация
+## Documentation
 
-- [SPEC.md](./SPEC.md) — архитектурная спецификация: решения, инварианты, открытые вопросы;
-- [CHANGELOG.md](./CHANGELOG.md) — история изменений;
-- [examples/hospital](./examples/hospital/) — живой пример со всеми видами моделей;
-- [CONTRIBUTING.md](./CONTRIBUTING.md) — как собрать, погонять тесты и предложить правку.
+- [SPEC.md](./SPEC.md) — the architecture spec: decisions, invariants, open questions (in Russian);
+- [CHANGELOG.md](./CHANGELOG.md) — release history (in Russian);
+- [examples/hospital](./examples/hospital/) — a live example with every model kind;
+- [CONTRIBUTING.md](./CONTRIBUTING.md) — build, test and PR guide (in Russian; PRs and issues in English are welcome).
 
-## Лицензия
+## License
 
 [MIT](./LICENSE) © Alexey Yakimanskiy
