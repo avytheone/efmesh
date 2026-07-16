@@ -71,6 +71,19 @@ export const divergedPaths = (oldAst: string, newAst: string): ReadonlyArray<str
 }
 
 /**
+ * Гвардрейл override'а (#5): в новом верхнем SELECT колонок меньше — они
+ * удалены, потомки читают их по именам, «non-breaking» очевидно противоречит
+ * AST. Непарсибельный канон противоречием не считается: решение — за
+ * оператором, override явный и журналируется.
+ */
+export const dropsColumns = (oldAst: string, newAst: string): boolean => {
+  const before = topSelect(oldAst)
+  const after = topSelect(newAst)
+  if (before === null || after === null) return false
+  return after.list.length < before.list.length
+}
+
+/**
  * Обоснование вердикта categorizeAstChange теми же правилами, которыми он
  * вынесен (SPEC §5.2): non-breaking — только суффикс верхнего SELECT.
  */

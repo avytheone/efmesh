@@ -233,8 +233,31 @@ on encountering a snapshot of another version, honestly stops
 | **forward-only** | An explicit user flag (`--forward-only <model>,…`) or a cascade: the model's own AST did not change, and all changed parents are themselves forward-only | Nothing retroactively: the new version inherits the physical table and done-intervals of the old one (the snapshot's `physical_fp`), new columns are added via `ALTER` (history gets NULL), dropping columns cannot be expressed by reuse — an error. Only `incrementalByTimeRange` — for the other kinds "retroactively" does not exist by construction |
 | **metadata-only** | Fields outside the fingerprint changed | Nothing |
 
-Categorization is automatic (comparison of AST expressions by column), with the option of
-a manual override in the plan dialog. When in doubt efmesh is conservative: if it could not
+**Indirect physics reuse (0.2.0, #5 — the sqlmesh "indirect non-breaking"
+class).** A descendant whose own AST did not change (indirect) inherits the
+physical table and interval accounting of its previous version when it is
+safe by construction: (1) the version was moved ONLY by parents — verified by
+recomputing the fingerprint with the parents' old fingerprints, which must
+reproduce the old one (so a simultaneous metadata drift of kind/grain/
+columns/target disables reuse); (2) every changed direct parent guarantees
+identical data in the existing columns: non-breaking (strictly suffix
+columns), forward-only, or an ancestor that itself reuses physics. Applies to
+materialized kinds (full, incrementalByTimeRange, incrementalByUniqueKey,
+scdType2) — scdType2 keeps its accumulated row history instead of losing it
+to a rebuild. Reused physics is shared with the old version: refresh-style
+kinds mutate it in place before promotion — the same trade-off forward-only
+already makes.
+
+Categorization is automatic (comparison of AST expressions by column), with a
+manual override as a flag, not a dialog (0.2.0, #5): `--reclassify
+model=breaking|non-breaking` on `plan`/`apply` states the operator's verdict
+on top of `--explain`, is journaled with `applied_by`
+(`PlanAction.reclassifiedFrom`), and thereby governs whether descendants may
+reuse physics. It does not exempt the model itself from a rebuild — that is
+`--forward-only`'s job. Guard rail: an override that plainly contradicts the
+AST (dropped columns declared non-breaking) is refused. It only applies to
+breaking/non-breaking verdicts; on unchanged/added/removed/indirect it is
+silently inert. When in doubt efmesh is conservative: if it could not
 prove non-breaking — then it is breaking. *Clarification in F2/F3: non-breaking
 is recognized as a strictly suffix extension of the select_list with the rest of
 the tree untouched (the descendants' INSERT is positional); physical reuse is not

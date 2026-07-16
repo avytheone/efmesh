@@ -16,6 +16,7 @@ import {
   planChanges,
   type FingerprintVersionError,
   type ForwardOnlyError,
+  type ReclassifyError,
   type InvalidEnvironmentError,
   type Plan,
   type PlanOptions,
@@ -42,6 +43,7 @@ export const Efmesh = {
     | StateError
     | InvalidEnvironmentError
     | ForwardOnlyError
+    | ReclassifyError
     | FingerprintVersionError
     | EngineError
     | SqlParseError

@@ -21,7 +21,7 @@ import { fp8 } from "./plan/naming.ts"
 import { envLockName, withStateLock } from "./plan/lock.ts"
 import { applyPlan } from "./plan/executor.ts"
 import { run } from "./plan/run.ts"
-import { planChanges, type Plan } from "./plan/planner.ts"
+import { planChanges, ReclassifyError, type Plan } from "./plan/planner.ts"
 import { migratePostgresState } from "./state/postgres.ts"
 import { migrateSqliteState, SqliteStateLive } from "./state/sqlite.ts"
 
@@ -106,6 +106,13 @@ const forwardOnlyFlag = Flag.string("forward-only").pipe(
   ),
 )
 
+const reclassifyFlag = Flag.string("reclassify").pipe(
+  Flag.withDefault(""),
+  Flag.withDescription(
+    "Override категоризации (#5): «модель=breaking|non-breaking[,…]» поверх --explain; журналируется с applied_by",
+  ),
+)
+
 const jobsFlag = Flag.string("jobs").pipe(
   Flag.withDefault(""),
   Flag.withDescription(
@@ -139,6 +146,35 @@ const parseForwardOnly = (value: string): ReadonlyArray<string> | undefined => {
     .filter((name) => name !== "")
   return names.length > 0 ? names : undefined
 }
+
+/** `модель=breaking|non-breaking[,…]` → запись для PlanOptions.reclassify (#5). */
+export const parseReclassify = (
+  value: string,
+): Effect.Effect<Readonly<Record<string, "breaking" | "non-breaking">> | undefined, ReclassifyError> =>
+  Effect.gen(function* () {
+    const entries = value
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter((entry) => entry !== "")
+    if (entries.length === 0) return undefined
+    const parsed: Record<string, "breaking" | "non-breaking"> = {}
+    for (const entry of entries) {
+      const [model, category, ...extra] = entry.split("=")
+      if (
+        model === undefined ||
+        model === "" ||
+        extra.length > 0 ||
+        (category !== "breaking" && category !== "non-breaking")
+      ) {
+        return yield* new ReclassifyError({
+          model: entry,
+          reason: "ожидается «модель=breaking» или «модель=non-breaking»",
+        })
+      }
+      parsed[model] = category
+    }
+    return parsed
+  })
 
 const yesFlag = Flag.boolean("yes").pipe(
   Flag.withAlias("y"),
@@ -188,6 +224,11 @@ export const planToJson = (plan: Plan): unknown => ({
   actions: plan.actions.map((action) => ({
     name: action.name,
     change: action.change,
+    // override оператора (#5) и реюз физики — аддитивные поля контракта
+    ...(action.reclassifiedFrom !== undefined
+      ? { reclassifiedFrom: action.reclassifiedFrom }
+      : {}),
+    ...(action.reusedFrom !== undefined ? { reusedFrom: action.reusedFrom } : {}),
     fingerprint: action.fingerprint,
     build: action.build,
     backfill: action.backfill.map((range) => ({
@@ -209,13 +250,21 @@ const printPlan = (plan: Plan, explain = false) =>
     yield* Console.log(`план для окружения «${plan.env}»:`)
     for (const action of plan.actions) {
       const mark = CHANGE_MARK[action.change] ?? "?"
+      const overridden =
+        action.reclassifiedFrom !== undefined
+          ? `  [override: было ${action.reclassifiedFrom}]`
+          : ""
+      const reused =
+        action.change === "indirect" && action.reusedFrom !== undefined
+          ? "  [физика реюзается]"
+          : ""
       const build = action.build ? "  [сборка]" : ""
       const backfill =
         action.backfill.length > 0
           ? `  бэкфилл ${action.backfill.map(formatRange).join(", ")}`
           : ""
       yield* Console.log(
-        `  ${mark} ${action.name}  ${action.change} @${fp8(action.fingerprint)}${build}${backfill}`,
+        `  ${mark} ${action.name}  ${action.change} @${fp8(action.fingerprint)}${overridden}${reused}${build}${backfill}`,
       )
       if (explain && action.explain !== undefined) {
         yield* Console.log(`      почему: ${action.explain.reason}`)
@@ -244,15 +293,18 @@ const planCommand = Command.make(
     env: Argument.string("env"),
     config: configFlag,
     forwardOnly: forwardOnlyFlag,
+    reclassify: reclassifyFlag,
     json: jsonFlag,
     explain: explainFlag,
   },
-  ({ config, env, explain, forwardOnly, json }) =>
+  ({ config, env, explain, forwardOnly, json, reclassify }) =>
     Effect.gen(function* () {
       const loaded = yield* loadConfig(config)
       const names = parseForwardOnly(forwardOnly)
+      const overrides = yield* parseReclassify(reclassify)
       const plan = yield* Efmesh.plan(env, loaded.models, {
         ...(names !== undefined ? { forwardOnly: names } : {}),
+        ...(overrides !== undefined ? { reclassify: overrides } : {}),
       }).pipe(Effect.provide(configLayers(loaded)))
       yield* json ? printJson(planToJson(plan)) : printPlan(plan, explain)
     }),
@@ -264,14 +316,16 @@ const applyCommand = Command.make(
     env: Argument.string("env"),
     config: configFlag,
     forwardOnly: forwardOnlyFlag,
+    reclassify: reclassifyFlag,
     jobs: jobsFlag,
     retries: retriesFlag,
     yes: yesFlag,
   },
-  ({ config, env, forwardOnly, jobs, retries, yes }) =>
+  ({ config, env, forwardOnly, jobs, reclassify, retries, yes }) =>
     Effect.gen(function* () {
       const loaded = yield* loadConfig(config)
       const names = parseForwardOnly(forwardOnly)
+      const overrides = yield* parseReclassify(reclassify)
       const modelConcurrency = parseJobs(jobs)
       const retry = parseRetries(retries)
       // план и применение — под одним слоем и одним межпроцессным локом:
@@ -282,6 +336,7 @@ const applyCommand = Command.make(
         const graph = yield* buildGraph(loaded.models)
         const plan = yield* planChanges(env, graph, {
           ...(names !== undefined ? { forwardOnly: names } : {}),
+          ...(overrides !== undefined ? { reclassify: overrides } : {}),
         })
         yield* printPlan(plan)
         const decision = decideApply(plan.hasChanges, yes, process.stdin.isTTY === true)

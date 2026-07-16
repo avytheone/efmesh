@@ -103,6 +103,39 @@ export interface CanonCache {
 export const canonCacheKey = (dialect: string, source: string): string =>
   sha256(`${FINGERPRINT_VERSION}:${dialect}:${source}`)
 
+/** Модель в объёме, нужном fingerprint'у: kind, метаданные формы данных, цель. */
+type FingerprintableModel = Parameters<typeof columnNames>[0] & {
+  readonly name: { readonly full: string }
+  readonly kind: ModelKind
+  readonly grain: ReadonlyArray<string> | undefined
+  readonly target: string | undefined
+}
+
+/**
+ * Fingerprint одной модели из готового AST и подписей родителей
+ * (`имя=fingerprint`, отсортированы). Нужен планировщику для проверки
+ * «версию сдвинули ТОЛЬКО родители» (#5): пересчёт со старыми подписями
+ * обязан дать старый fingerprint — иначе разошлись ещё и метаданные,
+ * и физику реюзать нельзя.
+ */
+export const modelFingerprint = (
+  model: FingerprintableModel,
+  ast: string | null,
+  parents: ReadonlyArray<string>,
+): Effect.Effect<string, SeedReadError> =>
+  Effect.gen(function* () {
+    const payload = JSON.stringify({
+      ast,
+      kind: yield* kindPayload(model, model.kind),
+      grain: model.grain,
+      columns: columnNames(model),
+      // смена цели материализации = новая физика, потребители перечитают её
+      target: model.target,
+      parents,
+    })
+    return sha256(payload)
+  })
+
 /** Fingerprint всех моделей графа; транзитивность — через хэши родителей. */
 export const fingerprintGraph = (
   graph: ModelGraph,
@@ -135,16 +168,7 @@ export const fingerprintGraph = (
       const parents = [...model.deps]
         .sort()
         .map((dep) => `${dep}=${versions.get(dep)!.fingerprint}`)
-      const payload = JSON.stringify({
-        ast,
-        kind: yield* kindPayload(model, model.kind),
-        grain: model.grain,
-        columns: columnNames(model),
-        // смена цели материализации = новая физика, потребители перечитают её
-        target: model.target,
-        parents,
-      })
-      versions.set(name, { fingerprint: sha256(payload), ast })
+      versions.set(name, { fingerprint: yield* modelFingerprint(model, ast, parents), ast })
     }
     return versions
   })

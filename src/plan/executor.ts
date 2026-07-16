@@ -32,6 +32,7 @@ import {
 import type {
   FingerprintVersionError,
   ForwardOnlyError,
+  ReclassifyError,
   InvalidEnvironmentError,
   Plan,
   PlanAction,
@@ -66,6 +67,7 @@ export type ApplyError =
   | AuditFailure
   | InvalidEnvironmentError
   | ForwardOnlyError
+  | ReclassifyError
   | FingerprintVersionError
   | EngineFeatureError
 
@@ -546,6 +548,22 @@ export const applyPlan = (
           const body = render(model.fragment, { resolveRef })
           // контракт схемы (SPEC §3.2): дрейф типов ловится до сборки
           yield* checkContract(engine, model, body)
+          // indirect-реюз (#5): данные идентичны по построению (родители
+          // non-breaking/forward-only, своё тело не менялось) — пересборка
+          // пропускается, аудиты гоняются по унаследованной физике
+          if (model.kind._tag === "full" && action.reusedFrom !== undefined) {
+            yield* runAudits(engine, model, physicalFor(model, action.physicalFingerprint))
+            yield* store.upsertSnapshot({
+              name: action.name,
+              fingerprint: action.fingerprint,
+              physicalFp: action.physicalFingerprint,
+              canonicalAst: action.canonicalAst ?? "",
+              renderedSql: body,
+              kind: model.kind._tag,
+              fingerprintVersion: FINGERPRINT_VERSION,
+            })
+            break
+          }
           if (model.kind._tag === "full" && model.target === "parquet") {
             const prefix = parquetPrefix(lakePath!, model.name, action.physicalFingerprint)
             yield* ensureDir(prefix)
@@ -748,6 +766,8 @@ export const applyPlan = (
         actions: plan.actions.map((a) => ({
           name: a.name,
           change: a.change,
+          // override оператора (#5) в журнале: видно, кто и что заявил
+          ...(a.reclassifiedFrom !== undefined ? { reclassifiedFrom: a.reclassifiedFrom } : {}),
           fingerprint: a.fingerprint.slice(0, 8),
           build: a.build,
           backfill: a.backfill.map((r) => `[${toIso(r.start)}, ${toIso(r.end)})`),

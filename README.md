@@ -66,7 +66,7 @@ Honestly placed: the **core** is the same class of system as sqlmesh — snapsho
 
 **Materialization targets.** Native engine tables, `parquet` (a lake, local or s3://, interval = partition, views over `read_parquet`), `ducklake` (table-per-fingerprint in a [DuckLake](https://ducklake.select) catalog — catalog snapshots and time travel come as a bonus).
 
-**Plans and versions.** Fingerprints over canonical ASTs (reformatting SQL never triggers a rebuild — frozen by golden tests), change categorization breaking / non-breaking / indirect / forward-only, `--forward-only` applies a change without replaying history (the new version inherits physical storage and done-intervals; new columns via `ALTER`), plan confirmation in a TTY, an applied-plans journal with `applied_by`.
+**Plans and versions.** Fingerprints over canonical ASTs (reformatting SQL never triggers a rebuild — frozen by golden tests), change categorization breaking / non-breaking / indirect / forward-only with `plan --explain` reasoning and a `--reclassify` operator override, indirect physics reuse (descendants of a non-breaking change are not rebuilt — scdType2 keeps its history), `--forward-only` applies a change without replaying history (the new version inherits physical storage and done-intervals; new columns via `ALTER`), plan confirmation in a TTY, an applied-plans journal with `applied_by`.
 
 **Data quality.** A schema contract before every build (`DESCRIBE` of the query against the declared Schema), `notNull` / `unique` / `accepted` audits (blocking fails the apply, `warn` logs), a standalone `efmesh audit` over an environment's view layer, and `testModel` — unit tests for models on fixtures in in-memory DuckDB.
 
@@ -175,6 +175,12 @@ export default defineConfig({
 | `efmesh migrate` | bring the state-store schema up to the current version |
 
 `apply`/`run` flags: `--jobs N` — DAG concurrency (always 1 on DuckDB — single connection), `--retries N` — retries for transient batch failures (exponential backoff), `--yes`/`-y` — skip confirmation, `--forward-only <model>,…` — reuse physical storage and history.
+
+`plan`/`apply` take `--reclassify <model>=breaking|non-breaking[,…]` — the
+operator's verdict on top of `--explain`, journaled with `applied_by`. A
+non-breaking parent lets unchanged descendants reuse their previous physical
+tables instead of rebuilding (scdType2 keeps its row history); an override
+that plainly contradicts the AST (dropped columns) is refused.
 
 `plan`, `audit` and `status` take `--json` — a stable machine-readable shape
 (a contract under semver) for CI and bots; exit codes are unchanged, stdout

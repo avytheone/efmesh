@@ -24,6 +24,18 @@ the first version gathers them in full.
   physics for `forward-only`); also shipped in `--json` as `explain`
   (`PlanAction.explain` in the library API). AST paths are a debugging
   hint, not a contract (#4).
+- Indirect physics reuse — the sqlmesh "indirect non-breaking" class: a
+  descendant whose own AST did not change and whose changed parents are all
+  non-breaking/forward-only inherits the previous version's physical table
+  and interval accounting instead of a full rebuild (scdType2 keeps its row
+  history). Safety is proven, not assumed: the fingerprint recomputed with
+  the parents' old fingerprints must reproduce the old version, so
+  simultaneous metadata drift disables reuse (#5).
+- `--reclassify model=breaking|non-breaking` on `plan`/`apply`: the
+  operator's verdict as a flag on top of `--explain` (no interactive
+  dialog — works in CI), journaled with `applied_by`
+  (`PlanAction.reclassifiedFrom`); governs descendants' physics reuse.
+  Guard rail: dropped columns declared non-breaking are refused (#5).
 
 ## [0.1.0-beta.2] — 2026-07-16
 

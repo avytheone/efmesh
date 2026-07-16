@@ -9,8 +9,8 @@ import { StateStore } from "../state/store.ts"
 import type { StateError } from "../state/store.ts"
 import { categorizeAstChange } from "./categorize.ts"
 import type { ChangeExplanation } from "./explain.ts"
-import { explainCategorized } from "./explain.ts"
-import { FINGERPRINT_VERSION, fingerprintGraph } from "./fingerprint.ts"
+import { dropsColumns, explainCategorized } from "./explain.ts"
+import { FINGERPRINT_VERSION, fingerprintGraph, modelFingerprint } from "./fingerprint.ts"
 import { validateEnvName } from "./naming.ts"
 
 export class InvalidEnvironmentError extends Data.TaggedError("InvalidEnvironmentError")<{
@@ -19,6 +19,16 @@ export class InvalidEnvironmentError extends Data.TaggedError("InvalidEnvironmen
 
 /** Модель нельзя применить forward-only (SPEC §5.2). */
 export class ForwardOnlyError extends Data.TaggedError("ForwardOnlyError")<{
+  readonly model: string
+  readonly reason: string
+}> {}
+
+/**
+ * Override категоризации не принимается (#5): модели нет в проекте или
+ * AST-дифф очевидно противоречит заявленному вердикту (удалённые колонки
+ * не бывают non-breaking — потомки читают их по именам).
+ */
+export class ReclassifyError extends Data.TaggedError("ReclassifyError")<{
   readonly model: string
   readonly reason: string
 }> {}
@@ -67,6 +77,8 @@ export interface PlanAction {
   /** Канонический AST тела (null у external) — сохраняется в снапшот. */
   readonly canonicalAst: string | null
   readonly change: ChangeCategory
+  /** Вердикт планировщика до override оператора (#5); журналируется. */
+  readonly reclassifiedFrom?: ChangeCategory
   /**
    * Почему категория такая (#4): разошедшиеся узлы канонического AST и
    * причина словами. Есть у всех изменённых моделей, кроме added/removed —
@@ -106,7 +118,29 @@ export interface PlanOptions {
    * «задним числом» не бывает по построению.
    */
   readonly forwardOnly?: ReadonlyArray<string>
+  /**
+   * Override категоризации (#5, SPEC §5.2): оператор, глядя на `--explain`,
+   * заявляет вердикт вместо планировщика. Управляет судьбой ПОТОМКОВ
+   * (non-breaking-родитель разрешает им реюз физики); саму модель от
+   * пересборки освобождает не он, а forwardOnly. Гвардрейл: очевидное
+   * противоречие AST (удалённые колонки → non-breaking) — ошибка.
+   * Применяется только к вердиктам breaking/non-breaking; на unchanged/
+   * added/removed/indirect молча не влияет.
+   */
+  readonly reclassify?: Readonly<Record<string, "breaking" | "non-breaking">>
 }
+
+/**
+ * Виды, чью физику стоит наследовать при indirect-реюзе (#5): материализуемые
+ * таблицы. view/embedded материализации не имеют, seed пересобирается из
+ * файла дёшево и родителей не имеет.
+ */
+const REUSABLE_KINDS: ReadonlySet<string> = new Set([
+  "full",
+  "incrementalByTimeRange",
+  "incrementalByUniqueKey",
+  "scdType2",
+])
 
 export const planChanges = (
   env: string,
@@ -116,6 +150,7 @@ export const planChanges = (
   Plan,
   | InvalidEnvironmentError
   | ForwardOnlyError
+  | ReclassifyError
   | FingerprintVersionError
   | StateError
   | EngineError
@@ -140,6 +175,12 @@ export const planChanges = (
         })
       }
     }
+    const reclassify = options?.reclassify ?? {}
+    for (const flagged of Object.keys(reclassify)) {
+      if (!graph.models.has(flagged)) {
+        return yield* new ReclassifyError({ model: flagged, reason: "модели нет в проекте" })
+      }
+    }
     // кэш канонизации (#8) — стор под рукой; его сбои глотаются:
     // промах кэша — это просто честный пересчёт, а не ошибка плана
     const versions = yield* fingerprintGraph(graph, {
@@ -152,12 +193,15 @@ export const planChanges = (
 
     const actions: Array<PlanAction> = []
     const changeOf = new Map<string, ChangeCategory>()
+    // кто в этом плане наследует физику старой версии (indirect-реюз, #5)
+    const reusedPhysics = new Set<string>()
     for (const name of graph.order) {
       const model = graph.models.get(name)!
       const { fingerprint, ast } = versions.get(name)!
       const known = current.get(name)
       let change: ChangeCategory
       let explain: ChangeExplanation | undefined
+      let reclassifiedFrom: ChangeCategory | undefined
       let reusedFrom: string | undefined
       let physicalFingerprint = fingerprint
       if (known === undefined) change = "added"
@@ -205,11 +249,52 @@ export const planChanges = (
           change = categorizeAstChange(oldAst, ast)
           explain = explainCategorized(oldAst, ast, change)
         }
+        // override оператора (#5): вердикт заявлен флагом поверх --explain;
+        // планировщик проверяет только очевидное противоречие AST
+        const override = reclassify[name]
+        if (
+          override !== undefined &&
+          (change === "breaking" || change === "non-breaking") &&
+          change !== override
+        ) {
+          if (override === "non-breaking" && (oldAst === "" || ast === null)) {
+            return yield* new ReclassifyError({
+              model: name,
+              reason:
+                "канонического AST нет — проверить вердикт нечем, override не принимается",
+            })
+          }
+          if (override === "non-breaking" && ast !== null && dropsColumns(oldAst, ast)) {
+            return yield* new ReclassifyError({
+              model: name,
+              reason:
+                "в новом SELECT колонок меньше — потомки читают удалённые колонки по именам, non-breaking противоречит AST",
+            })
+          }
+          reclassifiedFrom = change
+          explain = {
+            diverged: explain?.diverged ?? [],
+            reason: `override оператора: ${change} → ${override}; вердикт планировщика: ${explain?.reason ?? "—"}`,
+          }
+          change = override
+        }
+        // «версию сдвинули ТОЛЬКО родители»: отпечаток со старыми подписями
+        // родителей обязан дать known — иначе вместе с родителями разошлись
+        // и метаданные (kind/grain/columns/target), наследовать физику нельзя
+        const parentsOnly =
+          change === "indirect" &&
+          previous !== undefined &&
+          [...model.deps].every((dep) => current.has(dep)) &&
+          (yield* modelFingerprint(
+            model,
+            ast,
+            [...model.deps].sort().map((dep) => `${dep}=${current.get(dep)!}`),
+          )) === known
         // forward-only: явный флаг пользователя — либо каскад: собственный AST
         // не менялся, а все изменившиеся родители сами forward-only (реюз
         // физики родителя означает, что и потомку нечего переигрывать)
         const cascaded =
-          change === "indirect" &&
+          parentsOnly &&
           model.kind._tag === "incrementalByTimeRange" &&
           [...model.deps].every((dep) => {
             const parent = changeOf.get(dep)
@@ -230,6 +315,35 @@ export const planChanges = (
                   "собственный AST не менялся, все изменившиеся родители forward-only — физика реюзается каскадом",
                 cascadeFrom: changedParents,
               }
+        }
+        // indirect-реюз (#5, класс sqlmesh «indirect non-breaking»): своё тело
+        // не менялось, версию сдвинули только родители, и каждый изменившийся
+        // родитель гарантирует те же данные в старых колонках (non-breaking —
+        // строго суффикс; forward-only и реюз — буквально та же физика) —
+        // потомку нечего переигрывать: физика и учёт наследуются, scdType2
+        // не теряет накопленную историю строк
+        if (
+          change === "indirect" &&
+          parentsOnly &&
+          REUSABLE_KINDS.has(model.kind._tag) &&
+          changedParents.length > 0 &&
+          changedParents.every((dep) => {
+            const parent = changeOf.get(dep)!
+            return (
+              parent === "non-breaking" ||
+              parent === "forward-only" ||
+              (parent === "indirect" && reusedPhysics.has(dep))
+            )
+          })
+        ) {
+          reusedFrom = known
+          physicalFingerprint = previous!.physicalFp
+          reusedPhysics.add(name)
+          explain = {
+            diverged: [],
+            reason: `изменившиеся родители не трогают существующие данные (non-breaking/forward-only) — физика и учёт наследуются от @${known.slice(0, 8)}, пересборки нет`,
+            cascadeFrom: changedParents,
+          }
         }
       }
       changeOf.set(name, change)
@@ -273,6 +387,7 @@ export const planChanges = (
         ...(reusedFrom !== undefined ? { reusedFrom } : {}),
         canonicalAst: ast,
         change,
+        ...(reclassifiedFrom !== undefined ? { reclassifiedFrom } : {}),
         ...(explain !== undefined ? { explain } : {}),
         build: !alreadyBuilt,
         backfill,

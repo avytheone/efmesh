@@ -1,5 +1,24 @@
 import { describe, expect, test } from "bun:test"
-import { decideApply, EXIT_AWAITING_HUMAN, isAffirmative } from "../src/cli.ts"
+import { Effect } from "effect"
+import {
+  decideApply,
+  EXIT_AWAITING_HUMAN,
+  isAffirmative,
+  parseReclassify,
+} from "../src/cli.ts"
+
+describe("--reclassify — разбор флага (#5)", () => {
+  test("пары модель=категория; пусто — undefined; мусор — ошибка", async () => {
+    expect(
+      await Effect.runPromise(parseReclassify("med.a=non-breaking, med.b=breaking")),
+    ).toEqual({ "med.a": "non-breaking", "med.b": "breaking" })
+    expect(await Effect.runPromise(parseReclassify(""))).toBeUndefined()
+    for (const bad of ["med.a", "med.a=indirect", "=breaking", "a=b=c"]) {
+      const failure = await Effect.runPromise(Effect.flip(parseReclassify(bad)))
+      expect(failure._tag).toBe("ReclassifyError")
+    }
+  })
+})
 
 describe("подтверждение плана (F4)", () => {
   test("y/yes/д/да — согласие, регистр и пробелы не мешают", () => {
