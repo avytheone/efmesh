@@ -1,3 +1,4 @@
+import { writeFileSync } from "node:fs"
 import * as NodePath from "node:path"
 import { Console, Data, Effect, Layer } from "effect"
 import { Argument, Command, Flag } from "effect/unstable/cli"
@@ -6,6 +7,7 @@ import { buildGraph } from "./core/graph.ts"
 import { Efmesh } from "./efmesh.ts"
 import { DuckDBEngineLive } from "./engine/duckdb.ts"
 import { diffEnvironments } from "./plan/diff.ts"
+import { renderGraphHtml } from "./plan/graph-html.ts"
 import { janitor } from "./plan/janitor.ts"
 import { fp8 } from "./plan/naming.ts"
 import { run } from "./plan/run.ts"
@@ -212,17 +214,31 @@ const janitorCommand = Command.make(
     }),
 ).pipe(Command.withDescription("Убрать физику, на которую не ссылается ни одно окружение"))
 
-const graphCommand = Command.make("graph", { config: configFlag }, ({ config }) =>
-  Effect.gen(function* () {
-    const loaded = yield* loadConfig(config)
-    const graph = yield* buildGraph(loaded.models)
-    for (const name of graph.order) {
-      const model = graph.models.get(name)!
-      const deps = model.deps.size > 0 ? `  ←  ${[...model.deps].sort().join(", ")}` : ""
-      yield* Console.log(`${name} (${model.kind._tag})${deps}`)
-    }
-  }),
-).pipe(Command.withDescription("DAG моделей в топологическом порядке"))
+const graphCommand = Command.make(
+  "graph",
+  {
+    config: configFlag,
+    html: Flag.string("html").pipe(
+      Flag.withDefault(""),
+      Flag.withDescription("Записать DAG самодостаточной HTML-страницей по указанному пути"),
+    ),
+  },
+  ({ config, html }) =>
+    Effect.gen(function* () {
+      const loaded = yield* loadConfig(config)
+      const graph = yield* buildGraph(loaded.models)
+      if (html !== "") {
+        yield* Effect.sync(() => writeFileSync(html, renderGraphHtml(graph)))
+        yield* Console.log(`DAG записан: ${html}`)
+        return
+      }
+      for (const name of graph.order) {
+        const model = graph.models.get(name)!
+        const deps = model.deps.size > 0 ? `  ←  ${[...model.deps].sort().join(", ")}` : ""
+        yield* Console.log(`${name} (${model.kind._tag})${deps}`)
+      }
+    }),
+).pipe(Command.withDescription("DAG моделей в топологическом порядке (или --html файл)"))
 
 export const rootCommand = Command.make("efmesh").pipe(
   Command.withDescription("sqlmesh на bun, typescript и Effect"),
