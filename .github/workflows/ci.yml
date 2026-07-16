@@ -1,0 +1,30 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Установить зависимости
+        run: bun install --frozen-lockfile
+
+      # бинарники Postgres есть в образе, но вне PATH; с ними гоняются
+      # и интеграционные тесты (initdb-кластер), без них — skipIf
+      - name: Postgres в PATH
+        run: ls -d /usr/lib/postgresql/*/bin 2>/dev/null | head -1 >> "$GITHUB_PATH" || true
+
+      - name: Типы
+        run: bunx tsc --noEmit
+
+      - name: Тесты
+        run: bun test

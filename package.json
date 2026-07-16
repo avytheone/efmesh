@@ -4,6 +4,12 @@
   "description": "sqlmesh-like data transformation framework on TypeScript, Bun and Effect",
   "license": "MIT",
   "author": "Alexey Yakimanskiy",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/avytheone/efmesh.git"
+  },
+  "homepage": "https://github.com/avytheone/efmesh#readme",
+  "bugs": "https://github.com/avytheone/efmesh/issues",
   "keywords": [
     "data-engineering",
     "sqlmesh",
