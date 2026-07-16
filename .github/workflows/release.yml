@@ -1,0 +1,60 @@
+# Публикация в npmjs.org при пуше тега vX.Y.Z: тесты → сверка версии →
+# npm publish через Trusted Publishing (OIDC) — без токенов в секретах,
+# с provenance («пакет собран из этого репозитория и этого коммита»).
+# Требует однократной настройки на npmjs.com: пакет → Settings →
+# Trusted Publisher → GitHub Actions, repo avytheone/efmesh, release.yml.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  id-token: write # OIDC для trusted publishing + provenance
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Установить зависимости
+        run: bun install --frozen-lockfile
+
+      - name: Postgres в PATH
+        run: ls -d /usr/lib/postgresql/*/bin 2>/dev/null | head -1 >> "$GITHUB_PATH" || true
+
+      - name: Типы
+        run: bunx tsc --noEmit
+
+      - name: Тесты
+        run: bun test
+
+      - name: Версия тега = версия пакета
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG="$(bun -e 'console.log(require("./package.json").version)')"
+          if [ "$TAG" != "$PKG" ]; then
+            echo "тег v$TAG не совпадает с package.json ($PKG)" >&2
+            exit 1
+          fi
+
+      # npm ≥ 11.5 (OIDC) — берём свежий node
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Публикация (dist-tag beta для пре-релизов, latest для стабильных)
+        run: |
+          PKG="$(bun -e 'console.log(require("./package.json").version)')"
+          case "$PKG" in
+            *-*) DIST_TAG=beta ;;
+            *)   DIST_TAG=latest ;;
+          esac
+          npm publish --access public --provenance --tag "$DIST_TAG"
