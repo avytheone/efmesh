@@ -108,11 +108,12 @@ describe("SqliteState", () => {
   test("журнал планов пишется и читается по порядку", async () => {
     const plans = await withStore((store) =>
       Effect.gen(function* () {
-        yield* store.recordPlan("dev", `{"changes":1}`)
-        yield* store.recordPlan("dev", `{"changes":2}`)
+        yield* store.recordPlan("dev", `{"changes":1}`, "avy")
+        yield* store.recordPlan("dev", `{"changes":2}`, "cron")
         return yield* store.listPlans("dev")
       }),
     )
     expect(plans.map((p) => p.summary)).toEqual([`{"changes":1}`, `{"changes":2}`])
+    expect(plans.map((p) => p.appliedBy)).toEqual(["avy", "cron"])
   })
 })

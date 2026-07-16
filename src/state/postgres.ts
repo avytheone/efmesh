@@ -42,7 +42,8 @@ CREATE TABLE IF NOT EXISTS efmesh_state.plans (
   id         INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   env        TEXT NOT NULL,
   summary    TEXT NOT NULL,
-  applied_at TEXT NOT NULL
+  applied_at TEXT NOT NULL,
+  applied_by TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS efmesh_state.intervals (
   snapshot_fp TEXT NOT NULL,
@@ -89,6 +90,7 @@ const applyMigrations = async (pool: SQL): Promise<void> => {
     ALTER TABLE efmesh_state.snapshots ADD COLUMN IF NOT EXISTS canonical_ast TEXT NOT NULL DEFAULT '';
     ALTER TABLE efmesh_state.snapshots ADD COLUMN IF NOT EXISTS orphaned_at TEXT;
     ALTER TABLE efmesh_state.snapshots ADD COLUMN IF NOT EXISTS physical_fp TEXT NOT NULL DEFAULT '';
+    ALTER TABLE efmesh_state.plans ADD COLUMN IF NOT EXISTS applied_by TEXT NOT NULL DEFAULT '';
     CREATE TABLE IF NOT EXISTS efmesh_state.meta (version INTEGER NOT NULL);
   `)
   await pool.begin(async (tx) => {
@@ -267,13 +269,13 @@ export const PostgresStateLive = (
             ),
           ),
 
-        recordPlan: (env, summary) =>
+        recordPlan: (env, summary, appliedBy) =>
           isoNow.pipe(
             Effect.flatMap((now) =>
               attempt("recordPlan", async () => {
                 await sql.unsafe(
-                  `INSERT INTO efmesh_state.plans (env, summary, applied_at) VALUES ($1, $2, $3)`,
-                  [env, summary, now],
+                  `INSERT INTO efmesh_state.plans (env, summary, applied_at, applied_by) VALUES ($1, $2, $3, $4)`,
+                  [env, summary, now, appliedBy],
                 )
               }),
             ),
@@ -282,7 +284,7 @@ export const PostgresStateLive = (
         listPlans: (env) =>
           attempt("listPlans", async () => {
             return (await sql.unsafe(
-              `SELECT id, env, summary, applied_at AS "appliedAt"
+              `SELECT id, env, summary, applied_at AS "appliedAt", applied_by AS "appliedBy"
                FROM efmesh_state.plans WHERE env = $1 ORDER BY id`,
               [env],
             )) as ReadonlyArray<PlanRecord>

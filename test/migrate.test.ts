@@ -66,4 +66,44 @@ describe("версия схемы state store + migrate (SPEC §6, F4)", () => {
       orphanedAt: null,
     })
   })
+
+  test("стор версии 1 (F4): открытие — StateSchemaError, migrate доносит applied_by", async () => {
+    const path = join(mkdtempSync(join(tmpdir(), "efmesh-migrate-")), "state.sqlite")
+    // раскладка версии 1: plans ещё без applied_by, meta уже есть;
+    // snapshots обязательна — по ней стор отличается от свежего (бутстрап)
+    const db = new Database(path, { create: true })
+    db.exec(`
+      CREATE TABLE snapshots (
+        name TEXT NOT NULL, fingerprint TEXT NOT NULL, rendered_sql TEXT NOT NULL,
+        canonical_ast TEXT NOT NULL DEFAULT '', physical_fp TEXT NOT NULL DEFAULT '',
+        kind TEXT NOT NULL, created_at TEXT NOT NULL, orphaned_at TEXT,
+        PRIMARY KEY (name, fingerprint)
+      );
+      CREATE TABLE plans (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, env TEXT NOT NULL,
+        summary TEXT NOT NULL, applied_at TEXT NOT NULL
+      );
+      CREATE TABLE meta (version INTEGER NOT NULL);
+      INSERT INTO meta (version) VALUES (1);
+      INSERT INTO plans (env, summary, applied_at) VALUES ('dev', '{}', '2026-01-01T00:00:00.000Z');
+    `)
+    db.close()
+
+    const failure = await Effect.runPromise(Effect.flip(openStore(path)))
+    expect(failure._tag).toBe("StateSchemaError")
+    expect(failure).toMatchObject({ found: 1, wanted: STATE_VERSION })
+
+    const report = await Effect.runPromise(migrateSqliteState({ path }))
+    expect(report).toEqual({ from: 1, to: STATE_VERSION })
+
+    const plans = await Effect.runPromise(
+      Effect.gen(function* () {
+        const store = yield* StateStore
+        yield* store.recordPlan("dev", "{}", "avy")
+        return yield* store.listPlans("dev")
+      }).pipe(Effect.provide(SqliteStateLive({ path }))),
+    )
+    // старой записи журнал приписывает пустого автора, новой — настоящего
+    expect(plans.map((plan) => plan.appliedBy)).toEqual(["", "avy"])
+  })
 })

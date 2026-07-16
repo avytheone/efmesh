@@ -6,11 +6,12 @@ export class StateError extends Data.TaggedError("StateError")<{
 }> {}
 
 /**
- * Текущая версия схемы state store (F4). Свежий стор бутстрапится сразу
+ * Текущая версия схемы state store. Свежий стор бутстрапится сразу
  * на неё; стор со схемой старше (в т.ч. созданный до появления версии)
  * открытие не проходит — данные догоняет явный `efmesh migrate`.
+ * 1 — базовая раскладка (F4), 2 — applied_by в журнале планов (F5).
  */
-export const STATE_VERSION = 1
+export const STATE_VERSION = 2
 
 /** Схема стора не совпадает с ожидаемой бинарём — нужен `efmesh migrate`. */
 export class StateSchemaError extends Data.TaggedError("StateSchemaError")<{
@@ -61,6 +62,8 @@ export interface PlanRecord {
   readonly env: string
   readonly summary: string
   readonly appliedAt: string
+  /** Кто применил план (ОС-пользователь или ApplyOptions.appliedBy); '' у записей до v2. */
+  readonly appliedBy: string
 }
 
 /**
@@ -99,7 +102,11 @@ export interface StateStoreShape {
     entries: ReadonlyArray<{ readonly name: string; readonly fingerprint: string }>,
   ) => Effect.Effect<void, StateError>
   /** Журнал применённых планов. */
-  readonly recordPlan: (env: string, summary: string) => Effect.Effect<void, StateError>
+  readonly recordPlan: (
+    env: string,
+    summary: string,
+    appliedBy: string,
+  ) => Effect.Effect<void, StateError>
   readonly listPlans: (env: string) => Effect.Effect<ReadonlyArray<PlanRecord>, StateError>
   /**
    * Межпроцессная блокировка (SPEC §7): true — получена, false — держит

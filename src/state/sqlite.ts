@@ -33,7 +33,8 @@ CREATE TABLE IF NOT EXISTS plans (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   env        TEXT NOT NULL,
   summary    TEXT NOT NULL,
-  applied_at TEXT NOT NULL
+  applied_at TEXT NOT NULL,
+  applied_by TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS intervals (
   snapshot_fp TEXT NOT NULL,
@@ -70,9 +71,10 @@ const readVersion = (db: Database): number => {
 }
 
 /**
- * Догоняет схему до STATE_VERSION. Версия 1 = базовая раскладка F4;
- * ALTER-ы ниже подхватывают сторы, созданные до соответствующих колонок
- * (canonical_ast — F2, orphaned_at/physical_fp — F3), — на новом сторе
+ * Догоняет схему до STATE_VERSION. Версия 1 = базовая раскладка F4,
+ * версия 2 = applied_by в журнале планов (F5); ALTER-ы ниже подхватывают
+ * сторы, созданные до соответствующих колонок (canonical_ast — F2,
+ * orphaned_at/physical_fp — F3, applied_by — F5), — на новом сторе
  * они no-op через try/catch. Будущие версии — новые записи здесь же.
  */
 const applyMigrations = (db: Database): void => {
@@ -81,6 +83,7 @@ const applyMigrations = (db: Database): void => {
     `ALTER TABLE snapshots ADD COLUMN canonical_ast TEXT NOT NULL DEFAULT ''`,
     `ALTER TABLE snapshots ADD COLUMN orphaned_at TEXT`,
     `ALTER TABLE snapshots ADD COLUMN physical_fp TEXT NOT NULL DEFAULT ''`,
+    `ALTER TABLE plans ADD COLUMN applied_by TEXT NOT NULL DEFAULT ''`,
   ]) {
     try {
       db.exec(alter)
@@ -264,15 +267,13 @@ export const SqliteStateLive = (
             ),
           ),
 
-        recordPlan: (env, summary) =>
+        recordPlan: (env, summary, appliedBy) =>
           isoNow.pipe(
             Effect.flatMap((now) =>
               attempt("recordPlan", () => {
-                db.query(`INSERT INTO plans (env, summary, applied_at) VALUES (?1, ?2, ?3)`).run(
-                  env,
-                  summary,
-                  now,
-                )
+                db.query(
+                  `INSERT INTO plans (env, summary, applied_at, applied_by) VALUES (?1, ?2, ?3, ?4)`,
+                ).run(env, summary, now, appliedBy)
               }),
             ),
           ),
@@ -281,7 +282,7 @@ export const SqliteStateLive = (
           attempt("listPlans", () => {
             return db
               .query(
-                `SELECT id, env, summary, applied_at AS appliedAt
+                `SELECT id, env, summary, applied_at AS appliedAt, applied_by AS appliedBy
                  FROM plans WHERE env = ?1 ORDER BY id`,
               )
               .all(env) as ReadonlyArray<PlanRecord>

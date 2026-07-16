@@ -1,4 +1,5 @@
 import { mkdirSync } from "node:fs"
+import { userInfo } from "node:os"
 import { Clock, Data, Deferred, Effect, Schedule } from "effect"
 import { AuditFailure } from "../core/audit.ts"
 import type { SeedReadError } from "../core/errors.ts"
@@ -91,6 +92,17 @@ export interface ApplyOptions {
    * аудита детерминирован, это не транзиентный сбой.
    */
   readonly retry?: { readonly attempts: number; readonly baseDelayMs?: number }
+  /** Кто применяет план — в журнал (SPEC §6); по умолчанию ОС-пользователь. */
+  readonly appliedBy?: string
+}
+
+/** ОС-пользователь для журнала планов; в стерильных окружениях (CI) — ''. */
+const osUser = (): string => {
+  try {
+    return userInfo().username
+  } catch {
+    return process.env["USER"] ?? ""
+  }
 }
 
 /** Модель просит экспорт в ATTACH-алиас, которого нет в конфиге. */
@@ -711,6 +723,7 @@ export const applyPlan = (
           backfill: a.backfill.map((r) => `[${toIso(r.start)}, ${toIso(r.end)})`),
         })),
       }),
+      options?.appliedBy ?? osUser(),
     )
 
     return { plan, built }
