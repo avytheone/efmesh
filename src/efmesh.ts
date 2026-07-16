@@ -11,6 +11,7 @@ import {
   type ApplyError,
   type ApplyOptions,
 } from "./plan/executor.ts"
+import { envLockName, withStateLock, type LockHeldError, type LockOptions } from "./plan/lock.ts"
 import {
   planChanges,
   type ForwardOnlyError,
@@ -46,17 +47,21 @@ export const Efmesh = {
     StateStore | EngineAdapter
   > => buildGraph(models).pipe(Effect.flatMap((graph) => planChanges(env, graph, options))),
 
-  /** План + применение: физика, бэкфилл интервалов, view-слой, состояние. */
+  /**
+   * План + применение: физика, бэкфилл интервалов, view-слой, состояние.
+   * Идёт под межпроцессным локом `env:<имя>` (SPEC §14.6) — тем же, что у
+   * run: параллельные мутации окружения из разных процессов отсекаются.
+   */
   apply: (
     env: string,
     models: Iterable<AnyModel>,
-    options?: PlanOptions & ApplyOptions,
-  ): Effect.Effect<AppliedPlan, ApplyError, EngineAdapter | StateStore> =>
+    options?: PlanOptions & ApplyOptions & LockOptions,
+  ): Effect.Effect<AppliedPlan, ApplyError | LockHeldError, EngineAdapter | StateStore> =>
     Effect.gen(function* () {
       const graph = yield* buildGraph(models)
       const plan = yield* planChanges(env, graph, options)
       return yield* applyPlan(plan, graph, options)
-    }),
+    }).pipe(withStateLock(envLockName(env), options?.lockTtlMs)),
 
   /** Canonical-рендер SQL модели (ссылки — логические имена) для отладки. */
   render: (models: Iterable<AnyModel>, name: string): Effect.Effect<string, GraphError> =>

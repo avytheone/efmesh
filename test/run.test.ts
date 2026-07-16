@@ -5,6 +5,7 @@ import { fromIso } from "../src/core/interval.ts"
 import { defineExternal, defineModel, external, kind } from "../src/core/model.ts"
 import { EngineAdapter } from "../src/engine/adapter.ts"
 import { DuckDBEngineLive } from "../src/engine/duckdb.ts"
+import { envLockName } from "../src/plan/lock.ts"
 import { run } from "../src/plan/run.ts"
 import { SqliteStateLive } from "../src/state/sqlite.ts"
 import { StateStore } from "../src/state/store.ts"
@@ -79,20 +80,45 @@ describe("run — тик планировщика (SPEC §7)", () => {
         const models = [raw, events]
         yield* Efmesh.apply("dev", models, { now: fromIso("2026-01-02T00:00:00Z") })
 
-        // «другой процесс» держит лок
-        expect(yield* store.acquireLock("run:dev", 3_600_000)).toBe(true)
+        // «другой процесс» держит лок — общий env:<имя>, тот же, что у apply
+        expect(yield* store.acquireLock(envLockName("dev"), 3_600_000)).toBe(true)
         const held = yield* Effect.flip(
           run("dev", models, { now: fromIso("2026-01-03T00:00:00Z") }),
         )
-        expect(held._tag).toBe("RunLockHeldError")
+        expect(held._tag).toBe("LockHeldError")
 
         // лок протух (ttl отрицательный не сделать — эмулируем перехват освобождением)
-        yield* store.releaseLock("run:dev")
+        yield* store.releaseLock(envLockName("dev"))
         const tick = yield* run("dev", models, { now: fromIso("2026-01-03T00:00:00Z") })
         expect(tick.built).toEqual(["med.events"])
 
         // после run лок освобождён
-        expect(yield* store.acquireLock("run:dev", 1000)).toBe(true)
+        expect(yield* store.acquireLock(envLockName("dev"), 1000)).toBe(true)
+      }),
+    )
+  })
+
+  test("apply под тем же env-локом: параллельный apply и apply↔run отсекаются (SPEC §14.6)", async () => {
+    await scenario(
+      Effect.gen(function* () {
+        const store = yield* StateStore
+        yield* seedSource
+        const models = [raw, events]
+
+        // «другой процесс» мутирует dev — apply не проходит
+        expect(yield* store.acquireLock(envLockName("dev"), 3_600_000)).toBe(true)
+        const held = yield* Effect.flip(
+          Efmesh.apply("dev", models, { now: fromIso("2026-01-02T00:00:00Z") }),
+        )
+        expect(held._tag).toBe("LockHeldError")
+
+        // другое окружение — другой лок, prod применяется свободно
+        yield* Efmesh.apply("prod", models, { now: fromIso("2026-01-02T00:00:00Z") })
+
+        // лок отпущен — apply проходит и освобождает лок за собой
+        yield* store.releaseLock(envLockName("dev"))
+        yield* Efmesh.apply("dev", models, { now: fromIso("2026-01-02T00:00:00Z") })
+        expect(yield* store.acquireLock(envLockName("dev"), 1000)).toBe(true)
       }),
     )
   })

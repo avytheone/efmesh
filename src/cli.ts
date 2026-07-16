@@ -15,6 +15,7 @@ import { renderGraphHtml } from "./plan/graph-html.ts"
 import { formatLineage, lineage, LineageError } from "./plan/lineage.ts"
 import { janitor } from "./plan/janitor.ts"
 import { fp8 } from "./plan/naming.ts"
+import { envLockName, withStateLock } from "./plan/lock.ts"
 import { applyPlan } from "./plan/executor.ts"
 import { run } from "./plan/run.ts"
 import { planChanges, type Plan } from "./plan/planner.ts"
@@ -173,8 +174,10 @@ const applyCommand = Command.make(
       const loaded = yield* loadConfig(config)
       const names = parseForwardOnly(forwardOnly)
       const modelConcurrency = parseJobs(jobs)
-      // план и применение — под одним слоем: применяется ровно тот план,
-      // который показан и подтверждён, без пересчёта между ними
+      // план и применение — под одним слоем и одним межпроцессным локом:
+      // применяется ровно тот план, который показан и подтверждён, и никто
+      // (второй apply, cron с run) не вклинится между ними (SPEC §14.6);
+      // цена — лок держится и пока человек думает над подтверждением
       yield* Effect.gen(function* () {
         const graph = yield* buildGraph(loaded.models)
         const plan = yield* planChanges(env, graph, {
@@ -197,7 +200,7 @@ const applyCommand = Command.make(
             : "сборка не потребовалась (только view-swap)",
         )
         yield* Console.log(`окружение «${applied.plan.env}» промоутнуто`)
-      }).pipe(Effect.provide(configLayers(loaded)))
+      }).pipe(withStateLock(envLockName(env)), Effect.provide(configLayers(loaded)))
     }),
 ).pipe(Command.withDescription("Применить план: собрать физику и переключить view"))
 

@@ -5,6 +5,7 @@ import { EngineAdapter } from "../engine/adapter.ts"
 import type { EngineError } from "../engine/adapter.ts"
 import { StateStore } from "../state/store.ts"
 import type { StateError } from "../state/store.ts"
+import { janitorLockName, withStateLock, type LockHeldError, type LockOptions } from "./lock.ts"
 import { ducklakeAttachSql, ducklakeRef, parquetPrefix, physicalRef } from "./naming.ts"
 
 /**
@@ -21,7 +22,7 @@ import { ducklakeAttachSql, ducklakeRef, parquetPrefix, physicalRef } from "./na
  * переключением view.
  */
 
-export interface JanitorOptions {
+export interface JanitorOptions extends LockOptions {
   readonly ttlDays?: number
   readonly lakePath?: string
   /** DuckLake-каталог (SPEC §14.5) — чтобы снести и таблицы-на-fingerprint в нём. */
@@ -41,7 +42,11 @@ const DAY_MS = 86_400_000
 
 export const janitor = (
   options?: JanitorOptions,
-): Effect.Effect<JanitorReport, EngineError | StateError, EngineAdapter | StateStore> =>
+): Effect.Effect<
+  JanitorReport,
+  EngineError | StateError | LockHeldError,
+  EngineAdapter | StateStore
+> =>
   Effect.gen(function* () {
     const engine = yield* EngineAdapter
     const store = yield* StateStore
@@ -99,4 +104,8 @@ export const janitor = (
     }
 
     return { removed, kept }
-  })
+  }).pipe(
+    // два janitor'а из разных процессов не должны наперегонки сносить одно и
+    // то же; от гонки janitor↔apply защищает ttl (окно на мгновенный откат)
+    withStateLock(janitorLockName, options?.lockTtlMs),
+  )
