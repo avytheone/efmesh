@@ -5,6 +5,25 @@ export class StateError extends Data.TaggedError("StateError")<{
   readonly cause: unknown
 }> {}
 
+/**
+ * Текущая версия схемы state store (F4). Свежий стор бутстрапится сразу
+ * на неё; стор со схемой старше (в т.ч. созданный до появления версии)
+ * открытие не проходит — данные догоняет явный `efmesh migrate`.
+ */
+export const STATE_VERSION = 1
+
+/** Схема стора не совпадает с ожидаемой бинарём — нужен `efmesh migrate`. */
+export class StateSchemaError extends Data.TaggedError("StateSchemaError")<{
+  readonly found: number
+  readonly wanted: number
+}> {}
+
+/** Итог миграции для CLI. */
+export interface MigrationReport {
+  readonly from: number
+  readonly to: number
+}
+
 /** Версия модели, известная state store (SPEC §6). */
 export interface SnapshotRecord {
   readonly name: string

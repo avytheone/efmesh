@@ -3,11 +3,12 @@ import { Clock, Effect, Layer } from "effect"
 import type {
   EnvironmentRecord,
   IntervalRecord,
+  MigrationReport,
   PlanRecord,
   SnapshotRecord,
   StateStoreShape,
 } from "./store.ts"
-import { StateError, StateStore } from "./store.ts"
+import { STATE_VERSION, StateError, StateSchemaError, StateStore } from "./store.ts"
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS snapshots (
@@ -56,9 +57,63 @@ export interface SqliteStateOptions {
 
 const isoNow = Clock.currentTimeMillis.pipe(Effect.map((ms) => new Date(ms).toISOString()))
 
+const tableExists = (db: Database, name: string): boolean =>
+  db
+    .query(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?1`)
+    .get(name) !== null
+
+/** 0 — стор без таблицы meta (создан до появления версионирования, F0–F3). */
+const readVersion = (db: Database): number => {
+  if (!tableExists(db, "meta")) return 0
+  const row = db.query(`SELECT version FROM meta`).get() as { version: number } | null
+  return row?.version ?? 0
+}
+
+/**
+ * Догоняет схему до STATE_VERSION. Версия 1 = базовая раскладка F4;
+ * ALTER-ы ниже подхватывают сторы, созданные до соответствующих колонок
+ * (canonical_ast — F2, orphaned_at/physical_fp — F3), — на новом сторе
+ * они no-op через try/catch. Будущие версии — новые записи здесь же.
+ */
+const applyMigrations = (db: Database): void => {
+  db.exec(SCHEMA)
+  for (const alter of [
+    `ALTER TABLE snapshots ADD COLUMN canonical_ast TEXT NOT NULL DEFAULT ''`,
+    `ALTER TABLE snapshots ADD COLUMN orphaned_at TEXT`,
+    `ALTER TABLE snapshots ADD COLUMN physical_fp TEXT NOT NULL DEFAULT ''`,
+  ]) {
+    try {
+      db.exec(alter)
+    } catch {
+      // колонка уже есть
+    }
+  }
+  db.exec(`CREATE TABLE IF NOT EXISTS meta (version INTEGER NOT NULL)`)
+  db.exec(`DELETE FROM meta`)
+  db.query(`INSERT INTO meta (version) VALUES (?1)`).run(STATE_VERSION)
+}
+
+/** `efmesh migrate`: явное обновление схемы существующего стора. */
+export const migrateSqliteState = (
+  options?: SqliteStateOptions,
+): Effect.Effect<MigrationReport, StateError> =>
+  Effect.try({
+    try: () => {
+      const db = new Database(options?.path ?? ":memory:", { create: true })
+      try {
+        const from = readVersion(db)
+        applyMigrations(db)
+        return { from, to: STATE_VERSION }
+      } finally {
+        db.close()
+      }
+    },
+    catch: (cause) => new StateError({ operation: "migrate", cause }),
+  })
+
 export const SqliteStateLive = (
   options?: SqliteStateOptions,
-): Layer.Layer<StateStore, StateError> =>
+): Layer.Layer<StateStore, StateError | StateSchemaError> =>
   Layer.effect(
     StateStore,
     Effect.gen(function* () {
@@ -67,30 +122,33 @@ export const SqliteStateLive = (
           try: () => {
             const db = new Database(options?.path ?? ":memory:", { create: true })
             db.exec("PRAGMA journal_mode = WAL;")
-            db.exec(SCHEMA)
-            // миграция баз, созданных до появления canonical_ast (F2)
-            try {
-              db.exec(`ALTER TABLE snapshots ADD COLUMN canonical_ast TEXT NOT NULL DEFAULT ''`)
-            } catch {
-              // колонка уже есть
-            }
-            // миграции баз, созданных до появления orphaned_at и physical_fp (F3)
-            try {
-              db.exec(`ALTER TABLE snapshots ADD COLUMN orphaned_at TEXT`)
-            } catch {
-              // колонка уже есть
-            }
-            try {
-              db.exec(`ALTER TABLE snapshots ADD COLUMN physical_fp TEXT NOT NULL DEFAULT ''`)
-            } catch {
-              // колонка уже есть
-            }
             return db
           },
           catch: (cause) => new StateError({ operation: "open", cause }),
         }),
         (db) => Effect.sync(() => db.close()),
       )
+      // свежий стор бутстрапится на текущую версию; существующий со схемой
+      // старше требует явного `efmesh migrate` — молча менять чужие данные
+      // при открытии нельзя (SPEC §6)
+      const fresh = yield* Effect.try({
+        try: () => !tableExists(db, "snapshots"),
+        catch: (cause) => new StateError({ operation: "open", cause }),
+      })
+      if (fresh) {
+        yield* Effect.try({
+          try: () => applyMigrations(db),
+          catch: (cause) => new StateError({ operation: "migrate", cause }),
+        })
+      } else {
+        const version = yield* Effect.try({
+          try: () => readVersion(db),
+          catch: (cause) => new StateError({ operation: "open", cause }),
+        })
+        if (version !== STATE_VERSION) {
+          return yield* new StateSchemaError({ found: version, wanted: STATE_VERSION })
+        }
+      }
 
       const attempt = <A>(operation: string, body: () => A) =>
         Effect.try({ try: body, catch: (cause) => new StateError({ operation, cause }) })

@@ -3,11 +3,12 @@ import { Clock, Effect, Layer } from "effect"
 import type {
   EnvironmentRecord,
   IntervalRecord,
+  MigrationReport,
   PlanRecord,
   SnapshotRecord,
   StateStoreShape,
 } from "./store.ts"
-import { StateError, StateStore } from "./store.ts"
+import { STATE_VERSION, StateError, StateSchemaError, StateStore } from "./store.ts"
 
 /**
  * State store в Postgres (SPEC §6, F3) — для командной/прод-работы:
@@ -65,6 +66,55 @@ export interface PostgresStateOptions {
   readonly max?: number
 }
 
+const regclass = async (pool: SQL, table: string): Promise<boolean> => {
+  const rows = (await pool.unsafe(
+    `SELECT to_regclass('efmesh_state.${table}') AS r`,
+  )) as ReadonlyArray<{ r: string | null }>
+  return rows[0]?.r != null
+}
+
+/** 0 — стор без таблицы meta (создан до появления версионирования, F0–F3). */
+const readVersion = async (pool: SQL): Promise<number> => {
+  if (!(await regclass(pool, "meta"))) return 0
+  const rows = (await pool.unsafe(
+    `SELECT version FROM efmesh_state.meta`,
+  )) as ReadonlyArray<{ version: number }>
+  return rows[0]?.version ?? 0
+}
+
+/** Догоняет схему до STATE_VERSION (см. sqlite-реализацию — семантика та же). */
+const applyMigrations = async (pool: SQL): Promise<void> => {
+  await pool.unsafe(SCHEMA)
+  await pool.unsafe(`
+    ALTER TABLE efmesh_state.snapshots ADD COLUMN IF NOT EXISTS canonical_ast TEXT NOT NULL DEFAULT '';
+    ALTER TABLE efmesh_state.snapshots ADD COLUMN IF NOT EXISTS orphaned_at TEXT;
+    ALTER TABLE efmesh_state.snapshots ADD COLUMN IF NOT EXISTS physical_fp TEXT NOT NULL DEFAULT '';
+    CREATE TABLE IF NOT EXISTS efmesh_state.meta (version INTEGER NOT NULL);
+  `)
+  await pool.begin(async (tx) => {
+    await tx.unsafe(`DELETE FROM efmesh_state.meta`)
+    await tx.unsafe(`INSERT INTO efmesh_state.meta (version) VALUES ($1)`, [STATE_VERSION])
+  })
+}
+
+/** `efmesh migrate`: явное обновление схемы существующего стора. */
+export const migratePostgresState = (
+  options: PostgresStateOptions,
+): Effect.Effect<MigrationReport, StateError> =>
+  Effect.tryPromise({
+    try: async () => {
+      const pool = new SQL({ url: options.url, max: 1 })
+      try {
+        const from = await readVersion(pool)
+        await applyMigrations(pool)
+        return { from, to: STATE_VERSION }
+      } finally {
+        await pool.end()
+      }
+    },
+    catch: (cause) => new StateError({ operation: "migrate", cause }),
+  })
+
 const SNAPSHOT_COLUMNS = `
   name, fingerprint, rendered_sql AS "renderedSql",
   canonical_ast AS "canonicalAst", kind, created_at AS "createdAt",
@@ -74,21 +124,37 @@ const SNAPSHOT_COLUMNS = `
 
 export const PostgresStateLive = (
   options: PostgresStateOptions,
-): Layer.Layer<StateStore, StateError> =>
+): Layer.Layer<StateStore, StateError | StateSchemaError> =>
   Layer.effect(
     StateStore,
     Effect.gen(function* () {
       const sql = yield* Effect.acquireRelease(
         Effect.tryPromise({
-          try: async () => {
-            const pool = new SQL({ url: options.url, max: options.max ?? 4 })
-            await pool.unsafe(SCHEMA)
-            return pool
-          },
+          try: async () => new SQL({ url: options.url, max: options.max ?? 4 }),
           catch: (cause) => new StateError({ operation: "open", cause }),
         }),
         (pool) => Effect.promise(() => pool.end()).pipe(Effect.ignore),
       )
+      // свежий стор бутстрапится на текущую версию; существующий со схемой
+      // старше требует явного `efmesh migrate` (SPEC §6)
+      const fresh = yield* Effect.tryPromise({
+        try: async () => !(await regclass(sql, "snapshots")),
+        catch: (cause) => new StateError({ operation: "open", cause }),
+      })
+      if (fresh) {
+        yield* Effect.tryPromise({
+          try: () => applyMigrations(sql),
+          catch: (cause) => new StateError({ operation: "migrate", cause }),
+        })
+      } else {
+        const version = yield* Effect.tryPromise({
+          try: () => readVersion(sql),
+          catch: (cause) => new StateError({ operation: "open", cause }),
+        })
+        if (version !== STATE_VERSION) {
+          return yield* new StateSchemaError({ found: version, wanted: STATE_VERSION })
+        }
+      }
 
       const attempt = <A>(operation: string, body: () => Promise<A>) =>
         Effect.tryPromise({

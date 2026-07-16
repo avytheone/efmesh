@@ -17,7 +17,8 @@ import { janitor } from "./plan/janitor.ts"
 import { fp8 } from "./plan/naming.ts"
 import { run } from "./plan/run.ts"
 import type { Plan } from "./plan/planner.ts"
-import { SqliteStateLive } from "./state/sqlite.ts"
+import { migratePostgresState } from "./state/postgres.ts"
+import { migrateSqliteState, SqliteStateLive } from "./state/sqlite.ts"
 
 export class ConfigLoadError extends Data.TaggedError("ConfigLoadError")<{
   readonly path: string
@@ -302,6 +303,23 @@ const auditCommand = Command.make(
   Command.withDescription("Прогнать аудиты по view-слою окружения, ничего не меняя"),
 )
 
+const migrateCommand = Command.make(
+  "migrate",
+  { config: configFlag },
+  ({ config }) =>
+    Effect.gen(function* () {
+      const loaded = yield* loadConfig(config)
+      const report = yield* (loaded.state?.url !== undefined
+        ? migratePostgresState({ url: loaded.state.url })
+        : migrateSqliteState({ path: loaded.state?.path ?? "efmesh.state.sqlite" }))
+      yield* Console.log(
+        report.from === report.to
+          ? `state store уже на версии ${report.to}`
+          : `state store: версия ${report.from} → ${report.to}`,
+      )
+    }),
+).pipe(Command.withDescription("Догнать схему state store до текущей версии"))
+
 const graphCommand = Command.make(
   "graph",
   {
@@ -371,5 +389,6 @@ export const rootCommand = Command.make("efmesh").pipe(
     lineageCommand,
     diffCommand,
     janitorCommand,
+    migrateCommand,
   ]),
 )

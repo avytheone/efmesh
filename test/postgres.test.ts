@@ -5,8 +5,8 @@ import { fromIso } from "../src/core/interval.ts"
 import { defineExternal, defineModel, defineSeed, external, kind } from "../src/core/model.ts"
 import { EngineAdapter } from "../src/engine/adapter.ts"
 import { PostgresEngineLive } from "../src/engine/postgres.ts"
-import { PostgresStateLive } from "../src/state/postgres.ts"
-import { StateStore } from "../src/state/store.ts"
+import { migratePostgresState, PostgresStateLive } from "../src/state/postgres.ts"
+import { STATE_VERSION, StateStore } from "../src/state/store.ts"
 import { hasPostgres, startCluster, type TestCluster } from "./helpers/pg-cluster.ts"
 
 let cluster: TestCluster
@@ -70,6 +70,26 @@ describe.skipIf(!hasPostgres)("Postgres-адаптер (SPEC §9.1, F3)", () => 
         yield* store.releaseLock("run:dev")
       }),
     )
+  })
+
+  test("версия схемы: стор без meta не открывается, migrate догоняет", async () => {
+    await scenario(
+      Effect.gen(function* () {
+        const engine = yield* EngineAdapter
+        // стор уже создан beforeAll-открытиями — имитируем доверсионный
+        yield* engine.execute(`DROP TABLE IF EXISTS efmesh_state.meta`)
+      }),
+    )
+    const failure = await Effect.runPromise(
+      Effect.flip(
+        Effect.gen(function* () {
+          return yield* StateStore
+        }).pipe(Effect.provide(PostgresStateLive({ url: cluster.url }))),
+      ),
+    )
+    expect(failure._tag).toBe("StateSchemaError")
+    const report = await Effect.runPromise(migratePostgresState({ url: cluster.url }))
+    expect(report).toEqual({ from: 0, to: STATE_VERSION })
   })
 
   test("canonicalize: libpg_query, формат-инвариантность и ошибка парсинга", async () => {
