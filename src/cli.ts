@@ -5,6 +5,7 @@ import { Argument, Command, Flag } from "effect/unstable/cli"
 import type { EfmeshConfig } from "./config.ts"
 import { buildGraph } from "./core/graph.ts"
 import { Efmesh } from "./efmesh.ts"
+import { scaffold } from "./init.ts"
 import { DuckDBEngineLive } from "./engine/duckdb.ts"
 import { PostgresEngineLive } from "./engine/postgres.ts"
 import { PostgresStateLive } from "./state/postgres.ts"
@@ -111,6 +112,17 @@ const printPlan = (plan: Plan) =>
     }
     if (!plan.hasChanges) yield* Console.log("  изменений нет")
   })
+
+const initCommand = Command.make(
+  "init",
+  { dir: Argument.string("dir").pipe(Argument.withDefault(".")) },
+  ({ dir }) =>
+    Effect.gen(function* () {
+      const created = yield* scaffold(dir)
+      for (const file of created) yield* Console.log(`создан ${file}`)
+      yield* Console.log("дальше: bun efmesh plan dev && bun efmesh apply dev")
+    }),
+).pipe(Command.withDescription("Скаффолд проекта: конфиг, модели-пример, seed"))
 
 const planCommand = Command.make(
   "plan",
@@ -349,6 +361,7 @@ const lineageCommand = Command.make(
 export const rootCommand = Command.make("efmesh").pipe(
   Command.withDescription("sqlmesh на bun, typescript и Effect"),
   Command.withSubcommands([
+    initCommand,
     planCommand,
     applyCommand,
     runCommand,
