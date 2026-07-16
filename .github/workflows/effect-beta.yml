@@ -1,11 +1,11 @@
-# Ранний сигнал дрейфа Effect v4: раз в неделю гоняем типы и тесты против
-# СВЕЖЕЙ беты effect. Не гейт (основной CI пинован lockfile-ом) — красный
-# прогон здесь означает «пора смотреть, что сломала новая бета».
+# Early signal of Effect v4 drift: once a week run types and tests against
+# the FRESH effect beta. Not a gate (the main CI is pinned by the lockfile) —
+# a red run here means "time to look at what the new beta broke".
 name: effect-beta-drift
 
 on:
   schedule:
-    - cron: "0 6 * * 1" # понедельник, 06:00 UTC
+    - cron: "0 6 * * 1" # Monday, 06:00 UTC
   workflow_dispatch:
 
 jobs:
@@ -18,19 +18,19 @@ jobs:
         with:
           bun-version: latest
 
-      - name: Установить зависимости (пин из lockfile)
+      - name: Install dependencies (pinned by the lockfile)
         run: bun install --frozen-lockfile
 
-      - name: Обновить effect до свежей беты
+      - name: Bump effect to the fresh beta
         run: |
           bun add "effect@beta" "@effect/platform-bun@beta"
           bun -e 'console.log("effect:", require("effect/package.json").version)'
 
-      - name: Postgres в PATH
+      - name: Postgres on PATH
         run: ls -d /usr/lib/postgresql/*/bin 2>/dev/null | head -1 >> "$GITHUB_PATH" || true
 
-      - name: Типы
+      - name: Types
         run: bunx tsc --noEmit
 
-      - name: Тесты
+      - name: Tests
         run: bun test

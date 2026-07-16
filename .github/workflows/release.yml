@@ -1,7 +1,7 @@
-# Публикация в npmjs.org при пуше тега vX.Y.Z: тесты → сверка версии →
-# npm publish через Trusted Publishing (OIDC) — без токенов в секретах,
-# с provenance («пакет собран из этого репозитория и этого коммита»).
-# Требует однократной настройки на npmjs.com: пакет → Settings →
+# Publish to npmjs.org on a vX.Y.Z tag push: tests → version check →
+# npm publish via Trusted Publishing (OIDC) — no tokens in secrets,
+# with provenance ("the package was built from this repo and this commit").
+# Requires a one-time setup on npmjs.com: package → Settings →
 # Trusted Publisher → GitHub Actions, repo avytheone/efmesh, release.yml.
 name: release
 
@@ -11,7 +11,7 @@ on:
 
 permissions:
   contents: read
-  id-token: write # OIDC для trusted publishing + provenance
+  id-token: write # OIDC for trusted publishing + provenance
 
 jobs:
   publish:
@@ -23,34 +23,34 @@ jobs:
         with:
           bun-version: latest
 
-      - name: Установить зависимости
+      - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Postgres в PATH
+      - name: Postgres on PATH
         run: ls -d /usr/lib/postgresql/*/bin 2>/dev/null | head -1 >> "$GITHUB_PATH" || true
 
-      - name: Типы
+      - name: Types
         run: bunx tsc --noEmit
 
-      - name: Тесты
+      - name: Tests
         run: bun test
 
-      - name: Версия тега = версия пакета
+      - name: Tag version = package version
         run: |
           TAG="${GITHUB_REF_NAME#v}"
           PKG="$(bun -e 'console.log(require("./package.json").version)')"
           if [ "$TAG" != "$PKG" ]; then
-            echo "тег v$TAG не совпадает с package.json ($PKG)" >&2
+            echo "tag v$TAG does not match package.json ($PKG)" >&2
             exit 1
           fi
 
-      # npm ≥ 11.5 (OIDC) — берём свежий node
+      # npm >= 11.5 (OIDC) — take a fresh node
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
 
-      - name: Публикация (dist-tag beta для пре-релизов, latest для стабильных)
+      - name: Publish (dist-tag beta for pre-releases, latest for stable)
         run: |
           PKG="$(bun -e 'console.log(require("./package.json").version)')"
           case "$PKG" in
