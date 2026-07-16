@@ -1,6 +1,6 @@
 {
   "name": "efmesh",
-  "version": "0.0.1",
+  "version": "0.1.0-beta.1",
   "description": "sqlmesh-like data transformation framework on TypeScript, Bun and Effect",
   "type": "module",
   "module": "src/index.ts",
