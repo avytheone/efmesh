@@ -4,6 +4,23 @@
   "description": "sqlmesh-like data transformation framework on TypeScript, Bun and Effect",
   "license": "MIT",
   "author": "Alexey Yakimanskiy",
+  "keywords": [
+    "data-engineering",
+    "sqlmesh",
+    "dbt",
+    "duckdb",
+    "postgres",
+    "effect",
+    "bun",
+    "data-transformation",
+    "incremental",
+    "lakehouse"
+  ],
+  "files": [
+    "src",
+    "SPEC.md",
+    "CHANGELOG.md"
+  ],
   "type": "module",
   "module": "src/index.ts",
   "bin": {
