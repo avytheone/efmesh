@@ -34,13 +34,21 @@ export interface AuditRunReport {
 export class AuditTargetError extends Data.TaggedError("AuditTargetError")<{
   readonly model: string
   readonly reason: string
-}> {}
+}> {
+  override get message(): string {
+    return `audit target «${this.model}»: ${this.reason}`
+  }
+}
 
 /** Result for the CLI: the environment's blocking audits are violated. */
 export class EnvironmentAuditError extends Data.TaggedError("EnvironmentAuditError")<{
   readonly env: string
   readonly blockingViolations: number
-}> {}
+}> {
+  override get message(): string {
+    return `environment «${this.env}»: ${this.blockingViolations} blocking audit violation(s)`
+  }
+}
 
 const selfFor = (graph: ModelGraph, env: string, model: AnyModel): string => {
   const resolve = (ref: string): string => {

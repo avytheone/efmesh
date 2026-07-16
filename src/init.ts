@@ -17,7 +17,11 @@ import { Data, Effect } from "effect"
 export class InitError extends Data.TaggedError("InitError")<{
   readonly path: string
   readonly reason: string
-}> {}
+}> {
+  override get message(): string {
+    return `${this.path}: ${this.reason}`
+  }
+}
 
 const MODELS_TS = `import { Schema } from "effect"
 import { audit, defineModel, defineSeed, kind } from "@avytheone/efmesh"

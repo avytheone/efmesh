@@ -11,7 +11,11 @@ import { StateStore, type StateError } from "../state/store.ts"
 
 export class LockHeldError extends Data.TaggedError("LockHeldError")<{
   readonly name: string
-}> {}
+}> {
+  override get message(): string {
+    return `lock «${this.name}» is held by another apply/run process`
+  }
+}
 
 export interface LockOptions {
   /** How long the lock lives without being released (crashed process); by default 1 hour. */

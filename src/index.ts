@@ -101,6 +101,7 @@ export {
   ModelDefinitionError,
   SeedReadError,
   UnknownDependencyError,
+  UnknownModelError,
 } from "./core/errors.ts"
 export type { GraphError } from "./core/graph.ts"
 

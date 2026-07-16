@@ -16,7 +16,11 @@ import type { Engine, EngineError } from "../engine/adapter.ts"
 export class SchemaMismatchError extends Data.TaggedError("SchemaMismatchError")<{
   readonly model: string
   readonly problems: ReadonlyArray<string>
-}> {}
+}> {
+  override get message(): string {
+    return `schema contract of model «${this.model}»: ${this.problems.join("; ")}`
+  }
+}
 
 export type TypeFamily = "text" | "numeric" | "boolean" | "temporal" | "any"
 

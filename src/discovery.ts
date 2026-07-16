@@ -14,12 +14,20 @@ import type { AnyModel } from "./core/model.ts"
 export class DiscoveryError extends Data.TaggedError("DiscoveryError")<{
   readonly path: string
   readonly reason: string
-}> {}
+}> {
+  override get message(): string {
+    return `model discovery at ${this.path}: ${this.reason}`
+  }
+}
 
 export class DiscoveryConflictError extends Data.TaggedError("DiscoveryConflictError")<{
   readonly name: string
   readonly files: ReadonlyArray<string>
-}> {}
+}> {
+  override get message(): string {
+    return `model «${this.name}» is defined in more than one place: ${this.files.join(", ")}`
+  }
+}
 
 const isModel = (value: unknown): value is AnyModel =>
   typeof value === "object" &&

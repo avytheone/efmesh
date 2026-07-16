@@ -1,9 +1,14 @@
 import { Context, Data, Effect } from "effect"
+import { causeText } from "../error-text.ts"
 
 export class StateError extends Data.TaggedError("StateError")<{
   readonly operation: string
   readonly cause: unknown
-}> {}
+}> {
+  override get message(): string {
+    return `state store: ${this.operation} failed — ${causeText(this.cause)}`
+  }
+}
 
 /**
  * Current schema version of the state store. A fresh store bootstraps
@@ -20,7 +25,11 @@ export const STATE_VERSION = 5
 export class StateSchemaError extends Data.TaggedError("StateSchemaError")<{
   readonly found: number
   readonly wanted: number
-}> {}
+}> {
+  override get message(): string {
+    return `state store schema is v${this.found}, but this efmesh expects v${this.wanted} — run \`efmesh migrate\``
+  }
+}
 
 /** Migration outcome for the CLI. */
 export interface MigrationReport {

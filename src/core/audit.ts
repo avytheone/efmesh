@@ -7,7 +7,11 @@ export class AuditFailure extends Data.TaggedError("AuditFailure")<{
   readonly model: string
   readonly audit: string
   readonly violations: number
-}> {}
+}> {
+  override get message(): string {
+    return `audit ${this.audit} on model «${this.model}»: ${this.violations} violating row(s)`
+  }
+}
 
 /**
  * Audit (SPEC §8) — a SQL predicate over a model's result: the query returns

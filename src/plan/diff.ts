@@ -94,7 +94,11 @@ export interface DataDiffOptions {
 export class DataDiffError extends Data.TaggedError("DataDiffError")<{
   readonly model: string
   readonly reason: string
-}> {}
+}> {
+  override get message(): string {
+    return `data diff of model «${this.model}»: ${this.reason}`
+  }
+}
 
 /** Kinds with a view-layer in the environment — their data is comparable. */
 const COMPARABLE_KINDS: ReadonlySet<string> = new Set([

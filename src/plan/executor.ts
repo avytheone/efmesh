@@ -8,8 +8,8 @@ import type { Interval } from "../core/interval.ts"
 import { intervalsWithin, splitIntoBatches, sqlTimestamp, toIso } from "../core/interval.ts"
 import { columnNames, type AnyModel } from "../core/model.ts"
 import { quoteIdent, render } from "../core/sql.ts"
-import { EngineAdapter } from "../engine/adapter.ts"
-import type { Engine, EngineError, SqlParseError } from "../engine/adapter.ts"
+import { EngineAdapter, EngineError } from "../engine/adapter.ts"
+import type { Engine, SqlParseError } from "../engine/adapter.ts"
 import { StateStore } from "../state/store.ts"
 import type { StateError, StateStoreShape } from "../state/store.ts"
 import { Metric } from "effect"
@@ -47,12 +47,20 @@ export interface AppliedPlan {
 /** The project has parquet models, but the lake path is not set in the config. */
 export class LakeNotConfiguredError extends Data.TaggedError("LakeNotConfiguredError")<{
   readonly model: string
-}> {}
+}> {
+  override get message(): string {
+    return `model «${this.model}» targets parquet, but no lake path is configured`
+  }
+}
 
 /** The project has ducklake models, but the catalog is not set in the config. */
 export class DucklakeNotConfiguredError extends Data.TaggedError("DucklakeNotConfiguredError")<{
   readonly model: string
-}> {}
+}> {
+  override get message(): string {
+    return `model «${this.model}» targets ducklake, but no catalog is configured`
+  }
+}
 
 export type ApplyError =
   | GraphError
@@ -119,14 +127,38 @@ const osUser = (): string => {
 export class AttachNotConfiguredError extends Data.TaggedError("AttachNotConfiguredError")<{
   readonly model: string
   readonly attach: string
-}> {}
+}> {
+  override get message(): string {
+    return `model «${this.model}» exports to ATTACH alias «${this.attach}», which is not in the config`
+  }
+}
 
 /** A DuckDB federation feature unavailable on the current engine (SPEC §9.3). */
 export class EngineFeatureError extends Data.TaggedError("EngineFeatureError")<{
   readonly model: string
   readonly feature: string
   readonly dialect: string
-}> {}
+}> {
+  override get message(): string {
+    return `model «${this.model}» uses ${this.feature}, unavailable on the ${this.dialect} engine (DuckDB only)`
+  }
+}
+
+/**
+ * Names the culprit on an engine failure raised while building a model: the
+ * adapter cannot know which model a statement belongs to, so the executor
+ * attaches it here (#13). Only fills in a model that is not already set, and
+ * only for EngineError — every other error in the channel already carries the
+ * model in a typed field.
+ */
+const attachModel =
+  (model: string) =>
+  <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
+    Effect.mapError(effect, (error) =>
+      error instanceof EngineError && error.model === undefined
+        ? (new EngineError({ sql: error.sql, cause: error.cause, model }) as E & EngineError)
+        : error,
+    )
 
 /** Several statements in one engine transaction; rollback on any error. */
 const transactional = (
@@ -368,7 +400,9 @@ export const applyPlan = (
       const model = graph.models.get(ref)
       const fingerprint = physicalFpOf.get(ref)
       if (model === undefined || fingerprint === undefined) {
-        throw new Error(`reference to a model outside the plan: ${ref}`)
+        // invariant: deps and the plan are built from the same graph, so every
+        // ref resolves — a miss is a defect in efmesh, not user-recoverable
+        throw new Error(`invariant violated: reference to a model «${ref}» outside the plan`)
       }
       return physicalFor(model, fingerprint)
     }
@@ -681,7 +715,7 @@ export const applyPlan = (
           (gate) => Deferred.await(gate),
           { discard: true },
         )
-        yield* buildOne(action)
+        yield* buildOne(action).pipe(attachModel(action.name))
         yield* Metric.update(snapshotsBuilt, 1)
         yield* Deferred.succeed(gates.get(action.name)!, undefined)
       })

@@ -41,7 +41,9 @@ const sha256 = (input: string): string => {
 /** Canonical render: refs are logical names, bounds are $start/$end placeholders. */
 export const canonicalSql = (graph: ModelGraph, name: string): string => {
   const model = graph.models.get(name)
-  if (model === undefined) throw new Error(`model ${name} is not in the graph`)
+  // invariant: callers pass a name already known to the graph (the facade
+  // guards user input with UnknownModelError before reaching here)
+  if (model === undefined) throw new Error(`invariant violated: model «${name}» is not in the graph`)
   return render(model.fragment, { resolveRef: (ref) => ref })
 }
 

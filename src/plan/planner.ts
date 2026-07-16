@@ -15,13 +15,21 @@ import { validateEnvName } from "./naming.ts"
 
 export class InvalidEnvironmentError extends Data.TaggedError("InvalidEnvironmentError")<{
   readonly env: string
-}> {}
+}> {
+  override get message(): string {
+    return `invalid environment name «${this.env}» — use latin letters, digits and _`
+  }
+}
 
 /** The model cannot be applied forward-only (SPEC §5.2). */
 export class ForwardOnlyError extends Data.TaggedError("ForwardOnlyError")<{
   readonly model: string
   readonly reason: string
-}> {}
+}> {
+  override get message(): string {
+    return `model «${this.model}» cannot be applied forward-only: ${this.reason}`
+  }
+}
 
 /**
  * A categorization override is rejected (#5): the model is not in the project
@@ -31,7 +39,11 @@ export class ForwardOnlyError extends Data.TaggedError("ForwardOnlyError")<{
 export class ReclassifyError extends Data.TaggedError("ReclassifyError")<{
   readonly model: string
   readonly reason: string
-}> {}
+}> {
+  override get message(): string {
+    return `reclassify «${this.model}»: ${this.reason}`
+  }
+}
 
 /**
  * The snapshot was computed by a different version of the fingerprint
@@ -43,7 +55,11 @@ export class FingerprintVersionError extends Data.TaggedError("FingerprintVersio
   readonly model: string
   readonly found: number
   readonly wanted: number
-}> {}
+}> {
+  override get message(): string {
+    return `model «${this.model}» was fingerprinted by algorithm v${this.found}, but this efmesh expects v${this.wanted}`
+  }
+}
 
 export type ChangeCategory =
   /** The model was not in the environment. */

@@ -19,7 +19,11 @@ import { Data, Effect } from "effect"
 
 export class ScheduleError extends Data.TaggedError("ScheduleError")<{
   readonly reason: string
-}> {}
+}> {
+  override get message(): string {
+    return this.reason
+  }
+}
 
 /** Everything the worker needs, as absolute paths (crontab has no cwd). */
 export interface ScheduleTarget {

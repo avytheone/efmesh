@@ -19,7 +19,11 @@ import { planChanges, type PlanOptions } from "./planner.ts"
 export class RunBlockedByChangesError extends Data.TaggedError("RunBlockedByChangesError")<{
   readonly env: string
   readonly changes: ReadonlyArray<string>
-}> {}
+}> {
+  override get message(): string {
+    return `environment «${this.env}» has unapplied structural changes: ${this.changes.join(", ")} — run \`efmesh apply ${this.env}\``
+  }
+}
 
 export type RunError = ApplyError | LockHeldError | RunBlockedByChangesError
 

@@ -17,7 +17,11 @@ import { canonicalSql } from "./fingerprint.ts"
 export class LineageError extends Data.TaggedError("LineageError")<{
   readonly model: string
   readonly reason: string
-}> {}
+}> {
+  override get message(): string {
+    return `lineage «${this.model}»: ${this.reason}`
+  }
+}
 
 export interface LineageNode {
   readonly model: string

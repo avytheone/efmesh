@@ -1,13 +1,30 @@
 import { Context, Data, Effect } from "effect"
+import { causeText, sqlSnippet } from "../error-text.ts"
 
+/**
+ * The engine rejected a statement (SPEC §9.1). `cause` is the engine's own
+ * error (DuckDB/Postgres) — never swallowed; `sql` is the statement that
+ * failed; `model` names the culprit when the failure happened while building a
+ * specific model (attached by the executor). The `message` is derived from all
+ * three so an operator or agent sees what the engine said and where, not an
+ * empty `EngineError:` (#13).
+ */
 export class EngineError extends Data.TaggedError("EngineError")<{
   readonly sql: string
   readonly cause: unknown
-}> {}
+  /** The model being built when the engine failed, when known. */
+  readonly model?: string
+}> {
+  override get message(): string {
+    const where = this.model !== undefined ? `[model ${this.model}] ` : ""
+    return `${where}${causeText(this.cause)} — while running SQL: ${sqlSnippet(this.sql)}`
+  }
+}
 
 /** The engine could not parse the model's SQL (SPEC §9.2). */
 export class SqlParseError extends Data.TaggedError("SqlParseError")<{
   readonly sql: string
+  /** The engine parser's own message; also this error's rendered `message`. */
   readonly message: string
 }> {}
 

@@ -7,6 +7,16 @@ the first version gathers them in full.
 
 ## [Unreleased]
 
+- Human-readable, precise errors everywhere (#13). Every tagged error now
+  derives its `message` from its typed fields, so the culprit (model, env,
+  file, interval) and the underlying engine/system text are always present —
+  an empty `EngineError:` is constructively impossible. `EngineError` carries
+  the failing model and the engine's own message; a failing `apply` names the
+  model, quotes DuckDB/Postgres verbatim, and shows the SQL context. The CLI
+  now renders one failure screen (cause first, an actionable hint where one
+  exists) and prints the Effect fiber trace only under `--log-level debug`.
+  Exit codes (0/1/2) and `--json` shapes are unchanged. New exported error
+  `UnknownModelError` (render/lineage against a name not in the project).
 - The entire user-facing surface is English: CLI output and help, error
   messages, `--json` string values (key names and exit codes unchanged),
   the `init` scaffold, the hospital example data (#11). Source comments

@@ -22,6 +22,7 @@ import {
   type PlanOptions,
 } from "./plan/planner.ts"
 import type { SeedReadError } from "./core/errors.ts"
+import { UnknownModelError } from "./core/errors.ts"
 import type { GraphError } from "./core/graph.ts"
 import type { StateError } from "./state/store.ts"
 import { StateStore } from "./state/store.ts"
@@ -69,19 +70,28 @@ export const Efmesh = {
     }).pipe(withStateLock(envLockName(env), options?.lockTtlMs)),
 
   /** Canonical SQL render of a model (refs are logical names), for debugging. */
-  render: (models: Iterable<AnyModel>, name: string): Effect.Effect<string, GraphError> =>
-    buildGraph(models).pipe(Effect.map((graph) => canonicalSql(graph, name))),
+  render: (
+    models: Iterable<AnyModel>,
+    name: string,
+  ): Effect.Effect<string, GraphError | UnknownModelError> =>
+    buildGraph(models).pipe(
+      Effect.flatMap((graph) =>
+        graph.models.has(name)
+          ? Effect.succeed(canonicalSql(graph, name))
+          : new UnknownModelError({ model: name }),
+      ),
+    ),
 
   /** SQL render of a model against an environment's view layer — "as the engine would run it". */
   renderFor: (
     models: Iterable<AnyModel>,
     name: string,
     env: string,
-  ): Effect.Effect<string, GraphError> =>
+  ): Effect.Effect<string, GraphError | UnknownModelError> =>
     buildGraph(models).pipe(
-      Effect.map((graph) => {
+      Effect.flatMap((graph) => {
         const model = graph.models.get(name)
-        if (model === undefined) throw new Error(`model ${name} is not in the project`)
+        if (model === undefined) return new UnknownModelError({ model: name })
         // external and embedded have no view layer: source as-is / subquery
         const resolve = (ref: string): string => {
           const source = graph.models.get(ref)!
@@ -91,7 +101,7 @@ export const Efmesh = {
           }
           return viewRef(env, source.name)
         }
-        return render(model.fragment, { resolveRef: resolve })
+        return Effect.succeed(render(model.fragment, { resolveRef: resolve }))
       }),
     ),
 } as const
