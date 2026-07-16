@@ -1,12 +1,9 @@
 import { describe, expect, test } from "bun:test"
 import { Effect, Schema } from "effect"
-import {
-  buildGraph,
-  defineModel,
-  kind,
-  render,
-  transitiveDependents,
-} from "../src/index.ts"
+import { defineModel, kind } from "../src/index.ts"
+// внутренности графа и рендера — не публичное API, тестируются напрямую
+import { buildGraph, transitiveDependents } from "../src/core/graph.ts"
+import { render } from "../src/core/sql.ts"
 
 const moves = defineModel(
   {
