@@ -9,10 +9,16 @@ export interface EfmeshConfig {
   readonly engine?: {
     /** Путь к файлу DuckDB; по умолчанию `efmesh.duckdb` рядом с конфигом. */
     readonly path?: string
+    /** postgres://… — движком становится Postgres (F3); path игнорируется. */
+    readonly url?: string
+    /** Размер пула соединений Postgres — параллелизм бэкфилла (SPEC §5.3). */
+    readonly max?: number
   }
   readonly state?: {
     /** Путь к SQLite-файлу состояния; по умолчанию `efmesh.state.sqlite`. */
     readonly path?: string
+    /** postgres://… — состояние в Postgres (схема efmesh_state, SPEC §6). */
+    readonly url?: string
   }
   readonly lake?: {
     /** Корень parquet-озера (SPEC §3.3) — локальная директория или s3://…. */

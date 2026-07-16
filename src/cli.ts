@@ -6,6 +6,8 @@ import type { EfmeshConfig } from "./config.ts"
 import { buildGraph } from "./core/graph.ts"
 import { Efmesh } from "./efmesh.ts"
 import { DuckDBEngineLive } from "./engine/duckdb.ts"
+import { PostgresEngineLive } from "./engine/postgres.ts"
+import { PostgresStateLive } from "./state/postgres.ts"
 import { diffEnvironments } from "./plan/diff.ts"
 import { renderGraphHtml } from "./plan/graph-html.ts"
 import { formatLineage, lineage, LineageError } from "./plan/lineage.ts"
@@ -36,8 +38,15 @@ const loadConfig = (configPath: string): Effect.Effect<EfmeshConfig, ConfigLoadE
 /** Слои движка и состояния из конфига — общие для plan/apply. */
 const configLayers = (config: EfmeshConfig) =>
   Layer.mergeAll(
-    DuckDBEngineLive({ path: config.engine?.path ?? "efmesh.duckdb" }),
-    SqliteStateLive({ path: config.state?.path ?? "efmesh.state.sqlite" }),
+    config.engine?.url !== undefined
+      ? PostgresEngineLive({
+          url: config.engine.url,
+          ...(config.engine.max !== undefined ? { max: config.engine.max } : {}),
+        })
+      : DuckDBEngineLive({ path: config.engine?.path ?? "efmesh.duckdb" }),
+    config.state?.url !== undefined
+      ? PostgresStateLive({ url: config.state.url })
+      : SqliteStateLive({ path: config.state?.path ?? "efmesh.state.sqlite" }),
   )
 
 const configFlag = Flag.string("config").pipe(

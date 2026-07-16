@@ -1,5 +1,5 @@
 import { DuckDBInstance } from "@duckdb/node-api"
-import { Effect, Layer } from "effect"
+import { Effect, Layer, Semaphore } from "effect"
 import type { Engine, EngineColumn } from "./adapter.ts"
 import { EngineAdapter, EngineError, SqlParseError } from "./adapter.ts"
 
@@ -65,10 +65,24 @@ export const DuckDBEngineLive = (
           ),
         )
 
+      // одно соединение: параллельные транзакции сериализуются семафором,
+      // чтобы фибры не перемежали чужие BEGIN/COMMIT
+      const transactionLock = yield* Semaphore.make(1)
+
       const service: Engine = {
         dialect: "duckdb",
         query,
         execute: (sqlText) => Effect.asVoid(run(sqlText)),
+        transaction: (statements) =>
+          transactionLock.withPermits(1)(
+            Effect.asVoid(run("BEGIN")).pipe(
+              Effect.andThen(
+                Effect.forEach(statements, (statement) => run(statement), { discard: true }),
+              ),
+              Effect.andThen(Effect.asVoid(run("COMMIT"))),
+              Effect.onError(() => Effect.asVoid(run("ROLLBACK")).pipe(Effect.ignore)),
+            ),
+          ),
         describe: (sqlText) =>
           query(`DESCRIBE (${sqlText})`).pipe(
             Effect.map((rows): ReadonlyArray<EngineColumn> =>

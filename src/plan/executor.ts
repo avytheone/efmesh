@@ -50,6 +50,7 @@ export type ApplyError =
   | AuditFailure
   | InvalidEnvironmentError
   | ForwardOnlyError
+  | EngineFeatureError
 
 export interface ApplyOptions {
   /** «Сейчас» для scdType2-версионирования; по умолчанию — Clock. Инъекция для тестов. */
@@ -58,6 +59,12 @@ export interface ApplyOptions {
   readonly lakePath?: string
   /** ATTACH-базы по алиасам (SPEC §9.3) — для export-моделей. */
   readonly attach?: Readonly<Record<string, { readonly url: string; readonly options?: string }>>
+  /**
+   * Сколько батчей бэкфилла одной модели считать одновременно (SPEC §5.3).
+   * Осмыслен только на движке с пулом соединений (Postgres); DuckDB держит
+   * одно соединение — там бэкфилл последовательный независимо от значения.
+   */
+  readonly concurrency?: number
 }
 
 /** Модель просит экспорт в ATTACH-алиас, которого нет в конфиге. */
@@ -66,16 +73,18 @@ export class AttachNotConfiguredError extends Data.TaggedError("AttachNotConfigu
   readonly attach: string
 }> {}
 
+/** Возможность DuckDB-федерации, недоступная на текущем движке (SPEC §9.3). */
+export class EngineFeatureError extends Data.TaggedError("EngineFeatureError")<{
+  readonly model: string
+  readonly feature: string
+  readonly dialect: string
+}> {}
+
 /** Несколько стейтментов одной транзакцией движка; откат при любой ошибке. */
 const transactional = (
   engine: Engine,
   statements: ReadonlyArray<string>,
-): Effect.Effect<void, EngineError> =>
-  engine.execute("BEGIN").pipe(
-    Effect.andThen(Effect.forEach(statements, engine.execute, { discard: true })),
-    Effect.andThen(engine.execute("COMMIT")),
-    Effect.onError(() => engine.execute("ROLLBACK").pipe(Effect.ignore)),
-  )
+): Effect.Effect<void, EngineError> => engine.transaction(statements)
 
 /** Для s3://-путей mkdir не нужен (и невозможен) — httpfs пишет напрямую. */
 const ensureDir = (path: string): Effect.Effect<void> =>
@@ -162,12 +171,17 @@ const backfillIntoTable = (
   action: PlanAction,
   target: string,
   resolveRef: (ref: string) => string,
+  concurrency: number,
 ): Effect.Effect<void, EngineError | StateError | AuditFailure> =>
   Effect.gen(function* () {
     if (model.kind._tag !== "incrementalByTimeRange") return
     const kind = model.kind
-    for (const range of action.backfill) {
-      for (const batch of splitIntoBatches(range, kind.interval, kind.batchSize)) {
+    // вставка по именам: после forward-only-эволюции порядок колонок физики
+    // может отличаться от запроса; контракт схемы гарантирует совпадение имён
+    const columns = columnNames(model).map(quoteIdent).join(", ")
+
+    const runBatch = (batch: Interval) =>
+      Effect.gen(function* () {
         const marks = intervalsWithin(batch, kind.interval).map((interval: Interval) => ({
           startTs: toIso(interval.start),
           endTs: toIso(interval.end),
@@ -177,11 +191,9 @@ const backfillIntoTable = (
         const body = render(model.fragment, { resolveRef, interval: { start, end } })
         const markFailed = () =>
           store.markIntervals(action.fingerprint, marks, "failed").pipe(Effect.ignore)
-        // BY NAME: после forward-only-эволюции порядок колонок физики может
-        // отличаться от запроса; контракт схемы гарантирует совпадение имён
         yield* transactional(engine, [
           `DELETE FROM ${target} WHERE ${quoteIdent(kind.timeColumn)} >= ${start} AND ${quoteIdent(kind.timeColumn)} < ${end}`,
-          `INSERT INTO ${target} BY NAME ${body}`,
+          `INSERT INTO ${target} (${columns}) SELECT ${columns} FROM (${body}) q`,
         ]).pipe(Effect.tapError(markFailed))
         // аудит свежезагруженного интервала — до отметки done (SPEC §8)
         yield* runAudits(
@@ -191,8 +203,17 @@ const backfillIntoTable = (
         ).pipe(Effect.tapError(markFailed))
         yield* store.markIntervals(action.fingerprint, marks, "done")
         yield* Metric.update(intervalsDone, marks.length)
-      }
-    }
+      })
+
+    // пул соединений (Postgres) → батчи параллельно: интервалы не пересекаются,
+    // каждый — своя транзакция; DuckDB (одно соединение) — последовательно
+    const batches = action.backfill.flatMap((range) =>
+      splitIntoBatches(range, kind.interval, kind.batchSize),
+    )
+    yield* Effect.forEach(batches, runBatch, {
+      concurrency: engine.dialect === "duckdb" ? 1 : Math.max(1, concurrency),
+      discard: true,
+    })
   })
 
 /**
@@ -280,8 +301,30 @@ export const applyPlan = (
     // parquet-модели без озера — падение до любых действий
     for (const action of plan.actions) {
       const model = graph.models.get(action.name)
-      if (model !== undefined && model.target === "parquet" && lakePath === undefined) {
+      if (model === undefined) continue
+      if (model.target === "parquet" && lakePath === undefined) {
         return yield* new LakeNotConfiguredError({ model: model.name.full })
+      }
+      // DuckDB-федерация (SPEC §9.3) на других движках не выражается —
+      // честная ошибка до любых действий
+      if (engine.dialect !== "duckdb") {
+        const feature =
+          model.target === "parquet"
+            ? "target: parquet"
+            : model.kind._tag === "seed"
+              ? "seed (read_csv/read_json)"
+              : model.kind._tag === "external" && model.kind.source._tag === "files"
+                ? "external по файлам/URL (read_*)"
+                : model.export !== undefined
+                  ? "export в ATTACH-базу"
+                  : undefined
+        if (feature !== undefined) {
+          return yield* new EngineFeatureError({
+            model: model.name.full,
+            feature,
+            dialect: engine.dialect,
+          })
+        }
       }
     }
 
@@ -414,11 +457,17 @@ export const applyPlan = (
             )
           } else {
             const target = physicalRef(model.name, action.physicalFingerprint)
-            const ddl =
-              model.kind._tag === "view"
-                ? `CREATE OR REPLACE VIEW ${target} AS ${body}`
-                : `CREATE OR REPLACE TABLE ${target} AS ${body}`
-            yield* engine.execute(ddl)
+            if (model.kind._tag === "view") {
+              yield* engine.execute(`CREATE OR REPLACE VIEW ${target} AS ${body}`)
+            } else if (engine.dialect === "duckdb") {
+              yield* engine.execute(`CREATE OR REPLACE TABLE ${target} AS ${body}`)
+            } else {
+              // у Postgres нет CREATE OR REPLACE TABLE — атомарно через транзакцию
+              yield* transactional(engine, [
+                `DROP TABLE IF EXISTS ${target}`,
+                `CREATE TABLE ${target} AS ${body}`,
+              ])
+            }
           }
           // аудиты собранного снапшота — до промоушена (SPEC §8)
           yield* runAudits(engine, model, physicalFor(model, action.physicalFingerprint))
@@ -478,7 +527,15 @@ export const applyPlan = (
               renderedSql: render(model.fragment, { resolveRef: (ref) => ref }),
               kind: model.kind._tag,
             })
-            yield* backfillIntoTable(engine, store, model, action, target, resolveRef)
+            yield* backfillIntoTable(
+              engine,
+              store,
+              model,
+              action,
+              target,
+              resolveRef,
+              options?.concurrency ?? 4,
+            )
           }
           break
         }

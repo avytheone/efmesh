@@ -21,12 +21,22 @@ export interface EngineColumn {
  * живут отдельно (executor) и ходят через execute — адаптеру незачем
  * знать про физический/виртуальный слой.
  */
+export type Dialect = "duckdb" | "postgres"
+
 export interface Engine {
-  readonly dialect: "duckdb"
+  readonly dialect: Dialect
   readonly query: (
     sql: string,
   ) => Effect.Effect<ReadonlyArray<Record<string, unknown>>, EngineError>
   readonly execute: (sql: string) => Effect.Effect<void, EngineError>
+  /**
+   * Набор стейтментов одной транзакцией движка, откат при любой ошибке.
+   * Примитив адаптера, а не BEGIN/COMMIT через execute: на пуле соединений
+   * (Postgres) отдельные вызовы разъехались бы по разным соединениям.
+   */
+  readonly transaction: (
+    statements: ReadonlyArray<string>,
+  ) => Effect.Effect<void, EngineError>
   /** Имена и типы колонок запроса без его выполнения (контракт схемы, SPEC §3.2). */
   readonly describe: (sql: string) => Effect.Effect<ReadonlyArray<EngineColumn>, EngineError>
   /**
