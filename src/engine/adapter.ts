@@ -5,7 +5,7 @@ export class EngineError extends Data.TaggedError("EngineError")<{
   readonly cause: unknown
 }> {}
 
-/** Движок не смог распарсить SQL модели (SPEC §9.2). */
+/** The engine could not parse the model's SQL (SPEC §9.2). */
 export class SqlParseError extends Data.TaggedError("SqlParseError")<{
   readonly sql: string
   readonly message: string
@@ -17,9 +17,9 @@ export interface EngineColumn {
 }
 
 /**
- * Адаптер движка (SPEC §9.1). Минимальная поверхность: DDL-помощники
- * живут отдельно (executor) и ходят через execute — адаптеру незачем
- * знать про физический/виртуальный слой.
+ * Engine adapter (SPEC §9.1). A minimal surface: DDL helpers live separately
+ * (executor) and go through execute — the adapter has no need to know about
+ * the physical/virtual layer.
  */
 export type Dialect = "duckdb" | "postgres"
 
@@ -30,19 +30,19 @@ export interface Engine {
   ) => Effect.Effect<ReadonlyArray<Record<string, unknown>>, EngineError>
   readonly execute: (sql: string) => Effect.Effect<void, EngineError>
   /**
-   * Набор стейтментов одной транзакцией движка, откат при любой ошибке.
-   * Примитив адаптера, а не BEGIN/COMMIT через execute: на пуле соединений
-   * (Postgres) отдельные вызовы разъехались бы по разным соединениям.
+   * A set of statements in one engine transaction, rolled back on any error.
+   * An adapter primitive rather than BEGIN/COMMIT via execute: on a connection
+   * pool (Postgres) separate calls would scatter across different connections.
    */
   readonly transaction: (
     statements: ReadonlyArray<string>,
   ) => Effect.Effect<void, EngineError>
-  /** Имена и типы колонок запроса без его выполнения (контракт схемы, SPEC §3.2). */
+  /** Names and types of a query's columns without executing it (schema contract, SPEC §3.2). */
   readonly describe: (sql: string) => Effect.Effect<ReadonlyArray<EngineColumn>, EngineError>
   /**
-   * Канонический вид SELECT-запроса для fingerprint (SPEC §4, §9.2):
-   * парсинг родным парсером движка, нормализация, детерминированная
-   * сериализация. Переформатирование текста не меняет результат.
+   * The canonical form of a SELECT query for the fingerprint (SPEC §4, §9.2):
+   * parsing by the engine's native parser, normalization, deterministic
+   * serialization. Reformatting the text does not change the result.
    */
   readonly canonicalize: (sql: string) => Effect.Effect<string, EngineError | SqlParseError>
 }

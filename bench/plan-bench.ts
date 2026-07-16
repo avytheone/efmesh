@@ -1,8 +1,8 @@
 /**
- * Бенч оверхеда efmesh над движком: сколько стоят plan (canonicalize +
- * fingerprint всего графа) и apply на N синтетических моделях.
- * Запуск: bun bench/plan-bench.ts [N]
- * DAG: цепочки по 5 моделей от общих корней — есть и глубина, и веер.
+ * Bench of efmesh's overhead over the engine: how much plan (canonicalize +
+ * fingerprint of the whole graph) and apply cost on N synthetic models.
+ * Run: bun bench/plan-bench.ts [N]
+ * DAG: chains of 5 models from shared roots — both depth and fan-out.
  */
 import { Effect, Layer, Schema } from "effect"
 import { buildGraph } from "../src/core/graph.ts"

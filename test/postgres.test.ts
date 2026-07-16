@@ -32,8 +32,8 @@ const scenario = <A, E>(body: Effect.Effect<A, E, EngineAdapter | StateStore>) =
     ),
   )
 
-describe.skipIf(!hasPostgres)("Postgres-адаптер (SPEC §9.1, F3)", () => {
-  test("state store: снапшоты, promote с учётом сиротства, интервалы, лок с ttl", async () => {
+describe.skipIf(!hasPostgres)("Postgres adapter (SPEC §9.1, F3)", () => {
+  test("state store: snapshots, promote accounting for orphaning, intervals, lock with ttl", async () => {
     await scenario(
       Effect.gen(function* () {
         const store = yield* StateStore
@@ -45,7 +45,7 @@ describe.skipIf(!hasPostgres)("Postgres-адаптер (SPEC §9.1, F3)", () => 
           fingerprintVersion: 1,
         }
         yield* store.upsertSnapshot({ ...base, fingerprint: "f1", physicalFp: "f1" })
-        yield* store.upsertSnapshot({ ...base, fingerprint: "f1", physicalFp: "f1" }) // идемпотентно
+        yield* store.upsertSnapshot({ ...base, fingerprint: "f1", physicalFp: "f1" }) // idempotent
         yield* store.promote("dev", [{ name: "med.a", fingerprint: "f1" }])
         expect((yield* store.getSnapshot("med.a", "f1"))?.orphanedAt).toBeNull()
 
@@ -66,18 +66,18 @@ describe.skipIf(!hasPostgres)("Postgres-адаптер (SPEC §9.1, F3)", () => 
         expect(yield* store.acquireLock("run:dev", 60_000)).toBe(false)
         yield* store.releaseLock("run:dev")
         expect(yield* store.acquireLock("run:dev", 0)).toBe(true)
-        // ttl=0: протухший лок перехватывается сразу
+        // ttl=0: a stale lock is reclaimed immediately
         expect(yield* store.acquireLock("run:dev", 60_000)).toBe(true)
         yield* store.releaseLock("run:dev")
       }),
     )
   })
 
-  test("версия схемы: стор без meta не открывается, migrate догоняет", async () => {
+  test("schema version: a store without meta refuses to open, migrate catches up", async () => {
     await scenario(
       Effect.gen(function* () {
         const engine = yield* EngineAdapter
-        // стор уже создан beforeAll-открытиями — имитируем доверсионный
+        // the store was already created by beforeAll opens — simulate a pre-versioned one
         yield* engine.execute(`DROP TABLE IF EXISTS efmesh_state.meta`)
       }),
     )
@@ -93,7 +93,7 @@ describe.skipIf(!hasPostgres)("Postgres-адаптер (SPEC §9.1, F3)", () => 
     expect(report).toEqual({ from: 0, to: STATE_VERSION })
   })
 
-  test("canonicalize: libpg_query, формат-инвариантность и ошибка парсинга", async () => {
+  test("canonicalize: libpg_query, format invariance and a parse error", async () => {
     await scenario(
       Effect.gen(function* () {
         const engine = yield* EngineAdapter
@@ -111,7 +111,7 @@ describe.skipIf(!hasPostgres)("Postgres-адаптер (SPEC §9.1, F3)", () => 
     )
   })
 
-  test("describe: имена и типы без выполнения запроса", async () => {
+  test("describe: names and types without running the query", async () => {
     await scenario(
       Effect.gen(function* () {
         const engine = yield* EngineAdapter
@@ -125,7 +125,7 @@ describe.skipIf(!hasPostgres)("Postgres-адаптер (SPEC §9.1, F3)", () => 
     )
   })
 
-  test("e2e: full + view + инкрементальный бэкфилл с параллельными батчами", async () => {
+  test("e2e: full + view + incremental backfill with parallel batches", async () => {
     await scenario(
       Effect.gen(function* () {
         const engine = yield* EngineAdapter
@@ -151,7 +151,7 @@ describe.skipIf(!hasPostgres)("Postgres-адаптер (SPEC §9.1, F3)", () => 
             kind: kind.incrementalByTimeRange({
               timeColumn: "happened_at",
               start: "2026-01-01T00:00:00Z",
-              batchSize: 1, // каждый день — свой батч и своя транзакция
+              batchSize: 1, // each day is its own batch and its own transaction
             }),
             schema: Schema.Struct({ id: Schema.String, happened_at: Schema.DateTimeUtc }),
           },
@@ -179,17 +179,17 @@ describe.skipIf(!hasPostgres)("Postgres-адаптер (SPEC §9.1, F3)", () => 
         const models = [raw, events, daily, load]
         const jan7 = fromIso("2026-01-07T00:00:00Z")
 
-        // 6 однодневных батчей, конкурентность 4 — пул соединений
+        // 6 one-day batches, concurrency 4 — connection pool
         const applied = yield* Efmesh.apply("dev", models, { now: jan7, concurrency: 4 })
         expect(applied.built).toEqual(["med.events", "med.daily", "med.load"])
         const rows = yield* engine.query(`SELECT n FROM dev__med.load`)
         expect(rows).toEqual([{ n: 6 }])
 
-        // идемпотентность
+        // idempotency
         const again = yield* Efmesh.apply("dev", models, { now: jan7, concurrency: 4 })
         expect(again.plan.hasChanges).toBe(false)
 
-        // promote в prod — родные схемы, без пересчёта
+        // promote to prod — native schemas, no recompute
         yield* Efmesh.apply("prod", models, { now: jan7 })
         const prod = yield* engine.query(`SELECT n FROM med.load`)
         expect(prod).toEqual([{ n: 6 }])
@@ -197,7 +197,7 @@ describe.skipIf(!hasPostgres)("Postgres-адаптер (SPEC §9.1, F3)", () => 
     )
   })
 
-  test("e2e: upsert по ключу и scdType2 на Postgres", async () => {
+  test("e2e: upsert by key and scdType2 on Postgres", async () => {
     await scenario(
       Effect.gen(function* () {
         const engine = yield* EngineAdapter
@@ -253,7 +253,7 @@ describe.skipIf(!hasPostgres)("Postgres-адаптер (SPEC §9.1, F3)", () => 
     )
   })
 
-  test("DAG-конкурентность: независимые модели строятся параллельно", async () => {
+  test("DAG concurrency: independent models build in parallel", async () => {
     const slow = (name: string) =>
       defineModel(
         { name, kind: kind.full(), schema: Schema.Struct({ n: Schema.Number }) },
@@ -266,13 +266,13 @@ describe.skipIf(!hasPostgres)("Postgres-адаптер (SPEC §9.1, F3)", () => 
         const applied = yield* Efmesh.apply("dev", models, { modelConcurrency: 4 })
         const elapsed = performance.now() - startedAt
         expect(applied.built).toEqual(["par.a", "par.b"])
-        // последовательно было бы ≥ 1200 мс (2 × pg_sleep 0.6); параллельно ~600
+        // sequentially it would be ≥ 1200 ms (2 × pg_sleep 0.6); in parallel ~600
         expect(elapsed).toBeLessThan(1100)
       }),
     )
   })
 
-  test("DAG-конкурентность: ромб при modelConcurrency 4 собирается по порядку", async () => {
+  test("DAG concurrency: a diamond at modelConcurrency 4 builds in order", async () => {
     await scenario(
       Effect.gen(function* () {
         const engine = yield* EngineAdapter
@@ -294,7 +294,7 @@ describe.skipIf(!hasPostgres)("Postgres-адаптер (SPEC §9.1, F3)", () => 
             SELECT (l.n + r.n)::INT AS n FROM ${ctx.ref(left)} l CROSS JOIN ${ctx.ref(right)} r
           `,
         )
-        // неверный порядок сборки упал бы на отсутствующей физике родителя
+        // a wrong build order would fail on a parent's missing physical table
         yield* Efmesh.apply("dev", [root, left, right, bottom], { modelConcurrency: 4 })
         const rows = yield* engine.query(`SELECT n FROM dev__dg.bottom`)
         expect(rows).toEqual([{ n: 112 }])
@@ -302,7 +302,7 @@ describe.skipIf(!hasPostgres)("Postgres-адаптер (SPEC §9.1, F3)", () => 
     )
   })
 
-  test("DuckDB-федерация на Postgres — честная EngineFeatureError", async () => {
+  test("DuckDB federation on Postgres — an honest EngineFeatureError", async () => {
     await scenario(
       Effect.gen(function* () {
         const departments = defineSeed({
@@ -313,7 +313,7 @@ describe.skipIf(!hasPostgres)("Postgres-адаптер (SPEC §9.1, F3)", () => 
         const failure = yield* Effect.flip(Efmesh.apply("dev", [departments]))
         expect(failure._tag).toBe("EngineFeatureError")
 
-        // target: ducklake — тоже DuckDB-федерация, на PG не выражается
+        // target: ducklake — also DuckDB federation, not expressible on PG
         const lake = defineModel(
           {
             name: "med3.lake",

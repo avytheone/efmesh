@@ -17,16 +17,16 @@ export class InvalidEnvironmentError extends Data.TaggedError("InvalidEnvironmen
   readonly env: string
 }> {}
 
-/** Модель нельзя применить forward-only (SPEC §5.2). */
+/** The model cannot be applied forward-only (SPEC §5.2). */
 export class ForwardOnlyError extends Data.TaggedError("ForwardOnlyError")<{
   readonly model: string
   readonly reason: string
 }> {}
 
 /**
- * Override категоризации не принимается (#5): модели нет в проекте или
- * AST-дифф очевидно противоречит заявленному вердикту (удалённые колонки
- * не бывают non-breaking — потомки читают их по именам).
+ * A categorization override is rejected (#5): the model is not in the project
+ * or the AST diff obviously contradicts the claimed verdict (removed columns
+ * are never non-breaking — descendants read them by name).
  */
 export class ReclassifyError extends Data.TaggedError("ReclassifyError")<{
   readonly model: string
@@ -34,10 +34,10 @@ export class ReclassifyError extends Data.TaggedError("ReclassifyError")<{
 }> {}
 
 /**
- * Снапшот посчитан другой версией алгоритма fingerprint (SPEC §4):
- * отпечатки разных версий несравнимы — план честно останавливается,
- * а не показывает «всё breaking». Лечится миграцией той версии efmesh,
- * которая сменила алгоритм.
+ * The snapshot was computed by a different version of the fingerprint
+ * algorithm (SPEC §4): fingerprints of different versions are incomparable —
+ * the plan honestly stops instead of showing "everything breaking". Cured by
+ * migrating to the version of efmesh that changed the algorithm.
  */
 export class FingerprintVersionError extends Data.TaggedError("FingerprintVersionError")<{
   readonly model: string
@@ -46,21 +46,21 @@ export class FingerprintVersionError extends Data.TaggedError("FingerprintVersio
 }> {}
 
 export type ChangeCategory =
-  /** Модели не было в окружении. */
+  /** The model was not in the environment. */
   | "added"
-  /** Смысловая правка запроса или метаданных: модель и потомки пересобираются. */
+  /** A meaningful edit of the query or metadata: the model and its descendants rebuild. */
   | "breaking"
-  /** Добавлены колонки в конец SELECT, остальное дерево нетронуто (SPEC §5.2). */
+  /** Columns appended to the end of the SELECT, the rest of the tree untouched (SPEC §5.2). */
   | "non-breaking"
-  /** Собственный AST не менялся — версия сдвинулась каскадом от родителя. */
+  /** The own AST did not change — the version shifted by cascade from a parent. */
   | "indirect"
   /**
-   * Физика и done-интервалы старой версии переиспользуются, история не
-   * переигрывается — новая логика действует с момента применения (SPEC §5.2).
-   * Явный флаг пользователя или каскад от forward-only-родителей.
+   * The physics and done-intervals of the old version are reused, history is
+   * not replayed — the new logic takes effect from the moment of application
+   * (SPEC §5.2). An explicit user flag or a cascade from forward-only parents.
    */
   | "forward-only"
-  /** Была в окружении, из проекта исчезла — view будет снесён при промоушене. */
+  /** Was in the environment, vanished from the project — the view is dropped at promotion. */
   | "removed"
   | "unchanged"
 
@@ -68,72 +68,73 @@ export interface PlanAction {
   readonly name: string
   readonly fingerprint: string
   /**
-   * Fingerprint, чьей физикой пользуется снапшот: обычно собственный,
-   * при forward-only — унаследованный от предыдущей версии.
+   * The fingerprint whose physics the snapshot uses: usually its own, and
+   * under forward-only — inherited from the previous version.
    */
   readonly physicalFingerprint: string
-  /** Откуда наследуются физика и done-интервалы (fingerprint старой версии) при forward-only. */
+  /** Where the physics and done-intervals are inherited from (fingerprint of the old version) under forward-only. */
   readonly reusedFrom?: string
-  /** Канонический AST тела (null у external) — сохраняется в снапшот. */
+  /** Canonical AST of the body (null for external) — saved into the snapshot. */
   readonly canonicalAst: string | null
   readonly change: ChangeCategory
-  /** Вердикт планировщика до override оператора (#5); журналируется. */
+  /** The planner's verdict before the operator override (#5); journaled. */
   readonly reclassifiedFrom?: ChangeCategory
   /**
-   * Почему категория такая (#4): разошедшиеся узлы канонического AST и
-   * причина словами. Есть у всех изменённых моделей, кроме added/removed —
-   * там сравнивать не с чем. Пути diverged — отладочная подсказка, не контракт.
+   * Why the category is what it is (#4): the diverged nodes of the canonical
+   * AST and the reason in words. Present on all changed models except
+   * added/removed — there is nothing to compare there. The diverged paths are
+   * a debugging hint, not a contract.
    */
   readonly explain?: ChangeExplanation
   /**
-   * Нужна ли сборка физики. false для unchanged/removed, external и для
-   * снапшотов, уже собранных другим окружением, — тогда промоушен это
-   * только view-swap.
+   * Whether physics needs building. false for unchanged/removed, external and
+   * for snapshots already built by another environment — then promotion is
+   * only a view-swap.
    */
   readonly build: boolean
   /**
-   * Диапазоны к пересчёту у incrementalByTimeRange (слитые из недостающих
-   * интервалов + lookback); у остальных видов пуст. Дыры бывают и у
-   * unchanged-модели — время идёт, появляются новые интервалы.
+   * Ranges to recompute for incrementalByTimeRange (merged from missing
+   * intervals + lookback); empty for other kinds. Gaps happen even for an
+   * unchanged model — time passes, new intervals appear.
    */
   readonly backfill: ReadonlyArray<Interval>
-  /** true у incrementalByUniqueKey: каждый apply перегоняет запрос (upsert по ключу). */
+  /** true for incrementalByUniqueKey: every apply re-runs the query (upsert by key). */
   readonly refresh: boolean
 }
 
 export interface Plan {
   readonly env: string
-  /** В топологическом порядке; removed — в конце. */
+  /** In topological order; removed comes last. */
   readonly actions: ReadonlyArray<PlanAction>
   readonly hasChanges: boolean
 }
 
 export interface PlanOptions {
-  /** «Сейчас» для расчёта интервалов; по умолчанию — Clock. Инъекция для тестов. */
+  /** "Now" for computing intervals; defaults to Clock. Injection point for tests. */
   readonly now?: number
   /**
-   * Модели, чьи изменения применить forward-only (SPEC §5.2): новая версия
-   * наследует физическую таблицу и done-интервалы старой, история не
-   * переигрывается. Только incrementalByTimeRange — у остальных видов
-   * «задним числом» не бывает по построению.
+   * Models whose changes to apply forward-only (SPEC §5.2): the new version
+   * inherits the physical table and done-intervals of the old one, history is
+   * not replayed. Only incrementalByTimeRange — other kinds have no
+   * "retroactive" notion by construction.
    */
   readonly forwardOnly?: ReadonlyArray<string>
   /**
-   * Override категоризации (#5, SPEC §5.2): оператор, глядя на `--explain`,
-   * заявляет вердикт вместо планировщика. Управляет судьбой ПОТОМКОВ
-   * (non-breaking-родитель разрешает им реюз физики); саму модель от
-   * пересборки освобождает не он, а forwardOnly. Гвардрейл: очевидное
-   * противоречие AST (удалённые колонки → non-breaking) — ошибка.
-   * Применяется только к вердиктам breaking/non-breaking; на unchanged/
-   * added/removed/indirect молча не влияет.
+   * Categorization override (#5, SPEC §5.2): the operator, looking at
+   * `--explain`, states the verdict instead of the planner. It governs the
+   * fate of DESCENDANTS (a non-breaking parent lets them reuse the physics);
+   * the model itself is freed from rebuilding not by this but by forwardOnly.
+   * Guardrail: an obvious AST contradiction (removed columns → non-breaking)
+   * is an error. Applies only to breaking/non-breaking verdicts; on unchanged/
+   * added/removed/indirect it silently has no effect.
    */
   readonly reclassify?: Readonly<Record<string, "breaking" | "non-breaking">>
 }
 
 /**
- * Виды, чью физику стоит наследовать при indirect-реюзе (#5): материализуемые
- * таблицы. view/embedded материализации не имеют, seed пересобирается из
- * файла дёшево и родителей не имеет.
+ * Kinds whose physics is worth inheriting on indirect reuse (#5):
+ * materialized tables. view/embedded have no materialization; seed rebuilds
+ * cheaply from a file and has no parents.
  */
 const REUSABLE_KINDS: ReadonlySet<string> = new Set([
   "full",
@@ -181,8 +182,8 @@ export const planChanges = (
         return yield* new ReclassifyError({ model: flagged, reason: "модели нет в проекте" })
       }
     }
-    // кэш канонизации (#8) — стор под рукой; его сбои глотаются:
-    // промах кэша — это просто честный пересчёт, а не ошибка плана
+    // canonicalization cache (#8) — the store is at hand; its failures are
+    // swallowed: a cache miss is just an honest recompute, not a plan error
     const versions = yield* fingerprintGraph(graph, {
       get: (key) => store.getCanon(key).pipe(Effect.orElseSucceed(() => undefined)),
       put: (key, canonical) => store.putCanon(key, canonical).pipe(Effect.ignore),
@@ -193,7 +194,7 @@ export const planChanges = (
 
     const actions: Array<PlanAction> = []
     const changeOf = new Map<string, ChangeCategory>()
-    // кто в этом плане наследует физику старой версии (indirect-реюз, #5)
+    // who in this plan inherits the physics of the old version (indirect reuse, #5)
     const reusedPhysics = new Set<string>()
     for (const name of graph.order) {
       const model = graph.models.get(name)!
@@ -207,8 +208,8 @@ export const planChanges = (
       if (known === undefined) change = "added"
       else if (known === fingerprint) change = "unchanged"
       else {
-        // категоризация по AST против последнего известного снапшота (SPEC §5.2);
-        // старых записей без AST и external — консервативно breaking
+        // categorization by AST against the last known snapshot (SPEC §5.2);
+        // old records without an AST and external — conservatively breaking
         const previous = yield* store.getSnapshot(name, known)
         if (previous !== undefined && previous.fingerprintVersion !== FINGERPRINT_VERSION) {
           return yield* new FingerprintVersionError({
@@ -232,7 +233,7 @@ export const planChanges = (
                 : "у прошлого снапшота не сохранён канонический AST — сравнивать не с чем, консервативно breaking",
           }
         } else if (oldAst === ast) {
-          change = "indirect" // версия сдвинута родителем/метаданными
+          change = "indirect" // version shifted by a parent/metadata
           explain =
             changedParents.length > 0
               ? {
@@ -249,8 +250,8 @@ export const planChanges = (
           change = categorizeAstChange(oldAst, ast)
           explain = explainCategorized(oldAst, ast, change)
         }
-        // override оператора (#5): вердикт заявлен флагом поверх --explain;
-        // планировщик проверяет только очевидное противоречие AST
+        // operator override (#5): the verdict is stated by a flag on top of
+        // --explain; the planner checks only an obvious AST contradiction
         const override = reclassify[name]
         if (
           override !== undefined &&
@@ -278,9 +279,9 @@ export const planChanges = (
           }
           change = override
         }
-        // «версию сдвинули ТОЛЬКО родители»: отпечаток со старыми подписями
-        // родителей обязан дать known — иначе вместе с родителями разошлись
-        // и метаданные (kind/grain/columns/target), наследовать физику нельзя
+        // "version shifted by parents ONLY": a fingerprint with the old parent
+        // signatures must yield known — otherwise the metadata diverged along
+        // with the parents (kind/grain/columns/target) and physics cannot be inherited
         const parentsOnly =
           change === "indirect" &&
           previous !== undefined &&
@@ -290,9 +291,9 @@ export const planChanges = (
             ast,
             [...model.deps].sort().map((dep) => `${dep}=${current.get(dep)!}`),
           )) === known
-        // forward-only: явный флаг пользователя — либо каскад: собственный AST
-        // не менялся, а все изменившиеся родители сами forward-only (реюз
-        // физики родителя означает, что и потомку нечего переигрывать)
+        // forward-only: an explicit user flag — or a cascade: the own AST did
+        // not change and all changed parents are themselves forward-only (reuse
+        // of a parent's physics means the descendant has nothing to replay either)
         const cascaded =
           parentsOnly &&
           model.kind._tag === "incrementalByTimeRange" &&
@@ -316,12 +317,12 @@ export const planChanges = (
                 cascadeFrom: changedParents,
               }
         }
-        // indirect-реюз (#5, класс sqlmesh «indirect non-breaking»): своё тело
-        // не менялось, версию сдвинули только родители, и каждый изменившийся
-        // родитель гарантирует те же данные в старых колонках (non-breaking —
-        // строго суффикс; forward-only и реюз — буквально та же физика) —
-        // потомку нечего переигрывать: физика и учёт наследуются, scdType2
-        // не теряет накопленную историю строк
+        // indirect reuse (#5, sqlmesh's "indirect non-breaking" class): the own
+        // body did not change, the version was shifted only by parents, and each
+        // changed parent guarantees the same data in the old columns (non-breaking
+        // — strictly a suffix; forward-only and reuse — literally the same
+        // physics) — the descendant has nothing to replay: physics and ledger are
+        // inherited, scdType2 does not lose its accumulated row history
         if (
           change === "indirect" &&
           parentsOnly &&
@@ -347,7 +348,7 @@ export const planChanges = (
         }
       }
       changeOf.set(name, change)
-      // external не материализуется — версия участвует в diff, физики нет
+      // external is not materialized — the version participates in the diff, there is no physics
       const existing = yield* store.getSnapshot(name, fingerprint)
       if (existing !== undefined) physicalFingerprint = existing.physicalFp
       const alreadyBuilt =
@@ -357,9 +358,9 @@ export const planChanges = (
       if (model.kind._tag === "incrementalByTimeRange") {
         const kind = model.kind
         const wanted = enumerateIntervals(kind.interval, fromIso(kind.start), now)
-        // покрытие привязано к fingerprint: новая версия = пустой учёт = полный
-        // бэкфилл; forward-only наследует done-интервалы старой версии —
-        // пересчитывается только то, чего не было
+        // coverage is keyed to the fingerprint: a new version = empty ledger =
+        // full backfill; forward-only inherits the done-intervals of the old
+        // version — only what was missing is recomputed
         const inherited =
           reusedFrom === undefined ? [] : yield* store.listIntervals(reusedFrom)
         const doneByStart = new Map<number, Interval>()
@@ -373,7 +374,7 @@ export const planChanges = (
         const done = [...doneByStart.values()]
         const missing = [...missingIntervals(wanted, done)]
         if (kind.lookback > 0) {
-          // поздно приезжающие данные: последние done-интервалы перечитываются
+          // late-arriving data: the last done-intervals are re-read
           const tail = done.sort((a, b) => a.start - b.start).slice(-kind.lookback)
           missing.push(...tail)
         }
@@ -391,7 +392,7 @@ export const planChanges = (
         ...(explain !== undefined ? { explain } : {}),
         build: !alreadyBuilt,
         backfill,
-        // каждый apply сверяет запрос с физикой: upsert / SCD-версионирование
+        // every apply reconciles the query with the physics: upsert / SCD versioning
         refresh:
           model.kind._tag === "incrementalByUniqueKey" || model.kind._tag === "scdType2",
       })

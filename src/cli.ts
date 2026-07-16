@@ -42,7 +42,7 @@ export class ConfigLoadError extends Data.TaggedError("ConfigLoadError")<{
   readonly reason: string
 }> {}
 
-/** Конфиг с уже собранным списком моделей: явные + найденные discovery. */
+/** Config with an already-assembled model list: explicit ones + discovery finds. */
 type LoadedConfig = EfmeshConfig & { readonly models: ReadonlyArray<AnyModel> }
 
 const loadConfig = (
@@ -65,7 +65,7 @@ const loadConfig = (
     })
     const explicit = config.models ?? []
     if (config.discovery === undefined) return { ...config, models: explicit }
-    // маски — относительно конфига: проект переносим независимо от cwd
+    // globs are relative to the config: the project is portable regardless of cwd
     const discovered = yield* discoverModels(config.discovery, NodePath.dirname(absolute))
     const seen = new Set(explicit)
     const names = new Map(explicit.map((model) => [model.name.full, "models в конфиге"]))
@@ -82,7 +82,7 @@ const loadConfig = (
     return { ...config, models: merged }
   })
 
-/** Слои движка и состояния из конфига — общие для plan/apply. */
+/** Engine and state layers from the config — shared by plan/apply. */
 const configLayers = (config: EfmeshConfig) =>
   Layer.mergeAll(
     config.engine?.url !== undefined
@@ -159,7 +159,7 @@ const parseForwardOnly = (value: string): ReadonlyArray<string> | undefined => {
   return names.length > 0 ? names : undefined
 }
 
-/** `модель=breaking|non-breaking[,…]` → запись для PlanOptions.reclassify (#5). */
+/** `model=breaking|non-breaking[,…]` → record for PlanOptions.reclassify (#5). */
 export const parseReclassify = (
   value: string,
 ): Effect.Effect<Readonly<Record<string, "breaking" | "non-breaking">> | undefined, ReclassifyError> =>
@@ -193,22 +193,22 @@ const yesFlag = Flag.boolean("yes").pipe(
   Flag.withDescription("Применить без подтверждения (не-TTY подтверждения не спрашивает)"),
 )
 
-/** y/yes/д/да — регистронезависимо; всё остальное (включая пусто) — отказ. */
+/** Accepts y/yes and their Russian equivalents, case-insensitive; anything else (including empty) is a refusal. */
 export const isAffirmative = (answer: string | null): boolean =>
   ["y", "yes", "д", "да"].includes((answer ?? "").trim().toLowerCase())
 
 /**
- * Exit-код «работа ждёт человека» (F6): план требует подтверждения в не-TTY
- * или run упёрся в структурные изменения. Алертинг обязан отличать это
- * штатное состояние от настоящих ошибок (код 1).
+ * The "work awaits a human" exit code (F6): the plan needs confirmation in a
+ * non-TTY, or run hit structural changes. Alerting must distinguish this
+ * normal state from real errors (code 1).
  */
 export const EXIT_AWAITING_HUMAN = 2
 
 /**
- * Судьба показанного плана (SPEC §5.1, ужесточено в F6): без изменений или
- * с --yes — применять; изменения в TTY — спросить человека; изменения в
- * не-TTY (CI, cron, пайп) — ОТКАЗ: молча применять план, который никто не
- * видел, нельзя, нужен явный --yes.
+ * The fate of a shown plan (SPEC §5.1, tightened in F6): no changes or
+ * --yes — apply; changes in a TTY — ask the human; changes in a
+ * non-TTY (CI, cron, pipe) — REFUSE: silently applying a plan nobody
+ * saw is forbidden, an explicit --yes is required.
  */
 export const decideApply = (
   hasChanges: boolean,
@@ -227,8 +227,8 @@ const explainFlag = Flag.boolean("explain").pipe(
 )
 
 /**
- * JSON-форма плана (#3) — КОНТРАКТ для CI и ботов: изменения формы —
- * semver-события пакета. Интервалы — ISO UTC, не epoch ms.
+ * JSON shape of the plan (#3) — a CONTRACT for CI and bots: shape changes
+ * are package semver events. Intervals are ISO UTC, not epoch ms.
  */
 export const planToJson = (plan: Plan): unknown => ({
   env: plan.env,
@@ -236,7 +236,7 @@ export const planToJson = (plan: Plan): unknown => ({
   actions: plan.actions.map((action) => ({
     name: action.name,
     change: action.change,
-    // override оператора (#5) и реюз физики — аддитивные поля контракта
+    // operator override (#5) and physical reuse — additive contract fields
     ...(action.reclassifiedFrom !== undefined
       ? { reclassifiedFrom: action.reclassifiedFrom }
       : {}),
@@ -247,7 +247,7 @@ export const planToJson = (plan: Plan): unknown => ({
       start: new Date(range.start).toISOString(),
       end: new Date(range.end).toISOString(),
     })),
-    // причина категории (#4); diverged-пути — отладочная подсказка, не контракт
+    // category reason (#4); diverged paths are a debug hint, not a contract
     ...(action.explain !== undefined ? { explain: action.explain } : {}),
   })),
 })
@@ -340,10 +340,10 @@ const applyCommand = Command.make(
       const overrides = yield* parseReclassify(reclassify)
       const modelConcurrency = parseJobs(jobs)
       const retry = parseRetries(retries)
-      // план и применение — под одним слоем и одним межпроцессным локом:
-      // применяется ровно тот план, который показан и подтверждён, и никто
-      // (второй apply, cron с run) не вклинится между ними (SPEC §14.6);
-      // цена — лок держится и пока человек думает над подтверждением
+      // plan and apply — under one layer and one cross-process lock:
+      // exactly the plan that was shown and confirmed gets applied, and no one
+      // (a second apply, cron with run) wedges in between them (SPEC §14.6);
+      // the cost — the lock is held even while the human ponders confirmation
       yield* Effect.gen(function* () {
         const graph = yield* buildGraph(loaded.models)
         const plan = yield* planChanges(env, graph, {
@@ -421,8 +421,8 @@ const runCommand = Command.make(
         ...(retry !== undefined ? { retry } : {}),
       }).pipe(
         Effect.provide(configLayers(loaded)),
-        // структурные изменения — штатное «ждёт человека с apply», не сбой:
-        // алертинг различает по exit-коду 2 (F6)
+        // structural changes are the normal "awaits a human with apply", not a failure:
+        // alerting tells it apart by exit code 2 (F6)
         Effect.catchTag("RunBlockedByChangesError", (blocked) =>
           Effect.gen(function* () {
             yield* Console.error(
@@ -522,7 +522,7 @@ const diffCommand = Command.make(
           })
         }
         const report = yield* Effect.gen(function* () {
-          // ducklake-витрины видны через ATTACH — как делает apply
+          // ducklake marts are visible via ATTACH — the same way apply does it
           if (loaded.ducklake !== undefined) {
             const engine = yield* EngineAdapter
             yield* engine.execute(ducklakeAttachSql(loaded.ducklake))
@@ -615,7 +615,7 @@ const scheduleCommand = Command.make(
         "журнал тиков: efmesh status " + env + "; NB: cron не догоняет пропущенные запуски — строже systemd-таймер (--print-systemd)",
       )
     }).pipe(
-      // reason — самое ценное (рецепт для оператора): наружу словами, не стектрейсом
+      // reason is the most valuable part (a recipe for the operator): surface it in words, not a stacktrace
       Effect.catchTag("ScheduleError", (error) =>
         Effect.gen(function* () {
           yield* Console.error(`schedule: ${error.reason}`)
@@ -728,7 +728,7 @@ const auditCommand = Command.make(
         Effect.provide(configLayers(loaded)),
       )
       if (json) {
-        // отчёт целиком; exit-код по blocking сохраняется — stdout чистый JSON
+        // the whole report; the blocking-based exit code is preserved — stdout is pure JSON
         yield* printJson(report)
         if (report.blockingViolations > 0) {
           return yield* new EnvironmentAuditError({

@@ -6,39 +6,40 @@ import { STATE_VERSION, StateStore } from "../state/store.ts"
 import type { PlanRecord, RunRecord, StateError } from "../state/store.ts"
 
 /**
- * `efmesh status <env>` (issue #1): одна команда на вопрос «что вообще
- * происходит» — для оператора ночного cron и для автора, забывшего
- * команды. Только чтение: стор открыт → версия схемы уже совпала.
+ * `efmesh status <env>` (issue #1): one command for the question «what is
+ * even going on» — for the nightly-cron operator and for the author who
+ * forgot the commands. Read-only: if the store opened → its schema version
+ * already matched.
  */
 
 export interface ModelLag {
   readonly model: string
-  /** Конец последнего done-интервала (ISO); null — ещё ничего не посчитано. */
+  /** End of the last done interval (ISO); null — nothing computed yet. */
   readonly doneUpTo: string | null
-  /** Сколько интервалов не хватает до «сейчас». 0 — догнано. */
+  /** How many intervals are missing up to «now». 0 — caught up. */
   readonly missing: number
-  /** Интервалы, помеченные failed, — застрявший бэкфилл виден сразу. */
+  /** Intervals marked failed — a stuck backfill is visible at once. */
   readonly failed: number
 }
 
 export interface StatusReport {
   readonly env: string
   readonly storeVersion: number
-  /** Строк в окружении; 0 — окружение не существует (ни разу не применялось). */
+  /** Rows in the environment; 0 — the environment does not exist (never applied). */
   readonly models: number
-  /** Последний промоушен (ISO); null — окружения нет. */
+  /** Last promotion (ISO); null — no environment. */
   readonly promotedAt: string | null
   readonly lastPlan: PlanRecord | null
-  /** Последние тики run, свежие первыми. */
+  /** Latest run ticks, freshest first. */
   readonly ticks: ReadonlyArray<RunRecord>
-  /** Отставание incremental-моделей окружения. */
+  /** Lag of the environment's incremental models. */
   readonly lag: ReadonlyArray<ModelLag>
 }
 
 export interface StatusOptions {
-  /** «Сейчас» для расчёта отставания; по умолчанию — Clock. Инъекция для тестов. */
+  /** «Now» for computing lag; by default — Clock. Injected for tests. */
   readonly now?: number
-  /** Сколько последних тиков показать; по умолчанию 5. */
+  /** How many latest ticks to show; by default 5. */
   readonly ticks?: number
 }
 
@@ -62,8 +63,8 @@ export const environmentStatus = (
     const lastPlan = plans.at(-1) ?? null
     const ticks = yield* store.listRuns(env, options?.ticks ?? 5)
 
-    // отставание — по УКАЗАТЕЛЯМ окружения (что реально отдаётся
-    // потребителям), а не по локальным fingerprint'ам проекта
+    // lag — by the environment's POINTERS (what is actually served to
+    // consumers), not by the project's local fingerprints
     const lag: Array<ModelLag> = []
     for (const row of rows) {
       const model = graph.models.get(row.name)

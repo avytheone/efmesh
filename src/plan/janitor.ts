@@ -9,32 +9,32 @@ import { janitorLockName, withStateLock, type LockHeldError, type LockOptions } 
 import { ducklakeAttachSql, ducklakeRef, parquetPrefix, physicalRef } from "./naming.ts"
 
 /**
- * Уборка осиротевшей физики (SPEC §5.4): снапшоты, на которые не ссылается
- * ни одно окружение и которые осиротели раньше, чем ttl назад, сносятся —
- * таблица/view движка, parquet-префикс озера, запись снапшота и учёт
- * интервалов.
+ * Cleanup of orphaned physical storage (SPEC §5.4): snapshots referenced by
+ * no environment and orphaned longer than ttl ago are removed — the engine
+ * table/view, the lake parquet prefix, the snapshot record and the interval
+ * bookkeeping.
  *
- * ttl отсчитывается от orphaned_at — отметки, которую промоушен ставит
- * при потере последней ссылки и снимает при возврате (откат на старую
- * версию обнуляет счётчик). Для записей без отметки (ни разу не
- * промоутились — например, apply упал до промоушена) — от created_at.
- * ttl по умолчанию 7 дней — достаточно, чтобы мгновенно откатиться
- * переключением view.
+ * ttl is measured from orphaned_at — the mark a promotion sets when the last
+ * reference is lost and clears on return (rolling back to an old version
+ * resets the counter). For records without the mark (never promoted — e.g.
+ * an apply that crashed before promotion) — from created_at.
+ * ttl defaults to 7 days — enough to roll back instantly by switching the
+ * view.
  */
 
 export interface JanitorOptions extends LockOptions {
   readonly ttlDays?: number
   readonly lakePath?: string
-  /** DuckLake-каталог (SPEC §14.5) — чтобы снести и таблицы-на-fingerprint в нём. */
+  /** DuckLake catalog (SPEC §14.5) — to also drop the fingerprint tables inside it. */
   readonly ducklake?: { readonly catalog: string; readonly dataPath?: string }
-  /** «Сейчас» — инъекция для тестов. */
+  /** «Now» — injected for tests. */
   readonly now?: number
 }
 
 export interface JanitorReport {
-  /** Снесённые снапшоты в виде `имя@fp8`. */
+  /** Removed snapshots as `name@fp8`. */
   readonly removed: ReadonlyArray<string>
-  /** Осиротевшие, но моложе ttl — остаются до следующего раза. */
+  /** Orphaned but younger than ttl — kept until next time. */
   readonly kept: ReadonlyArray<string>
 }
 
@@ -53,8 +53,9 @@ export const janitor = (
     const now = options?.now ?? (yield* Clock.currentTimeMillis)
     const ttlMs = (options?.ttlDays ?? 7) * DAY_MS
 
-    // снапшот не хранит цель материализации — при настроенном каталоге
-    // таблица сносится и там, и в _efmesh (DROP IF EXISTS терпим к пустоте)
+    // a snapshot does not store its materialization target — with a catalog
+    // configured, the table is dropped both there and in _efmesh (DROP IF EXISTS
+    // tolerates absence)
     const ducklake = options?.ducklake
     if (ducklake !== undefined && engine.dialect === "duckdb") {
       yield* engine.execute(ducklakeAttachSql(ducklake))
@@ -70,10 +71,11 @@ export const janitor = (
       !referenced.has(snapshot.fingerprint) &&
       (snapshot.orphanedAt ?? snapshot.createdAt) <= deadline
 
-    // фаза 1 — транзакционный claim записей: снос состоится, только если
-    // снапшот ВСЁ ЕЩЁ не referenced и сирота (проверки атомарны с удалением);
-    // параллельный apply, воскресивший версию (upsert снимает orphaned_at),
-    // claim проиграет — и её физика не тронется (гонка F6)
+    // phase 1 — transactional claim of records: removal happens only if the
+    // snapshot is STILL not referenced and an orphan (the checks are atomic
+    // with the delete); against a parallel apply that resurrected the version
+    // (upsert clears orphaned_at) the claim loses — and its physical storage
+    // is left untouched (F6 race)
     const claimed: Array<(typeof snapshots)[number]> = []
     for (const snapshot of snapshots) {
       if (referenced.has(snapshot.fingerprint)) continue
@@ -95,9 +97,9 @@ export const janitor = (
       removed.push(label)
     }
 
-    // фаза 2 — снос физики по СВЕЖЕМУ состоянию стора: физика делится между
-    // версиями (forward-only) и сносится, только если после claim'ов её не
-    // использует ни один выживший снапшот
+    // phase 2 — drop physical storage by the FRESH store state: storage is
+    // shared between versions (forward-only) and dropped only if, after the
+    // claims, no surviving snapshot uses it
     const survivors = yield* store.listSnapshots()
     const physicalInUse = new Set(survivors.map((snapshot) => snapshot.physicalFp))
     const dropped = new Set<string>()
@@ -124,7 +126,7 @@ export const janitor = (
 
     return { removed, kept }
   }).pipe(
-    // два janitor'а из разных процессов не должны наперегонки сносить одно и
-    // то же; от гонки janitor↔apply защищает ttl (окно на мгновенный откат)
+    // two janitors from different processes must not race to remove the same
+    // thing; the janitor↔apply race is guarded by ttl (the window for an instant rollback)
     withStateLock(janitorLockName, options?.lockTtlMs),
   )

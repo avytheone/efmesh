@@ -12,7 +12,7 @@ const withStore = <A, E>(body: (store: StateStoreShape) => Effect.Effect<A, E>) 
   )
 
 describe("SqliteState", () => {
-  test("снапшот: upsert идемпотентен, читается обратно", async () => {
+  test("snapshot: upsert is idempotent, reads back", async () => {
     const snapshot = await withStore((store) =>
       Effect.gen(function* () {
         const record = {
@@ -25,7 +25,7 @@ describe("SqliteState", () => {
           fingerprintVersion: 1,
         }
         yield* store.upsertSnapshot(record)
-        yield* store.upsertSnapshot(record) // повтор — no-op
+        yield* store.upsertSnapshot(record) // repeat — no-op
         return yield* store.getSnapshot("med.stays", "abc123")
       }),
     )
@@ -33,7 +33,7 @@ describe("SqliteState", () => {
     expect(snapshot?.createdAt).toMatch(/^\d{4}-/)
   })
 
-  test("promote заменяет весь набор окружения", async () => {
+  test("promote replaces the whole environment set", async () => {
     const envs = await withStore((store) =>
       Effect.gen(function* () {
         yield* store.promote("dev", [
@@ -47,7 +47,7 @@ describe("SqliteState", () => {
     expect(envs.map((e) => [e.name, e.fingerprint])).toEqual([["med.a", "f3"]])
   })
 
-  test("окружения независимы; referenced fingerprints — объединение", async () => {
+  test("environments are independent; referenced fingerprints — the union", async () => {
     const { prod, referenced } = await withStore((store) =>
       Effect.gen(function* () {
         yield* store.promote("dev", [{ name: "med.a", fingerprint: "f1" }])
@@ -62,13 +62,13 @@ describe("SqliteState", () => {
     expect(referenced).toEqual(new Set(["f1", "f2"]))
   })
 
-  test("интервалы: upsert по (fp, start), статус обновляется, изоляция по fp", async () => {
+  test("intervals: upsert by (fp, start), status is updated, isolation by fp", async () => {
     const { mine, other } = await withStore((store) =>
       Effect.gen(function* () {
         const jan1 = { startTs: "2026-01-01T00:00:00Z", endTs: "2026-01-02T00:00:00Z" }
         const jan2 = { startTs: "2026-01-02T00:00:00Z", endTs: "2026-01-03T00:00:00Z" }
         yield* store.markIntervals("fp_a", [jan1, jan2], "failed")
-        yield* store.markIntervals("fp_a", [jan2], "done") // ретрай успешен
+        yield* store.markIntervals("fp_a", [jan2], "done") // retry succeeded
         yield* store.markIntervals("fp_b", [jan1], "done")
         return {
           mine: yield* store.listIntervals("fp_a"),
@@ -83,7 +83,7 @@ describe("SqliteState", () => {
     expect(other).toHaveLength(1)
   })
 
-  test("orphaned_at: промоушен ставит отметку сироте и снимает при возврате", async () => {
+  test("orphaned_at: promotion marks an orphan and clears it on return", async () => {
     const phases = await withStore((store) =>
       Effect.gen(function* () {
         const base = { name: "med.a", renderedSql: "SELECT 1", canonicalAst: "{}", kind: "full", fingerprintVersion: 1 }
@@ -95,7 +95,7 @@ describe("SqliteState", () => {
         yield* store.promote("dev", [{ name: "med.a", fingerprint: "f2" }])
         const orphaned = yield* store.getSnapshot("med.a", "f1")
 
-        // откат на старую версию — отметка снимается, счётчик ttl обнулён
+        // rollback to the old version — the mark is cleared, the ttl counter is reset
         yield* store.promote("dev", [{ name: "med.a", fingerprint: "f1" }])
         const restored = yield* store.getSnapshot("med.a", "f1")
         return { referenced, orphaned, restored }
@@ -106,7 +106,7 @@ describe("SqliteState", () => {
     expect(phases.restored?.orphanedAt).toBeNull()
   })
 
-  test("журнал планов пишется и читается по порядку", async () => {
+  test("the plan journal is written and read back in order", async () => {
     const plans = await withStore((store) =>
       Effect.gen(function* () {
         yield* store.recordPlan("dev", `{"changes":1}`, "avy")

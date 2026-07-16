@@ -1,6 +1,6 @@
 import { Data } from "effect"
 
-/** Некорректная конфигурация модели: битое имя, self-ref и т.п. Бросается на этапе загрузки модуля. */
+/** Invalid model configuration: a malformed name, a self-ref, etc. Thrown at module load time. */
 export class ModelDefinitionError extends Data.TaggedError("ModelDefinitionError")<{
   readonly model: string
   readonly reason: string
@@ -19,7 +19,7 @@ export class DagCycleError extends Data.TaggedError("DagCycleError")<{
   readonly cycle: ReadonlyArray<string>
 }> {}
 
-/** Файл seed-модели не читается — fingerprint и сборка невозможны. */
+/** A seed model's file can't be read — fingerprint and assembly are impossible. */
 export class SeedReadError extends Data.TaggedError("SeedReadError")<{
   readonly model: string
   readonly file: string

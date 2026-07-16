@@ -2,11 +2,11 @@ import { Data, Effect } from "effect"
 import { StateStore, type StateError } from "../state/store.ts"
 
 /**
- * Межпроцессная блокировка через state store (SPEC §7, §14.6): мутации
- * окружения — apply и run — идут под ОДНИМ локом `env:<имя>`, поэтому
- * параллельные apply+apply и apply+run из разных процессов отсекаются.
- * Протухший лок упавшего процесса перехватывается по ttl (учтена гонка
- * в ту же миллисекунду: expires_at <= now).
+ * Cross-process lock via the state store (SPEC §7, §14.6): environment
+ * mutations — apply and run — go under ONE lock `env:<name>`, so parallel
+ * apply+apply and apply+run from different processes are cut off. A stale
+ * lock of a crashed process is reclaimed by ttl (the same-millisecond race is
+ * accounted for: expires_at <= now).
  */
 
 export class LockHeldError extends Data.TaggedError("LockHeldError")<{
@@ -14,14 +14,14 @@ export class LockHeldError extends Data.TaggedError("LockHeldError")<{
 }> {}
 
 export interface LockOptions {
-  /** Сколько лок живёт без освобождения (упавший процесс); по умолчанию 1 час. */
+  /** How long the lock lives without being released (crashed process); by default 1 hour. */
   readonly lockTtlMs?: number
 }
 
-/** Имя лока, под которым мутируется окружение (общий для apply и run). */
+/** Name of the lock under which an environment is mutated (shared by apply and run). */
 export const envLockName = (env: string): string => `env:${env}`
 
-/** Лок janitor — глобальный: уборка физики не привязана к окружению. */
+/** The janitor lock is global: physical-storage cleanup is not tied to an environment. */
 export const janitorLockName = "janitor"
 
 export const withStateLock =

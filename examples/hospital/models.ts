@@ -1,7 +1,7 @@
 import { Schema } from "effect"
 import { audit, defineExternal, defineModel, defineSeed, external, kind } from "../../src/index.ts"
 
-/** Справочник отделений из CSV: правка файла = новая версия и пересборка. */
+/** Departments reference from CSV: editing the file = a new version and a rebuild. */
 export const departments = defineSeed({
   name: "ref.departments",
   file: "departments.csv",
@@ -9,7 +9,7 @@ export const departments = defineSeed({
   description: "Отделения больницы",
 })
 
-/** Сырьё: parquet-выгрузка из КИС (см. seed.ts). Не материализуется — читается напрямую. */
+/** Raw data: a parquet dump from the HIS (see seed.ts). Not materialized — read directly. */
 export const rawMoves = defineExternal({
   name: "raw.moves",
   source: external.files("lake/raw/moves.parquet", "parquet"),
@@ -21,7 +21,7 @@ export const rawMoves = defineExternal({
   description: "Движения пациентов по отделениям — выгрузка КИС",
 })
 
-/** Инкрементальная лента движений: пересчёт по дням, дозагрузка при каждом apply. */
+/** Incremental feed of moves: recomputed by day, topped up on every apply. */
 export const moves = defineModel(
   {
     name: "med.moves",
@@ -86,7 +86,7 @@ export const deptLoad = defineModel(
   `,
 )
 
-/** Витрина в DuckLake-каталог: таблица-на-fingerprint, снапшоты каталога — бонус. */
+/** Mart in the DuckLake catalog: a table-per-fingerprint, catalog snapshots — a bonus. */
 export const deptDaily = defineModel(
   {
     name: "mart.dept_daily",
@@ -106,7 +106,7 @@ export const deptDaily = defineModel(
   `,
 )
 
-/** Витрина в озеро: физика — parquet-файлы, view поверх read_parquet. */
+/** Mart into the lake: physical storage is parquet files, a view over read_parquet. */
 export const staysMart = defineModel(
   {
     name: "mart.stays",

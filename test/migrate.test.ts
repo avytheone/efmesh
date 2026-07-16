@@ -12,7 +12,7 @@ const openStore = (path: string) =>
     return yield* StateStore
   }).pipe(Effect.provide(SqliteStateLive({ path })))
 
-/** Стор времён F0: без canonical_ast/orphaned_at/physical_fp и без meta. */
+/** An F0-era store: without canonical_ast/orphaned_at/physical_fp and without meta. */
 const createLegacyStore = (path: string): void => {
   const db = new Database(path, { create: true })
   db.exec(`
@@ -31,8 +31,8 @@ const createLegacyStore = (path: string): void => {
   db.close()
 }
 
-describe("версия схемы state store + migrate (SPEC §6, F4)", () => {
-  test("свежий стор бутстрапится сам; migrate по нему — уже на версии", async () => {
+describe("state store schema version + migrate (SPEC §6, F4)", () => {
+  test("a fresh store bootstraps itself; migrate on it — already at the version", async () => {
     const path = join(mkdtempSync(join(tmpdir(), "efmesh-migrate-")), "state.sqlite")
     const store = await Effect.runPromise(openStore(path))
     expect(store).toBeDefined()
@@ -40,7 +40,7 @@ describe("версия схемы state store + migrate (SPEC §6, F4)", () => {
     expect(report).toEqual({ from: STATE_VERSION, to: STATE_VERSION })
   })
 
-  test("старый стор: открытие — StateSchemaError, после migrate данные живы", async () => {
+  test("old store: opening — StateSchemaError, after migrate the data is alive", async () => {
     const path = join(mkdtempSync(join(tmpdir(), "efmesh-migrate-")), "state.sqlite")
     createLegacyStore(path)
 
@@ -51,7 +51,7 @@ describe("версия схемы state store + migrate (SPEC §6, F4)", () => {
     const report = await Effect.runPromise(migrateSqliteState({ path }))
     expect(report).toMatchObject({ from: 0, to: STATE_VERSION })
 
-    // старый снапшот читается: physical_fp пуст → fallback на fingerprint
+    // the old snapshot reads back: physical_fp is empty → fallback to fingerprint
     const snapshot = await Effect.runPromise(
       Effect.gen(function* () {
         const store = yield* StateStore
@@ -67,10 +67,10 @@ describe("версия схемы state store + migrate (SPEC §6, F4)", () => {
     })
   })
 
-  test("стор версии 1 (F4): открытие — StateSchemaError, migrate доносит applied_by", async () => {
+  test("version 1 store (F4): opening — StateSchemaError, migrate backfills applied_by", async () => {
     const path = join(mkdtempSync(join(tmpdir(), "efmesh-migrate-")), "state.sqlite")
-    // раскладка версии 1: plans ещё без applied_by, meta уже есть;
-    // snapshots обязательна — по ней стор отличается от свежего (бутстрап)
+    // version 1 layout: plans still without applied_by, meta already present;
+    // snapshots is required — it distinguishes the store from a fresh one (bootstrap)
     const db = new Database(path, { create: true })
     db.exec(`
       CREATE TABLE snapshots (
@@ -103,25 +103,25 @@ describe("версия схемы state store + migrate (SPEC §6, F4)", () => {
         return yield* store.listPlans("dev")
       }).pipe(Effect.provide(SqliteStateLive({ path }))),
     )
-    // старой записи журнал приписывает пустого автора, новой — настоящего
+    // the journal ascribes an empty author to the old record, a real one to the new
     expect(plans.map((plan) => plan.appliedBy)).toEqual(["", "avy"])
   })
 
-  test("migrate снимает копию стора перед апгрейдом; на актуальном — нет", async () => {
+  test("migrate takes a store backup before upgrading; on a current one — none", async () => {
     const path = join(mkdtempSync(join(tmpdir(), "efmesh-migrate-")), "state.sqlite")
     createLegacyStore(path)
 
     const report = await Effect.runPromise(migrateSqliteState({ path }))
     expect(report.backup).toBe(`${path}.backup-v0`)
     expect(existsSync(`${path}.backup-v0`)).toBe(true)
-    // в копии — доверсионная раскладка: можно откатить версию efmesh
+    // the backup holds the pre-version layout: the efmesh version can be rolled back
     const backup = new Database(`${path}.backup-v0`)
     expect(
       backup.query(`SELECT 1 FROM sqlite_master WHERE name = 'meta'`).get(),
     ).toBeNull()
     backup.close()
 
-    // повторный migrate по актуальному стору копию не плодит
+    // a repeated migrate on a current store does not spawn a backup
     const idle = await Effect.runPromise(migrateSqliteState({ path }))
     expect(idle.backup).toBeUndefined()
   })

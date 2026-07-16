@@ -9,11 +9,12 @@ import { SqliteStateLive } from "../src/state/sqlite.ts"
 import { StateStore } from "../src/state/store.ts"
 
 /**
- * #5: indirect-реюз физики и override категоризации. Потомок, чьё тело не
- * менялось, а изменившиеся родители не трогают существующие данные
- * (non-breaking/forward-only), наследует физику старой версии — scdType2 не
- * теряет историю, full не пересобирается. --reclassify заявляет вердикт
- * оператора поверх --explain и этим управляет судьбой потомков.
+ * #5: indirect physical reuse and categorization override. A child whose
+ * body did not change, while changed parents do not touch existing data
+ * (non-breaking/forward-only), inherits the physical table of the old
+ * version — scdType2 does not lose history, full is not rebuilt.
+ * --reclassify asserts the operator's verdict on top of --explain and thus
+ * governs the fate of children.
  */
 
 const testLayer = Layer.mergeAll(DuckDBEngineLive(), SqliteStateLive())
@@ -36,7 +37,7 @@ const base = defineModel(
   (ctx) => ctx.sql`SELECT id, name FROM ${ctx.ref(raw)}`,
 )
 
-/** Та же base, но с колонкой в хвосте — non-breaking по вердикту планировщика. */
+/** Same base, but with a column at the tail — non-breaking per the planner's verdict. */
 const baseWide = defineModel(
   {
     name: "med.base",
@@ -46,7 +47,7 @@ const baseWide = defineModel(
   (ctx) => ctx.sql`SELECT id, name, upper(name) AS uname FROM ${ctx.ref(raw)}`,
 )
 
-/** Та же base с правкой WHERE — честный breaking. */
+/** Same base with a WHERE edit — an honest breaking. */
 const baseFiltered = defineModel(
   {
     name: "med.base",
@@ -96,8 +97,8 @@ const physicalFpOf = (name: string, fingerprint: string) =>
     return (yield* store.getSnapshot(name, fingerprint))?.physicalFp
   })
 
-describe("indirect-реюз физики (#5)", () => {
-  test("suffix родителя: потомки наследуют физику, scd не теряет историю", async () => {
+describe("indirect physical reuse (#5)", () => {
+  test("parent suffix: children inherit the physical table, scd keeps its history", async () => {
     await scenario(
       Effect.gen(function* () {
         const engine = yield* EngineAdapter
@@ -121,8 +122,8 @@ describe("indirect-реюз физики (#5)", () => {
         expect(dim.explain?.cascadeFrom).toEqual(["med.base"])
         expect(mart.reusedFrom).toBe(oldMart.fingerprint)
 
-        // применение: scd-история не переигрывается — valid_from остаётся t1,
-        // а не t2 свежепересобранной таблицы
+        // application: scd history is not replayed — valid_from stays t1,
+        // not the t2 of a freshly rebuilt table
         yield* Efmesh.apply("dev", models, { now: t2 })
         const rows = yield* engine.query(
           `SELECT id, CAST(valid_from AS VARCHAR) AS f, valid_to FROM dev__med.dim ORDER BY id`,
@@ -131,7 +132,7 @@ describe("indirect-реюз физики (#5)", () => {
           { id: "p1", f: "2026-03-01 00:00:00", valid_to: null },
           { id: "p2", f: "2026-03-01 00:00:00", valid_to: null },
         ])
-        // снапшот новой версии указывает на физику старой
+        // the new version's snapshot points at the old version's physical table
         expect(yield* physicalFpOf("med.dim", dim.fingerprint)).toBe(
           oldDim.physicalFingerprint,
         )
@@ -139,7 +140,7 @@ describe("indirect-реюз физики (#5)", () => {
     )
   })
 
-  test("breaking родителя: потомок indirect, но реюза нет", async () => {
+  test("parent breaking: the child is indirect, but there is no reuse", async () => {
     await scenario(
       Effect.gen(function* () {
         yield* seedSource
@@ -153,13 +154,13 @@ describe("indirect-реюз физики (#5)", () => {
     )
   })
 
-  test("родитель и метаданные потомка разошлись разом — реюза нет", async () => {
+  test("parent and child metadata diverged at once — no reuse", async () => {
     await scenario(
       Effect.gen(function* () {
         yield* seedSource
         yield* Efmesh.apply("dev", [raw, base, martOf(base)])
-        // suffix у родителя + grain у витрины: «версию сдвинули только
-        // родители» не подтверждается — физика не наследуется
+        // parent suffix + mart grain: "only parents shifted the version" is
+        // not confirmed — the physical table is not inherited
         const plan = yield* Efmesh.plan("dev", [raw, baseWide, martOf(baseWide, ["n"])])
         const mart = plan.actions.find((a) => a.name === "med.mart")!
         expect(mart.change).toBe("indirect")
@@ -170,7 +171,7 @@ describe("indirect-реюз физики (#5)", () => {
 })
 
 describe("--reclassify (#5)", () => {
-  test("breaking → non-breaking: вердикт оператора открывает потомкам реюз", async () => {
+  test("breaking → non-breaking: the operator's verdict opens reuse to children", async () => {
     await scenario(
       Effect.gen(function* () {
         yield* seedSource
@@ -189,7 +190,7 @@ describe("--reclassify (#5)", () => {
     )
   })
 
-  test("гвардрейл: удалённые колонки не бывают non-breaking", async () => {
+  test("guardrail: dropped columns are never non-breaking", async () => {
     const narrow = defineModel(
       {
         name: "med.base",
@@ -211,7 +212,7 @@ describe("--reclassify (#5)", () => {
     )
   })
 
-  test("незнакомая модель — ошибка; совпадающий вердикт и unchanged — no-op", async () => {
+  test("unknown model — an error; a matching verdict and unchanged — a no-op", async () => {
     await scenario(
       Effect.gen(function* () {
         yield* seedSource
@@ -220,7 +221,7 @@ describe("--reclassify (#5)", () => {
           Efmesh.plan("dev", [raw, base], { reclassify: { "med.ghost": "breaking" } }),
         )
         expect(missing._tag).toBe("ReclassifyError")
-        // модель без изменений: override молча не применяется
+        // a model with no changes: the override is silently not applied
         const plan = yield* Efmesh.plan("dev", [raw, base], {
           reclassify: { "med.base": "non-breaking" },
         })

@@ -8,13 +8,13 @@ import type { EngineError } from "../engine/adapter.ts"
 import { externalSourceRef, viewRef } from "./naming.ts"
 
 /**
- * Автономный прогон аудитов (SPEC §8, F4): проверяет то, что окружение
- * отдаёт потребителям СЕЙЧАС — view-слой целиком, не свежезагруженный
- * интервал, как в apply. Ловит деградацию задним числом: поздние данные
- * через lookback, руками поправленную физику, дрейф external-источников.
+ * Standalone audit run (SPEC §8, F4): checks what the environment serves to
+ * consumers RIGHT NOW — the whole view-layer, not the freshly loaded interval
+ * as in apply. Catches degradation after the fact: late data via lookback,
+ * physical storage edited by hand, drift of external sources.
  *
- * Ничего не меняет и не помечает; отчёт целиком — упавший blocking-аудит
- * не прячет следующие за ним.
+ * Changes and marks nothing; the report is complete — a failed blocking audit
+ * does not hide the ones that follow it.
  */
 
 export interface AuditRunResult {
@@ -26,17 +26,17 @@ export interface AuditRunResult {
 
 export interface AuditRunReport {
   readonly results: ReadonlyArray<AuditRunResult>
-  /** Суммарные нарушения blocking-аудитов — не ноль ⇒ окружению нельзя верить. */
+  /** Total blocking-audit violations — nonzero ⇒ the environment cannot be trusted. */
   readonly blockingViolations: number
 }
 
-/** Запрошенной модели нет в проекте (или у неё нет аудитов — нечего гонять). */
+/** The requested model is not in the project (or has no audits — nothing to run). */
 export class AuditTargetError extends Data.TaggedError("AuditTargetError")<{
   readonly model: string
   readonly reason: string
 }> {}
 
-/** Итог для CLI: blocking-аудиты окружения нарушены. */
+/** Result for the CLI: the environment's blocking audits are violated. */
 export class EnvironmentAuditError extends Data.TaggedError("EnvironmentAuditError")<{
   readonly env: string
   readonly blockingViolations: number
@@ -51,7 +51,7 @@ const selfFor = (graph: ModelGraph, env: string, model: AnyModel): string => {
     }
     return viewRef(env, source.name)
   }
-  // embedded не материализуется — аудируется подзапрос против view окружения
+  // embedded is not materialized — the subquery is audited against the environment's view
   if (model.kind._tag === "embedded") {
     return `(${render(model.fragment, { resolveRef: resolve })})`
   }

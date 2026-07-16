@@ -25,14 +25,14 @@ const srcOf = (value: string): AnyModel =>
   )
 
 describe("janitor (SPEC §5.4)", () => {
-  test("осиротевшая физика старше ttl сносится, referenced и молодая — живут", async () => {
+  test("orphaned physical table older than ttl is removed, referenced and young ones survive", async () => {
     await scenario(
       Effect.gen(function* () {
         const engine = yield* EngineAdapter
         const v1 = srcOf("один")
         const v2 = srcOf("два")
 
-        // v1 в dev и prod, потом dev и prod уезжают на v2 — v1 сирота
+        // v1 in dev and prod, then dev and prod move to v2 — v1 is an orphan
         yield* Efmesh.apply("dev", [v1])
         yield* Efmesh.apply("prod", [v1])
         const oldPlan = yield* Efmesh.plan("dev", [v1])
@@ -42,12 +42,12 @@ describe("janitor (SPEC §5.4)", () => {
 
         const farFuture = fromIso("2027-01-01T00:00:00Z")
 
-        // моложе ttl (ttl огромный) — держим
+        // younger than ttl (ttl is huge) — keep it
         const gentle = yield* janitor({ ttlDays: 10_000, now: farFuture })
         expect(gentle.removed).toEqual([])
         expect(gentle.kept).toEqual([`med.src@${oldFp.slice(0, 8)}`])
 
-        // старше ttl — сносим; живой снапшот не тронут
+        // older than ttl — remove it; the live snapshot is untouched
         const strict = yield* janitor({ ttlDays: 1, now: farFuture })
         expect(strict.removed).toEqual([`med.src@${oldFp.slice(0, 8)}`])
         const table = `"_efmesh"."med__src__${oldFp.slice(0, 8)}"`
@@ -56,7 +56,7 @@ describe("janitor (SPEC §5.4)", () => {
         const alive = yield* engine.query(`SELECT a FROM med.src`)
         expect(alive).toEqual([{ a: "два" }])
 
-        // повторный прогон — уже чисто
+        // a repeated run — already clean
         const again = yield* janitor({ ttlDays: 1, now: farFuture })
         expect(again.removed).toEqual([])
       }),

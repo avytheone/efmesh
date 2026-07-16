@@ -1,14 +1,14 @@
 import type { ExternalSource, ModelName } from "../core/model.ts"
 
 /**
- * Раскладка объектов в движке (SPEC §2):
- * - физика: схема `_efmesh`, таблица `<схема>__<таблица>__<fp8>`;
- * - виртуалка: prod живёт в родных схемах моделей (`med.stays`),
- *   остальные окружения — в префиксованных (`dev__med.stays`).
+ * Object layout in the engine (SPEC §2):
+ * - physical: schema `_efmesh`, table `<schema>__<table>__<fp8>`;
+ * - virtual: prod lives in the models' native schemas (`med.stays`),
+ *   other environments — in prefixed ones (`dev__med.stays`).
  *
- * Схема именно `_efmesh`, не `efmesh`: DuckDB называет каталог по имени
- * файла базы, и для `efmesh.duckdb` ссылка `efmesh.x` становится
- * неоднозначной (каталог или схема) — Binder Error.
+ * The schema is `_efmesh`, not `efmesh`, precisely because: DuckDB names the
+ * catalog after the database file name, and for `efmesh.duckdb` the reference
+ * `efmesh.x` becomes ambiguous (catalog or schema) — a Binder Error.
  */
 
 export const PROD_ENV = "prod"
@@ -31,28 +31,28 @@ export const envSchema = (env: string, modelSchema: string): string =>
   env === PROD_ENV ? modelSchema : `${env}__${modelSchema}`
 
 /**
- * Раскладка parquet-озера (SPEC §3.3): `<lake>/<схема>/<таблица>/fp=<fp8>/…`,
- * у incremental внутри — партиции `interval=<ключ>/data.parquet`.
- * Интервал = партиция: пересчёт — перезапись файлов партиции, источник
- * правды — учёт интервалов, поэтому неатомарность перезаписи не страшна.
+ * Parquet-lake layout (SPEC §3.3): `<lake>/<schema>/<table>/fp=<fp8>/…`,
+ * for incremental inside — partitions `interval=<key>/data.parquet`.
+ * Interval = partition: a recompute rewrites the partition's files, the
+ * source of truth is the interval bookkeeping, so a non-atomic rewrite is harmless.
  */
 export const parquetPrefix = (lakePath: string, name: ModelName, fingerprint: string): string =>
   `${lakePath.replace(/\/+$/, "")}/${name.schema}/${name.table}/fp=${fp8(fingerprint)}`
 
 /**
- * union_by_name: партиции одного префикса могут отличаться схемой после
- * forward-only-эволюции (новые колонки появляются только в новых файлах —
- * история читается с NULL).
+ * union_by_name: partitions of one prefix may differ in schema after
+ * forward-only evolution (new columns appear only in new files — history is
+ * read with NULL).
  */
 export const parquetRef = (lakePath: string, name: ModelName, fingerprint: string): string =>
   `read_parquet('${parquetPrefix(lakePath, name, fingerprint).replaceAll(`'`, `''`)}/**/*.parquet', union_by_name=true)`
 
 /**
- * DuckLake-цель (SPEC §14.5): каталог подключается под фиксированным
- * алиасом, физика — таблица-на-fingerprint в нём (то же имя, что у
- * нативной физики, только каталог другой). Версионность остаётся нашей;
- * снапшоты/time travel DuckLake — бонус. Потребители вне efmesh должны
- * сами сделать ATTACH — view окружений ссылаются на каталог по алиасу.
+ * DuckLake target (SPEC §14.5): the catalog is attached under a fixed alias,
+ * the physical storage is a fingerprint table in it (the same name as native
+ * physical storage, only a different catalog). Versioning stays ours;
+ * DuckLake snapshots/time travel are a bonus. Consumers outside efmesh must
+ * ATTACH it themselves — the environments' views reference the catalog by alias.
  */
 export const ducklakeAlias = "_efmesh_ducklake"
 
@@ -69,7 +69,7 @@ export const ducklakeAttachSql = (config: {
       : ""
   }`
 
-/** Ключ партиции интервала — безопасен для файловых систем (без двоеточий). */
+/** Interval partition key — filesystem-safe (no colons). */
 export const intervalKey = (unit: "day" | "hour", startMs: number): string => {
   const iso = new Date(startMs).toISOString()
   return unit === "day" ? iso.slice(0, 10) : `${iso.slice(0, 10)}T${iso.slice(11, 13)}`
@@ -78,9 +78,9 @@ export const intervalKey = (unit: "day" | "hour", startMs: number): string => {
 const READERS = { parquet: "read_parquet", csv: "read_csv", json: "read_json" } as const
 
 /**
- * Во что рендерится ссылка на external-модель (SPEC §9.3): имя таблицы
- * (движка или ATTACH-базы) как есть, файлы/URL — через read_*.
- * external не материализуется, потребители читают источник напрямую.
+ * What a reference to an external model renders to (SPEC §9.3): the table name
+ * (of the engine or an ATTACH database) as is, files/URLs — via read_*.
+ * external is not materialized, consumers read the source directly.
  */
 export const externalSourceRef = (source: ExternalSource): string =>
   source._tag === "table"

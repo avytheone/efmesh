@@ -3,12 +3,12 @@ import { Data, Effect } from "effect"
 import type { AnyModel } from "./core/model.ts"
 
 /**
- * Discovery моделей по glob (SPEC §12): файлы по маскам из конфига
- * импортируются, все экспорты-модели (defineModel/defineExternal/defineSeed/
- * defineSqlModel — у всех _tag: "Model") собираются в проект. Порядок —
- * детерминированный (сортировка путей), два разных определения с одним
- * именем — ошибка загрузки; один и тот же объект, реэкспортированный из
- * нескольких файлов, считается один раз.
+ * Model discovery by glob (SPEC §12): files matching the config's masks are
+ * imported, and every model export (defineModel/defineExternal/defineSeed/
+ * defineSqlModel — all tagged _tag: "Model") joins the project. Order is
+ * deterministic (paths are sorted); two distinct definitions sharing a name
+ * are a load error; the same object re-exported from several files counts
+ * once.
  */
 
 export class DiscoveryError extends Data.TaggedError("DiscoveryError")<{

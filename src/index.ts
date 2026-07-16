@@ -1,11 +1,11 @@
 /**
- * Публичное API efmesh (F6): осознанный whitelist вместо `export *` —
- * всё, что экспортировано здесь, становится semver-обязательством пакета.
- * Внутренности (naming, lock-хелперы, executor, planner, fingerprint-кухня)
- * намеренно не экспортируются; юнит-тесты моделей — `efmesh/testing`.
+ * Public API of efmesh (F6): a deliberate whitelist instead of `export *` —
+ * everything exported here becomes a semver commitment of the package.
+ * Internals (naming, lock helpers, executor, planner, fingerprint plumbing)
+ * are deliberately not exported; unit-testing models lives in `efmesh/testing`.
  */
 
-// — определение проекта: модели, виды, аудиты, конфиг —
+// — project definition: models, kinds, audits, config —
 export {
   defineExternal,
   defineModel,
@@ -30,7 +30,7 @@ export { audit, type Audit, type AuditCtx } from "./core/audit.ts"
 export { defineConfig, type EfmeshConfig } from "./config.ts"
 export { discoverModels, DiscoveryConflictError, DiscoveryError } from "./discovery.ts"
 
-// — фасад и операции: обычные Effect'ы для встраивания (SPEC §10) —
+// — facade and operations: plain Effects for embedding (SPEC §10) —
 export { Efmesh } from "./efmesh.ts"
 export { run, daemon, Runner, RunBlockedByChangesError, type RunError, type RunOptions } from "./plan/run.ts"
 export { janitor, type JanitorOptions, type JanitorReport } from "./plan/janitor.ts"
@@ -68,7 +68,7 @@ export {
   type ScheduleTarget,
 } from "./plan/schedule.ts"
 
-// — план и применение: типы результата и опций —
+// — plan and apply: result and options types —
 export type {
   ChangeCategory,
   Plan,
@@ -94,7 +94,7 @@ export { SchemaMismatchError } from "./plan/contract.ts"
 export { LockHeldError, type LockOptions } from "./plan/lock.ts"
 export { FINGERPRINT_VERSION } from "./plan/fingerprint.ts"
 
-// — граф: составные ошибки загрузки проекта —
+// — graph: compound project-loading errors —
 export {
   DagCycleError,
   DuplicateModelError,
@@ -104,7 +104,7 @@ export {
 } from "./core/errors.ts"
 export type { GraphError } from "./core/graph.ts"
 
-// — движки: слои и сервис (кастомные обёртки — например, для тестов) —
+// — engines: layers and service (custom wrappers — e.g. for tests) —
 export {
   EngineAdapter,
   EngineError,
@@ -120,7 +120,7 @@ export {
   type PostgresEngineOptions,
 } from "./engine/postgres.ts"
 
-// — state store: слои, миграции, записи —
+// — state store: layers, migrations, records —
 export {
   StateStore,
   StateError,
@@ -140,5 +140,5 @@ export {
   type PostgresStateOptions,
 } from "./state/postgres.ts"
 
-// — интервалы: границы для options.now и разбор отчётов —
+// — intervals: bounds for options.now and report parsing —
 export { fromIso, toIso, type Interval, type IntervalUnit } from "./core/interval.ts"

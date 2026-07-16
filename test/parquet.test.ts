@@ -35,8 +35,8 @@ const seedSource = Effect.gen(function* () {
   `)
 })
 
-describe("parquet-цель (SPEC §3.3)", () => {
-  test("full: физика — файл в озере, view читает read_parquet, потребители тоже", async () => {
+describe("parquet target (SPEC §3.3)", () => {
+  test("full: physical table is a file in the lake, the view reads read_parquet, consumers too", async () => {
     const lake = mkdtempSync(join(tmpdir(), "efmesh-lake-"))
     await scenario(
       Effect.gen(function* () {
@@ -63,11 +63,11 @@ describe("parquet-цель (SPEC §3.3)", () => {
         const applied = yield* Efmesh.apply("dev", [raw, mart, consumer], { lakePath: lake })
         expect(applied.built).toEqual(["med.mart", "med.top"])
 
-        // файл лежит в раскладке <lake>/<схема>/<таблица>/fp=<fp8>/
+        // the file sits in the layout <lake>/<schema>/<table>/fp=<fp8>/
         const fp = applied.plan.actions.find((a) => a.name === "med.mart")!.fingerprint
         expect(existsSync(join(lake, "med", "mart", `fp=${fp8(fp)}`, "data.parquet"))).toBe(true)
 
-        // view окружения читает озеро; потребитель посчитал из него
+        // the environment view reads the lake; the consumer counted from it
         const rows = yield* engine.query(`SELECT count(*)::INT AS n FROM dev__med.mart`)
         expect(rows).toEqual([{ n: 3 }])
         const top = yield* engine.query(`SELECT n FROM dev__med.top`)
@@ -76,7 +76,7 @@ describe("parquet-цель (SPEC §3.3)", () => {
     )
   })
 
-  test("incremental: интервал = партиция, resume дописывает только новые партиции", async () => {
+  test("incremental: an interval = a partition, resume appends only new partitions", async () => {
     const lake = mkdtempSync(join(tmpdir(), "efmesh-lake-"))
     await scenario(
       Effect.gen(function* () {
@@ -99,7 +99,7 @@ describe("parquet-цель (SPEC §3.3)", () => {
         )
         const models = [raw, events]
 
-        // now = 3 января: завершены интервалы 1-го и 2-го — две партиции
+        // now = Jan 3: the Jan 1 and Jan 2 intervals are complete — two partitions
         const jan3 = fromIso("2026-01-03T00:00:00Z")
         const applied = yield* Efmesh.apply("dev", models, { now: jan3, lakePath: lake })
         const fp = applied.plan.actions.find((a) => a.name === "med.events")!.fingerprint
@@ -111,7 +111,7 @@ describe("parquet-цель (SPEC §3.3)", () => {
         const rows = yield* engine.query(`SELECT count(*)::INT AS n FROM dev__med.events`)
         expect(rows).toEqual([{ n: 2 }])
 
-        // время прошло — дописалась ровно партиция 3-го января
+        // time passed — exactly the Jan 3 partition was appended
         const jan4 = fromIso("2026-01-04T00:00:00Z")
         yield* Efmesh.apply("dev", models, { now: jan4, lakePath: lake })
         expect(existsSync(join(prefix, "interval=2026-01-03", "data.parquet"))).toBe(true)
@@ -121,7 +121,7 @@ describe("parquet-цель (SPEC §3.3)", () => {
     )
   })
 
-  test("parquet-модель без lakePath — LakeNotConfiguredError до любых действий", async () => {
+  test("a parquet model without lakePath — LakeNotConfiguredError before any actions", async () => {
     await scenario(
       Effect.gen(function* () {
         yield* seedSource

@@ -24,7 +24,7 @@ const raw = defineExternal({
   }),
 })
 
-/** v1 — без amount; v2 — с amount (добавление колонки); v3 — БЕЗ id (удаление). */
+/** v1 — no amount; v2 — with amount (column added); v3 — WITHOUT id (dropped). */
 const makeEvents = (version: 1 | 2 | 3): AnyModel =>
   defineModel(
     {
@@ -61,7 +61,7 @@ const makeEvents = (version: 1 | 2 | 3): AnyModel =>
             `,
   )
 
-/** Инкрементальный потомок с собственным неизменным AST — кандидат на каскад. */
+/** Incremental child with its own unchanged AST — a cascade candidate. */
 const makeChild = (parent: AnyModel): AnyModel =>
   defineModel(
     {
@@ -92,20 +92,20 @@ const seedSource = Effect.gen(function* () {
 })
 
 describe("forward-only (SPEC §5.2)", () => {
-  test("физика и done-интервалы переиспользуются, история не переигрывается", async () => {
+  test("physical table and done intervals are reused, history is not replayed", async () => {
     await scenario(
       Effect.gen(function* () {
         const engine = yield* EngineAdapter
         const store = yield* StateStore
         yield* seedSource
 
-        // v1: два дня истории
+        // v1: two days of history
         const jan3 = fromIso("2026-01-03T00:00:00Z")
         yield* Efmesh.apply("dev", [raw, makeEvents(1)], { now: jan3 })
         const planV1 = yield* Efmesh.plan("dev", [raw, makeEvents(1)], { now: jan3 })
         const fpV1 = planV1.actions.find((a) => a.name === "med.events")!.fingerprint
 
-        // v2 добавляет колонку; forward-only: физика та же, бэкфилл — только новый день
+        // v2 adds a column; forward-only: same physical table, backfill only the new day
         const jan4 = fromIso("2026-01-04T00:00:00Z")
         const models2 = [raw, makeEvents(2)]
         const plan2 = yield* Efmesh.plan("dev", models2, {
@@ -120,7 +120,7 @@ describe("forward-only (SPEC §5.2)", () => {
 
         yield* Efmesh.apply("dev", models2, { now: jan4, forwardOnly: ["med.events"] })
 
-        // та же физическая таблица: история с NULL, новый день — со значением
+        // same physical table: history with NULL, new day with a value
         const table = `"_efmesh"."med__events__${fp8(fpV1)}"`
         const rows = yield* engine.query(
           `SELECT id, amount FROM ${table} ORDER BY happened_at`,
@@ -131,22 +131,22 @@ describe("forward-only (SPEC §5.2)", () => {
           { id: "e3", amount: 30 },
         ])
 
-        // done-интервалы старой версии унаследованы новой
+        // done intervals of the old version are inherited by the new one
         const ledger = yield* store.listIntervals(action2.fingerprint)
         expect(ledger.filter((i) => i.status === "done")).toHaveLength(3)
 
-        // view окружения смотрит на ту же физику и видит новую колонку
+        // the environment view points at the same physical table and sees the new column
         const viaView = yield* engine.query(`SELECT count(*)::INT AS n FROM dev__med.events`)
         expect(viaView).toEqual([{ n: 3 }])
 
-        // повторный план — уже unchanged
+        // a repeated plan is already unchanged
         const planAgain = yield* Efmesh.plan("dev", models2, { now: jan4 })
         expect(planAgain.actions.find((a) => a.name === "med.events")!.change).toBe("unchanged")
       }),
     )
   })
 
-  test("каскад: indirect-потомок forward-only-родителя тоже forward-only", async () => {
+  test("cascade: an indirect child of a forward-only parent is forward-only too", async () => {
     await scenario(
       Effect.gen(function* () {
         yield* seedSource
@@ -161,12 +161,12 @@ describe("forward-only (SPEC §5.2)", () => {
         })
         const child = plan.actions.find((a) => a.name === "med.daily")!
         expect(child.change).toBe("forward-only")
-        expect(child.backfill).toEqual([]) // потомку нечего переигрывать
+        expect(child.backfill).toEqual([]) // the child has nothing to replay
       }),
     )
   })
 
-  test("удаление колонки forward-only не выражается — SchemaMismatchError", async () => {
+  test("dropping a column is not expressible as forward-only — SchemaMismatchError", async () => {
     await scenario(
       Effect.gen(function* () {
         yield* seedSource
@@ -181,7 +181,7 @@ describe("forward-only (SPEC §5.2)", () => {
     )
   })
 
-  test("forward-only применим только к incrementalByTimeRange", async () => {
+  test("forward-only applies only to incrementalByTimeRange", async () => {
     await scenario(
       Effect.gen(function* () {
         const full = defineModel(

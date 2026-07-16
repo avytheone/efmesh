@@ -1,14 +1,14 @@
 /**
- * Категоризация изменения по каноническим AST (SPEC §5.2): non-breaking —
- * это добавление колонок В КОНЕЦ верхнего SELECT при полностью неизменном
- * остальном дереве (потребители выбирают по именам, INSERT потомков — по
- * позициям, поэтому только суффикс безопасен). Всё прочее — breaking.
- * При любой неожиданной структуре — консервативно breaking.
+ * Change categorization by canonical ASTs (SPEC §5.2): non-breaking is adding
+ * columns TO THE END of the top SELECT with the rest of the tree entirely
+ * unchanged (consumers select by name, descendants' INSERT is by position, so
+ * only a suffix is safe). Everything else is breaking. On any unexpected
+ * structure — conservatively breaking.
  */
 
 type AstNode = Record<string, unknown>
 
-/** Верхний SELECT канона: список колонок + остальное дерево (для explain.ts). */
+/** The canon's top SELECT: the column list + the rest of the tree (for explain.ts). */
 export const topSelect = (
   astJson: string,
 ): { list: ReadonlyArray<string>; rest: string } | null => {
@@ -37,7 +37,7 @@ export const categorizeAstChange = (
   if (before === null || after === null) return "breaking"
   if (before.rest !== after.rest) return "breaking"
   if (after.list.length <= before.list.length) return "breaking"
-  // старый select_list — точный префикс нового
+  // the old select_list is an exact prefix of the new one
   return before.list.every((item, index) => item === after.list[index])
     ? "non-breaking"
     : "breaking"

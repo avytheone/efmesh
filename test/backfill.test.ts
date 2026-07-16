@@ -57,8 +57,8 @@ const countRows = Effect.gen(function* () {
   return (rows[0] as { n: number }).n
 })
 
-describe("бэкфилл incrementalByTimeRange (SPEC §5.3)", () => {
-  test("полный бэкфилл → идемпотентность → догон новых интервалов", async () => {
+describe("backfill incrementalByTimeRange (SPEC §5.3)", () => {
+  test("full backfill → idempotency → catching up new intervals", async () => {
     await scenario(
       Effect.gen(function* () {
         const store = yield* StateStore
@@ -66,7 +66,7 @@ describe("бэкфилл incrementalByTimeRange (SPEC §5.3)", () => {
         const daily = makeDaily()
         const models = [raw, daily]
 
-        // now = 4 января: завершены интервалы 1..3
+        // now = January 4: intervals 1..3 are complete
         const jan4 = fromIso("2026-01-04T00:00:00Z")
         const plan1 = yield* Efmesh.plan("dev", models, { now: jan4 })
         const action = plan1.actions.find((a) => a.name === "med.events")!
@@ -76,23 +76,23 @@ describe("бэкфилл incrementalByTimeRange (SPEC §5.3)", () => {
 
         const applied1 = yield* Efmesh.apply("dev", models, { now: jan4 })
         expect(applied1.built).toEqual(["med.events"])
-        expect(yield* countRows).toBe(3) // e1..e3; e4/e5 ещё в будущем
+        expect(yield* countRows).toBe(3) // e1..e3; e4/e5 are still in the future
 
-        // учёт: 3 done-интервала (батчами по 2)
+        // ledger: 3 done intervals (batches of 2)
         const ledger = yield* store.listIntervals(action.fingerprint)
         expect(ledger.filter((i) => i.status === "done")).toHaveLength(3)
 
-        // повторный apply тем же now: дыр нет, работы нет, дублей нет
+        // a repeated apply with the same now: no gaps, no work, no duplicates
         const applied2 = yield* Efmesh.apply("dev", models, { now: jan4 })
         expect(applied2.plan.hasChanges).toBe(false)
         expect(applied2.built).toEqual([])
         expect(yield* countRows).toBe(3)
 
-        // время прошло: now = 7 января → досчитываются ровно интервалы 4..6
+        // time passed: now = January 7 → exactly intervals 4..6 are computed
         const jan7 = fromIso("2026-01-07T00:00:00Z")
         const plan3 = yield* Efmesh.plan("dev", models, { now: jan7 })
         const action3 = plan3.actions.find((a) => a.name === "med.events")!
-        expect(action3.change).toBe("unchanged") // модель не менялась — только дыры
+        expect(action3.change).toBe("unchanged") // the model did not change — only gaps
         expect(action3.backfill).toEqual([
           { start: jan4, end: fromIso("2026-01-07T00:00:00Z") },
         ])
@@ -102,7 +102,7 @@ describe("бэкфилл incrementalByTimeRange (SPEC §5.3)", () => {
     )
   })
 
-  test("resume: failed-интервал пересчитывается без дублей, остальные не трогаются", async () => {
+  test("resume: a failed interval is recomputed without duplicates, the rest untouched", async () => {
     await scenario(
       Effect.gen(function* () {
         const store = yield* StateStore
@@ -114,7 +114,7 @@ describe("бэкфилл incrementalByTimeRange (SPEC §5.3)", () => {
         yield* Efmesh.apply("dev", models, { now: jan7 })
         expect(yield* countRows).toBe(5)
 
-        // имитация упавшего батча: 5 января помечено failed (данные при этом лежат)
+        // simulate a crashed batch: January 5 marked failed (the data is present anyway)
         const plan = yield* Efmesh.plan("dev", models, { now: jan7 })
         const fp = plan.actions.find((a) => a.name === "med.events")!.fingerprint
         yield* store.markIntervals(
@@ -123,14 +123,14 @@ describe("бэкфилл incrementalByTimeRange (SPEC §5.3)", () => {
           "failed",
         )
 
-        // план видит ровно эту дыру
+        // the plan sees exactly this gap
         const planResume = yield* Efmesh.plan("dev", models, { now: jan7 })
         const actionResume = planResume.actions.find((a) => a.name === "med.events")!
         expect(actionResume.backfill).toEqual([
           { start: fromIso("2026-01-05T00:00:00Z"), end: fromIso("2026-01-06T00:00:00Z") },
         ])
 
-        // пересчёт: DELETE+INSERT интервала — строк по-прежнему 5, дублей нет
+        // recompute: DELETE+INSERT of the interval — still 5 rows, no duplicates
         yield* Efmesh.apply("dev", models, { now: jan7 })
         expect(yield* countRows).toBe(5)
         const ledger = yield* store.listIntervals(fp)
@@ -139,7 +139,7 @@ describe("бэкфилл incrementalByTimeRange (SPEC §5.3)", () => {
     )
   })
 
-  test("lookback: последний done-интервал перечитывается — поздние данные подъезжают", async () => {
+  test("lookback: the last done interval is re-read — late data arrives", async () => {
     await scenario(
       Effect.gen(function* () {
         const engine = yield* EngineAdapter
@@ -151,12 +151,12 @@ describe("бэкфилл incrementalByTimeRange (SPEC §5.3)", () => {
         yield* Efmesh.apply("dev", models, { now: jan7 })
         expect(yield* countRows).toBe(5)
 
-        // задним числом приехала строка за 6 января
+        // a row for January 6 arrived retroactively
         yield* engine.execute(
           `INSERT INTO src.events VALUES ('e6', TIMESTAMP '2026-01-06 07:00:00')`,
         )
 
-        // без изменений модели план всё равно перечитывает хвост
+        // with no model changes the plan still re-reads the tail
         const plan = yield* Efmesh.plan("dev", models, { now: jan7 })
         const action = plan.actions.find((a) => a.name === "med.events")!
         expect(action.backfill).toEqual([

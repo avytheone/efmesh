@@ -2,7 +2,7 @@ import { Data, type Schema } from "effect"
 import type { SelfValue, SqlFragment, SqlLiteral } from "./sql.ts"
 import { quoteIdent, sql } from "./sql.ts"
 
-/** Blocking-аудит нашёл нарушения: снапшот/интервал не считается годным. */
+/** A blocking audit found violations: the snapshot/interval is considered unfit. */
 export class AuditFailure extends Data.TaggedError("AuditFailure")<{
   readonly model: string
   readonly audit: string
@@ -10,18 +10,18 @@ export class AuditFailure extends Data.TaggedError("AuditFailure")<{
 }> {}
 
 /**
- * Аудит (SPEC §8) — SQL-предикат над результатом модели: запрос возвращает
- * НАРУШАЮЩИЕ строки, непустой результат = провал. `ctx.self` рендерится
- * в физику снапшота (у incremental — в подзапрос обработанного интервала,
- * аудит проверяет то, что только что загрузили, а не всю историю).
+ * Audit (SPEC §8) — a SQL predicate over a model's result: the query returns
+ * the VIOLATING rows, a non-empty result means failure. `ctx.self` renders
+ * to the snapshot's physical table (for incremental, to a subquery of the
+ * processed interval — the audit checks what was just loaded, not the whole history).
  *
- * blocking-аудит (по умолчанию) роняет apply: интервал помечается failed,
- * view не промоутится. warn — лог + конвейер едет дальше.
+ * A blocking audit (the default) fails apply: the interval is marked failed,
+ * the view is not promoted. warn — logs and lets the pipeline continue.
  */
 export interface Audit {
   readonly name: string
   readonly blocking: boolean
-  /** Запрос нарушений; содержит узел Self. */
+  /** The violations query; contains a Self node. */
   readonly fragment: SqlFragment
 }
 
@@ -32,7 +32,7 @@ export interface AuditCtx {
 
 const SELF: SelfValue = { _tag: "SelfValue" }
 
-/** Билдеры типизированы колонками модели через параметр Fields. */
+/** Builders are typed by the model's columns via the Fields type parameter. */
 export const audit = {
   notNull: <Fields extends Schema.Struct.Fields>(
     column: Extract<keyof Fields, string>,
@@ -72,7 +72,7 @@ export const audit = {
     fragment: body({ sql, self: SELF }),
   }),
 
-  /** Понизить аудит до предупреждения: лог вместо провала. */
+  /** Downgrade an audit to a warning: log instead of failing. */
   warn: (base: Audit): Audit => ({ ...base, blocking: false }),
 } as const
 

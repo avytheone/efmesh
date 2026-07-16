@@ -52,7 +52,7 @@ const snapshotRows = Effect.gen(function* () {
 })
 
 describe("scdType2 (SPEC §3.1)", () => {
-  test("история версий: закрытие изменившихся/исчезнувших, вставка новых, идемпотентность", async () => {
+  test("version history: closing changed/vanished rows, inserting new ones, idempotency", async () => {
     await scenario(
       Effect.gen(function* () {
         const engine = yield* EngineAdapter
@@ -62,14 +62,14 @@ describe("scdType2 (SPEC §3.1)", () => {
         const t2 = fromIso("2026-02-02T00:00:00Z")
         const t3 = fromIso("2026-02-03T00:00:00Z")
 
-        // первая загрузка: все строки открыты с valid_from = t1
+        // first load: all rows opened with valid_from = t1
         yield* Efmesh.apply("dev", models, { now: t1 })
         expect(yield* snapshotRows).toEqual([
           { id: "icu", head: "Иванов", f: "2026-02-01 00:00:00", t: null },
           { id: "therapy", head: "Петрова", f: "2026-02-01 00:00:00", t: null },
         ])
 
-        // сменился зав. ОРИТ, терапия закрылась, появилась хирургия
+        // the ICU head changed, therapy closed, surgery appeared
         yield* engine.execute(`UPDATE src.depts SET head = 'Сидоров' WHERE id = 'icu'`)
         yield* engine.execute(`DELETE FROM src.depts WHERE id = 'therapy'`)
         yield* engine.execute(`INSERT INTO src.depts VALUES ('surgery', 'Козлов')`)
@@ -82,7 +82,7 @@ describe("scdType2 (SPEC §3.1)", () => {
           { id: "therapy", head: "Петрова", f: "2026-02-01 00:00:00", t: "2026-02-02 00:00:00" },
         ])
 
-        // без изменений источника: ничего не дрожит (valid_from не переписаны)
+        // with no source changes: nothing wobbles (valid_from are not rewritten)
         yield* Efmesh.apply("dev", models, { now: t3 })
         expect(yield* snapshotRows).toEqual([
           { id: "icu", head: "Иванов", f: "2026-02-01 00:00:00", t: "2026-02-02 00:00:00" },
@@ -94,7 +94,7 @@ describe("scdType2 (SPEC §3.1)", () => {
     )
   })
 
-  test("валидации: valid-колонки объявлены в схеме и не входят в key", () => {
+  test("validations: valid-columns are declared in the schema and not part of the key", () => {
     let error: unknown
     try {
       defineModel(

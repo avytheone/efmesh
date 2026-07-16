@@ -1,7 +1,7 @@
 /**
- * Помощник kill-9-теста (#7): чужой процесс, который честно берёт env-лок
- * через file-based стор и виснет — как apply, умерший посреди работы.
- * Аргументы: <путь-к-стору> <имя-лока> <ttlMs>
+ * Helper for the kill-9 test (#7): a foreign process that honestly takes the
+ * env lock through a file-based store and hangs — like an apply that died
+ * mid-work. Arguments: <store-path> <lock-name> <ttlMs>
  */
 import { Effect } from "effect"
 import { SqliteStateLive } from "../../src/state/sqlite.ts"
@@ -17,8 +17,8 @@ await Effect.runPromise(
       console.log("BUSY")
       process.exit(3)
     }
-    console.log("LOCKED") // сигнал тесту: можно убивать
-    // виснем «навсегда» — освобождения лока не будет, только SIGKILL
+    console.log("LOCKED") // signal to the test: safe to kill
+    // hang «forever» — the lock will never be released, only SIGKILL
     yield* Effect.promise(() => new Promise(() => {}))
   }).pipe(Effect.provide(SqliteStateLive({ path }))),
 )

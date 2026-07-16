@@ -54,8 +54,8 @@ const trace = (name: string, column: string) =>
     }).pipe(Effect.provide(DuckDBEngineLive())),
   )
 
-describe("lineage по колонкам (SPEC §9.4)", () => {
-  test("выражение раскручивается до сырьевой колонки external", async () => {
+describe("column lineage (SPEC §9.4)", () => {
+  test("an expression is unwound down to the raw external column", async () => {
     const tree = await trace("med.stays", "duration")
     // duration ← lead(moved_at) - moved_at ← med.moves.moved_at ← raw.moves.moved_at
     expect(tree.model).toBe("med.stays")
@@ -67,14 +67,14 @@ describe("lineage по колонкам (SPEC §9.4)", () => {
     ])
   })
 
-  test("сквозная колонка и печать дерева", async () => {
+  test("a pass-through column and tree printing", async () => {
     const tree = await trace("med.stays", "case_id")
     const lines = formatLineage(tree)
     expect(lines[0]).toBe("med.stays.case_id")
     expect(lines).toContain("    raw.moves.case_id  [external]")
   })
 
-  test("неизвестная колонка — LineageError", async () => {
+  test("an unknown column — LineageError", async () => {
     const failure = await Effect.runPromise(
       Effect.gen(function* () {
         const graph = yield* buildGraph([raw, moves, stays])

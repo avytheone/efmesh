@@ -12,14 +12,14 @@ import { SqliteStateLive } from "../src/state/sqlite.ts"
 import { StateStore } from "../src/state/store.ts"
 
 /**
- * Golden-тесты fingerprint (SPEC §4): отпечатки ЗАМОРОЖЕНЫ. Красный тест
- * здесь означает, что канонизация (json_serialize_sql DuckDB или
- * libpg_query) или состав payload сдвинулись — у каждого пользователя
- * это молча пере-фингерпринтит все модели и вынудит полный ребилд склада.
- * Правильная реакция: НЕ обновлять хэши, а (1) понять, что дало дрейф
- * (апгрейд @duckdb/node-api? libpg-query? правка payload?), (2) осознанно
- * инкрементировать FINGERPRINT_VERSION и обеспечить историю миграции,
- * (3) только потом заморозить новые значения.
+ * Golden fingerprint tests (SPEC §4): the fingerprints are FROZEN. A red
+ * test here means canonicalization (DuckDB's json_serialize_sql or
+ * libpg_query) or the payload composition has shifted — for every user
+ * that silently re-fingerprints all models and forces a full warehouse
+ * rebuild. The correct reaction: do NOT update the hashes, but (1) understand
+ * what caused the drift (a @duckdb/node-api upgrade? libpg-query? a payload
+ * edit?), (2) consciously increment FINGERPRINT_VERSION and provide a
+ * migration story, (3) only then freeze the new values.
  */
 
 const raw = defineExternal({
@@ -53,8 +53,8 @@ const mart = defineModel(
   `,
 )
 
-// то же тело, что у incremental, но переформатированное: лишние пробелы,
-// переносы, регистр ключевых слов — канонизация обязана дать тот же отпечаток
+// same body as incremental, but reformatted: extra spaces, line breaks,
+// keyword case — canonicalization must yield the same fingerprint
 const reformatted = defineModel(
   {
     name: "golden.events",
@@ -89,24 +89,24 @@ const fingerprints = (models: Parameters<typeof buildGraph>[0]) =>
       .pipe(Effect.flatMap(fingerprintGraph), Effect.provide(DuckDBEngineLive())),
   )
 
-describe("golden fingerprints — канонизация как контракт (SPEC §4)", () => {
-  test("константа версии не трогается случайно", () => {
+describe("golden fingerprints — canonicalization as a contract (SPEC §4)", () => {
+  test("the version constant is not touched by accident", () => {
     expect(FINGERPRINT_VERSION).toBe(GOLDEN.fingerprintVersion)
   })
 
-  test("DuckDB: отпечатки заморожены", async () => {
+  test("DuckDB: fingerprints are frozen", async () => {
     const versions = await fingerprints([raw, incremental, mart])
     expect(versions.get("golden.raw")?.fingerprint).toBe(GOLDEN.raw)
     expect(versions.get("golden.events")?.fingerprint).toBe(GOLDEN.events)
     expect(versions.get("golden.daily")?.fingerprint).toBe(GOLDEN.daily)
   })
 
-  test("DuckDB: переформатирование тела не меняет отпечаток", async () => {
+  test("DuckDB: reformatting the body does not change the fingerprint", async () => {
     const versions = await fingerprints([raw, reformatted])
     expect(versions.get("golden.events")?.fingerprint).toBe(GOLDEN.events)
   })
 
-  test("libpg_query: канон Postgres заморожен (sha256 дерева)", async () => {
+  test("libpg_query: the Postgres canon is frozen (sha256 of the tree)", async () => {
     const canon = await Effect.runPromise(
       canonicalizePostgresSql(
         `SELECT id, happened_at FROM golden.raw WHERE happened_at >= $start AND happened_at < $end`,
@@ -115,11 +115,11 @@ describe("golden fingerprints — канонизация как контракт
     expect(sha256(canon)).toBe(GOLDEN.postgresCanonSha256)
   })
 
-  test("снапшот чужой версии алгоритма — план честно останавливается", async () => {
+  test("a snapshot from another algorithm version — the plan honestly halts", async () => {
     const failure = await Effect.runPromise(
       Effect.gen(function* () {
         const store = yield* StateStore
-        // окружение указывает на снапшот, посчитанный «будущей» версией алгоритма
+        // the environment points at a snapshot computed by a "future" algorithm version
         yield* store.upsertSnapshot({
           name: "golden.daily",
           fingerprint: "oldfp",
@@ -138,8 +138,8 @@ describe("golden fingerprints — канонизация как контракт
   })
 })
 
-describe("кэш канонизации (#8)", () => {
-  test("второй plan не зовёт canonicalize; отпечатки идентичны; чужой ключ не липнет", async () => {
+describe("canonicalization cache (#8)", () => {
+  test("the second plan does not call canonicalize; fingerprints are identical; a foreign key does not stick", async () => {
     let calls = 0
     const models = [raw, incremental, mart]
     const { first, second } = await Effect.runPromise(
@@ -162,7 +162,7 @@ describe("кэш канонизации (#8)", () => {
           Effect.provideService(EngineAdapter, counting),
         )
         expect(callsAfterFirst).toBeGreaterThan(0)
-        expect(calls).toBe(callsAfterFirst) // всё из кэша
+        expect(calls).toBe(callsAfterFirst) // all from cache
         return { first, second }
       }).pipe(
         Effect.provide(Layer.mergeAll(DuckDBEngineLive(), SqliteStateLive())),

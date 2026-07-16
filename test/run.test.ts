@@ -44,35 +44,35 @@ const seedSource = Effect.gen(function* () {
   `)
 })
 
-describe("run — тик планировщика (SPEC §7)", () => {
-  test("догоняет интервалы существующей версии; изменения не применяет", async () => {
+describe("run — a scheduler tick (SPEC §7)", () => {
+  test("catches up intervals of the existing version; does not apply changes", async () => {
     await scenario(
       Effect.gen(function* () {
         const engine = yield* EngineAdapter
         yield* seedSource
         const models = [raw, events]
 
-        // изменения (added) — run отказывается, нужен apply
+        // changes (added) — run refuses, apply is needed
         const blocked = yield* Effect.flip(
           run("dev", models, { now: fromIso("2026-01-02T00:00:00Z") }),
         )
         expect(blocked._tag).toBe("RunBlockedByChangesError")
 
-        // человек применил план; дальше run догоняет новые интервалы сам
+        // a human applied the plan; from then on run catches up new intervals itself
         yield* Efmesh.apply("dev", models, { now: fromIso("2026-01-02T00:00:00Z") })
         const tick = yield* run("dev", models, { now: fromIso("2026-01-03T00:00:00Z") })
         expect(tick.built).toEqual(["med.events"])
         const rows = yield* engine.query(`SELECT count(*)::INT AS n FROM dev__med.events`)
         expect(rows).toEqual([{ n: 2 }])
 
-        // идемпотентность: без новых интервалов run ничего не делает
+        // idempotency: with no new intervals run does nothing
         const idle = yield* run("dev", models, { now: fromIso("2026-01-03T00:00:00Z") })
         expect(idle.built).toEqual([])
       }),
     )
   })
 
-  test("параллельный run отсечён блокировкой; протухший лок перехватывается", async () => {
+  test("a concurrent run is cut off by the lock; a stale lock is reclaimed", async () => {
     await scenario(
       Effect.gen(function* () {
         const store = yield* StateStore
@@ -80,42 +80,42 @@ describe("run — тик планировщика (SPEC §7)", () => {
         const models = [raw, events]
         yield* Efmesh.apply("dev", models, { now: fromIso("2026-01-02T00:00:00Z") })
 
-        // «другой процесс» держит лок — общий env:<имя>, тот же, что у apply
+        // "another process" holds the lock — the shared env:<name>, the same one apply uses
         expect(yield* store.acquireLock(envLockName("dev"), 3_600_000)).toBe(true)
         const held = yield* Effect.flip(
           run("dev", models, { now: fromIso("2026-01-03T00:00:00Z") }),
         )
         expect(held._tag).toBe("LockHeldError")
 
-        // лок протух (ttl отрицательный не сделать — эмулируем перехват освобождением)
+        // the lock went stale (a negative ttl is impossible — we emulate reclaim by releasing)
         yield* store.releaseLock(envLockName("dev"))
         const tick = yield* run("dev", models, { now: fromIso("2026-01-03T00:00:00Z") })
         expect(tick.built).toEqual(["med.events"])
 
-        // после run лок освобождён
+        // after run the lock is released
         expect(yield* store.acquireLock(envLockName("dev"), 1000)).toBe(true)
       }),
     )
   })
 
-  test("apply под тем же env-локом: параллельный apply и apply↔run отсекаются (SPEC §14.6)", async () => {
+  test("apply under the same env lock: a concurrent apply and apply↔run are cut off (SPEC §14.6)", async () => {
     await scenario(
       Effect.gen(function* () {
         const store = yield* StateStore
         yield* seedSource
         const models = [raw, events]
 
-        // «другой процесс» мутирует dev — apply не проходит
+        // "another process" mutates dev — apply does not go through
         expect(yield* store.acquireLock(envLockName("dev"), 3_600_000)).toBe(true)
         const held = yield* Effect.flip(
           Efmesh.apply("dev", models, { now: fromIso("2026-01-02T00:00:00Z") }),
         )
         expect(held._tag).toBe("LockHeldError")
 
-        // другое окружение — другой лок, prod применяется свободно
+        // a different environment — a different lock, prod applies freely
         yield* Efmesh.apply("prod", models, { now: fromIso("2026-01-02T00:00:00Z") })
 
-        // лок отпущен — apply проходит и освобождает лок за собой
+        // the lock is released — apply goes through and releases the lock after itself
         yield* store.releaseLock(envLockName("dev"))
         yield* Efmesh.apply("dev", models, { now: fromIso("2026-01-02T00:00:00Z") })
         expect(yield* store.acquireLock(envLockName("dev"), 1000)).toBe(true)
@@ -123,11 +123,11 @@ describe("run — тик планировщика (SPEC §7)", () => {
     )
   })
 
-  test("протухший лок упавшего процесса перехватывается", async () => {
+  test("a stale lock of a crashed process is reclaimed", async () => {
     await scenario(
       Effect.gen(function* () {
         const store = yield* StateStore
-        // лок с нулевым ttl — протухает мгновенно
+        // a lock with zero ttl — goes stale instantly
         expect(yield* store.acquireLock("run:zombie", 0)).toBe(true)
         expect(yield* store.acquireLock("run:zombie", 1000)).toBe(true)
       }),

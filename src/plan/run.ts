@@ -8,12 +8,12 @@ import { envLockName, withStateLock, type LockHeldError, type LockOptions } from
 import { planChanges, type PlanOptions } from "./planner.ts"
 
 /**
- * `run` — тик планировщика (SPEC §7): догоняет интервалы и upsert'ы
- * СУЩЕСТВУЮЩИХ версий, никогда не применяет изменения моделей — это
- * работа plan/apply с человеком у руля. Идемпотентен и безопасен для
- * cron/systemd: параллельный запуск отсекается блокировкой в state store —
- * той же `env:<имя>`, что у apply (SPEC §14.6), поэтому run не вклинится
- * в чужое применение и наоборот.
+ * `run` — a scheduler tick (SPEC §7): catches up intervals and upserts of
+ * EXISTING versions, never applies model changes — that is the job of
+ * plan/apply with a human at the helm. Idempotent and safe for cron/systemd:
+ * a parallel run is cut off by a lock in the state store — the same
+ * `env:<name>` as apply's (SPEC §14.6), so run will not wedge into someone
+ * else's apply and vice versa.
  */
 
 export class RunBlockedByChangesError extends Data.TaggedError("RunBlockedByChangesError")<{
@@ -25,7 +25,7 @@ export type RunError = ApplyError | LockHeldError | RunBlockedByChangesError
 
 export interface RunOptions extends PlanOptions, ApplyOptions, LockOptions {}
 
-/** Исход тика для журнала: ошибка → категория + деталь. */
+/** Tick outcome for the journal: error → category + detail. */
 const classify = (error: RunError): Pick<RunRecord, "outcome" | "detail"> => {
   switch (error._tag) {
     case "RunBlockedByChangesError":
@@ -45,9 +45,10 @@ export const run = (
   Effect.gen(function* () {
     const store = yield* StateStore
     const startedAt = new Date(yield* Clock.currentTimeMillis).toISOString()
-    // журнал тиков (SPEC §7, #2): исход пишется ВСЕГДА, включая неуспех —
-    // упавший в три часа ночи cron-тик дебажится задним числом; сбой самой
-    // записи не маскирует настоящий исход (лог + ignore)
+    // tick journal (SPEC §7, #2): the outcome is written ALWAYS, including
+    // failure — a cron tick that fell over at three in the morning is debugged
+    // after the fact; a failure of the write itself does not mask the real
+    // outcome (log + ignore)
     const journal = (entry: Pick<RunRecord, "outcome" | "detail">) =>
       Clock.currentTimeMillis.pipe(
         Effect.flatMap((now) =>
@@ -81,9 +82,9 @@ export const run = (
   })
 
 /**
- * Долгоживущий планировщик для встраивания в Effect-приложение (SPEC §7):
- * тики по Schedule, ошибка тика логируется и не роняет демона
- * (кроме занятого лока — это штатно, лог потише).
+ * Long-lived scheduler for embedding in an Effect application (SPEC §7):
+ * ticks on a Schedule; a tick error is logged and does not bring the daemon
+ * down (except a held lock — that is routine, logged more quietly).
  */
 export const daemon = (
   env: string,

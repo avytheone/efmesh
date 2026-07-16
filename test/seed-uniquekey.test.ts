@@ -16,7 +16,7 @@ const scenario = <A, E>(body: Effect.Effect<A, E, EngineAdapter | StateStore>) =
   Effect.runPromise(body.pipe(Effect.provide(testLayer)))
 
 describe("seed (SPEC §3.1)", () => {
-  test("CSV-справочник материализуется; правка файла = новая версия", async () => {
+  test("a CSV reference table is materialized; editing the file = a new version", async () => {
     const dir = mkdtempSync(join(tmpdir(), "efmesh-seed-"))
     const file = join(dir, "departments.csv")
     writeFileSync(file, "code,title\noric,ОРИТ\nther,терапия\n")
@@ -35,11 +35,11 @@ describe("seed (SPEC §3.1)", () => {
         const rows = yield* engine.query(`SELECT count(*)::INT AS n FROM dev__ref.departments`)
         expect(rows).toEqual([{ n: 2 }])
 
-        // без правки файла — изменений нет
+        // without editing the file — no changes
         const same = yield* Efmesh.apply("dev", [departments])
         expect(same.plan.hasChanges).toBe(false)
 
-        // дописали строку — версия сменилась, пересборка
+        // appended a row — the version changed, a rebuild
         writeFileSync(file, "code,title\noric,ОРИТ\nther,терапия\nsurg,хирургия\n")
         const plan = yield* Efmesh.plan("dev", [departments])
         expect(plan.actions[0]?.change).toBe("breaking")
@@ -50,7 +50,7 @@ describe("seed (SPEC §3.1)", () => {
     )
   })
 
-  test("отсутствующий файл — SeedReadError на этапе плана", async () => {
+  test("a missing file — SeedReadError at plan time", async () => {
     const ghost = defineSeed({
       name: "ref.ghost",
       file: "/nonexistent/ghost.csv",
@@ -62,7 +62,7 @@ describe("seed (SPEC §3.1)", () => {
 })
 
 describe("incrementalByUniqueKey (SPEC §3.1)", () => {
-  test("upsert по ключу: новые строки добавляются, изменённые заменяются, старые живут", async () => {
+  test("upsert by key: new rows are added, changed ones replaced, old ones live on", async () => {
     await scenario(
       Effect.gen(function* () {
         const engine = yield* EngineAdapter
@@ -86,16 +86,16 @@ describe("incrementalByUniqueKey (SPEC §3.1)", () => {
           { id: "p2", name: "Борис" },
         ])
 
-        // источник изменился: p2 переименован, p3 добавлен, p1 исчез из выборки
+        // the source changed: p2 renamed, p3 added, p1 dropped from the selection
         yield* engine.execute(`DELETE FROM src.people WHERE id = 'p1'`)
         yield* engine.execute(`UPDATE src.people SET name = 'Борис И.' WHERE id = 'p2'`)
         yield* engine.execute(`INSERT INTO src.people VALUES ('p3', 'Вера')`)
 
         const applied = yield* Efmesh.apply("dev", [people])
-        expect(applied.built).toEqual(["med.people"]) // refresh при каждом apply
+        expect(applied.built).toEqual(["med.people"]) // refresh on every apply
         const after = yield* engine.query(`SELECT * FROM dev__med.people ORDER BY id`)
         expect(after).toEqual([
-          { id: "p1", name: "Анна" }, // upsert не удаляет отсутствующих в выборке
+          { id: "p1", name: "Анна" }, // upsert does not delete rows absent from the selection
           { id: "p2", name: "Борис И." },
           { id: "p3", name: "Вера" },
         ])

@@ -16,8 +16,8 @@ const testLayer = Layer.mergeAll(DuckDBEngineLive(), SqliteStateLive())
 const scenario = <A, E>(body: Effect.Effect<A, E, EngineAdapter | StateStore>) =>
   Effect.runPromise(body.pipe(Effect.provide(testLayer)))
 
-describe("экспорт в ATTACH (SPEC §9.3)", () => {
-  test("готовая витрина уезжает в attach-базу после аудитов и промоушена", async () => {
+describe("export to ATTACH (SPEC §9.3)", () => {
+  test("a finished mart is exported to the attach database after audits and promotion", async () => {
     const dir = mkdtempSync(join(tmpdir(), "efmesh-export-"))
     const appDb = join(dir, "app.duckdb")
     const mart = defineModel(
@@ -39,7 +39,7 @@ describe("экспорт в ATTACH (SPEC §9.3)", () => {
     )
   })
 
-  test("алиас не задан в конфиге — AttachNotConfiguredError", async () => {
+  test("the alias is not set in the config — AttachNotConfiguredError", async () => {
     const orphan = defineModel(
       {
         name: "med.orphan",
@@ -54,7 +54,7 @@ describe("экспорт в ATTACH (SPEC §9.3)", () => {
   })
 })
 
-describe("diff окружений (SPEC §11)", () => {
+describe("environment diff (SPEC §11)", () => {
   test("only-in / different / same", async () => {
     const modelOf = (name: string, value: string) =>
       defineModel(

@@ -4,9 +4,9 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 /**
- * Одноразовый Postgres-кластер для интеграционных тестов: initdb в tmp,
- * TCP на свободном порту, fsync выключен — старт ~1 с. Без бинарников
- * Postgres в PATH тесты пропускаются (см. hasPostgres).
+ * A throwaway Postgres cluster for integration tests: initdb in tmp, TCP on a
+ * free port, fsync off — startup ~1 s. Without Postgres binaries in PATH the
+ * tests are skipped (see hasPostgres).
  */
 
 export const hasPostgres: boolean = (() => {

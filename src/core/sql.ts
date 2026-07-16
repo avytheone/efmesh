@@ -1,9 +1,9 @@
 /**
- * SQL-фрагменты: дерево из текста, ссылок на модели и идентификаторов.
+ * SQL fragments: a tree of text, model references, and identifiers.
  *
- * Тело модели рендерится в фрагмент один раз при определении; в текст SQL
- * фрагмент превращается позже — резолвером ссылок (canonical-рендер для
- * fingerprint, физический — для исполнения).
+ * A model body is rendered into a fragment once at definition time; the
+ * fragment turns into SQL text later — by the reference resolver
+ * (canonical rendering for the fingerprint, physical for execution).
  */
 
 export interface SqlFragment {
@@ -18,30 +18,30 @@ export type SqlNode =
   | { readonly _tag: "Bound"; readonly which: "start" | "end" }
   | { readonly _tag: "Self" }
 
-/** Ссылка на модель, полученная из `ctx.ref(model)`. */
+/** A model reference, obtained from `ctx.ref(model)`. */
 export interface RefValue {
   readonly _tag: "RefValue"
   readonly modelName: string
 }
 
-/** Список колонок, полученный из `ctx.cols(model, ...)`. */
+/** A list of columns, obtained from `ctx.cols(model, ...)`. */
 export interface IdentsValue {
   readonly _tag: "IdentsValue"
   readonly names: ReadonlyArray<string>
 }
 
-/** Граница обрабатываемого интервала — `ctx.start` / `ctx.end` (SPEC §3). */
+/** Bound of the interval being processed — `ctx.start` / `ctx.end` (SPEC §3). */
 export interface BoundValue {
   readonly _tag: "BoundValue"
   readonly which: "start" | "end"
 }
 
-/** Результат самой модели в запросе аудита — `ctx.self` (SPEC §8). */
+/** The model's own result in an audit query — `ctx.self` (SPEC §8). */
 export interface SelfValue {
   readonly _tag: "SelfValue"
 }
 
-/** Скалярные значения инлайнятся как SQL-литералы (детерминированно). */
+/** Scalar values are inlined as SQL literals (deterministically). */
 export type SqlLiteral = string | number | boolean | bigint | null
 
 export type Interpolation =
@@ -124,16 +124,16 @@ export const sql = (
 }
 
 export interface RenderOptions {
-  /** Во что превращается ссылка на модель (physical-таблица, view окружения, логическое имя…). */
+  /** What a model reference turns into (a physical table, an environment view, a logical name…). */
   readonly resolveRef: (modelName: string) => string
   /**
-   * Границы обрабатываемого интервала — готовые SQL-выражения
-   * (`TIMESTAMP '…'` при исполнении). Без них `ctx.start`/`ctx.end`
-   * рендерятся плейсхолдерами `$start`/`$end` — так канонический текст
-   * не зависит от конкретных дат и fingerprint стабилен (SPEC §3, §4).
+   * Bounds of the interval being processed — ready-made SQL expressions
+   * (`TIMESTAMP '…'` at execution time). Without them, `ctx.start`/`ctx.end`
+   * render as `$start`/`$end` placeholders — so the canonical text doesn't
+   * depend on specific dates and the fingerprint stays stable (SPEC §3, §4).
    */
   readonly interval?: { readonly start: string; readonly end: string }
-  /** Во что рендерится `ctx.self` в запросе аудита (физика или подзапрос интервала). */
+  /** What `ctx.self` renders to in an audit query (physical table or interval subquery). */
   readonly self?: string
 }
 
@@ -163,10 +163,10 @@ export const render = (fragment: SqlFragment, options: RenderOptions): string =>
 }
 
 /**
- * Парсер сырого SQL-текста (SPEC §14.1): `@ref(схема.таблица)` — ссылка
- * на модель, `@start`/`@end` — границы интервала. Всё остальное — текст
- * как есть. Для миграции существующих dbt/sqlmesh-проектов: типизация
- * ссылок теряется, зависимости объявляются рядом (defineSqlModel.refs).
+ * Parser for raw SQL text (SPEC §14.1): `@ref(schema.table)` is a model
+ * reference, `@start`/`@end` are interval bounds. Everything else is text
+ * as-is. For migrating existing dbt/sqlmesh projects: reference typing is
+ * lost, dependencies are declared alongside it (defineSqlModel.refs).
  */
 export const parseSqlText = (text: string): SqlFragment => {
   const nodes: Array<SqlNode> = []
@@ -195,6 +195,6 @@ export const collectRefs = (fragment: SqlFragment): ReadonlySet<string> => {
   return refs
 }
 
-/** Использует ли фрагмент границы интервала (валидация вида модели). */
+/** Whether the fragment uses interval bounds (model-kind validation). */
 export const usesBounds = (fragment: SqlFragment): boolean =>
   fragment.nodes.some((node) => node._tag === "Bound")

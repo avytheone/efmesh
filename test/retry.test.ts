@@ -43,9 +43,10 @@ const seedSource = Effect.gen(function* () {
 })
 
 /**
- * Движок, роняющий первые failures.left транзакций — эмуляция транзиентного
- * сбоя. Выбор ветки — внутри suspend: ретрай перезапускает эффект, и каждый
- * запуск должен видеть свежий счётчик, а не решение момента вызова.
+ * An engine that drops the first failures.left transactions — emulating a
+ * transient failure. The branch choice is inside suspend: a retry re-runs the
+ * effect, and each run must see the fresh counter, not the decision made at
+ * call time.
  */
 const flaky = (real: Engine, failures: { left: number }): Engine => ({
   ...real,
@@ -57,8 +58,8 @@ const flaky = (real: Engine, failures: { left: number }): Engine => ({
     }),
 })
 
-describe("ретраи бэкфилла (SPEC §5.3)", () => {
-  test("транзиентный сбой батча пережидается Schedule.exponential", async () => {
+describe("backfill retries (SPEC §5.3)", () => {
+  test("a transient batch failure is waited out by Schedule.exponential", async () => {
     await scenario(
       Effect.gen(function* () {
         const engine = yield* EngineAdapter
@@ -76,7 +77,7 @@ describe("ретраи бэкфилла (SPEC §5.3)", () => {
     )
   })
 
-  test("без retry поведение прежнее: первый сбой роняет apply, повтор продолжает", async () => {
+  test("without retry the behavior is unchanged: the first failure drops apply, a rerun continues", async () => {
     await scenario(
       Effect.gen(function* () {
         const engine = yield* EngineAdapter
@@ -88,7 +89,7 @@ describe("ретраи бэкфилла (SPEC §5.3)", () => {
         )
         expect(failed._tag).toBe("EngineError")
 
-        // ретраи исчерпаны — ошибка отдаётся наружу, интервал остаётся failed
+        // retries exhausted — the error is surfaced, the interval stays failed
         const exhausted = yield* Effect.flip(
           Efmesh.apply("dev", [raw, events], {
             now: fromIso("2026-01-03T00:00:00Z"),
@@ -97,7 +98,7 @@ describe("ретраи бэкфилла (SPEC §5.3)", () => {
         )
         expect(exhausted._tag).toBe("EngineError")
 
-        // здоровый движок — resume с места остановки
+        // a healthy engine — resume from where it stopped
         const applied = yield* Efmesh.apply("dev", [raw, events], {
           now: fromIso("2026-01-03T00:00:00Z"),
         })

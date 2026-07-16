@@ -26,7 +26,7 @@ const staysV1 = defineModel(
   (ctx) => ctx.sql`SELECT ${ctx.cols(moves, "case_id", "dept")} FROM ${ctx.ref(moves)}`,
 )
 
-/** Та же модель, изменённое тело — «правка кода» между планами. */
+/** Same model, changed body — a "code edit" between plans. */
 const staysV2 = defineModel(
   {
     name: "med.stays",
@@ -39,23 +39,23 @@ const staysV2 = defineModel(
 )
 
 /**
- * Один живой стенд на весь сценарий: общий DuckDB + общий state store,
- * как в реальном проекте между вызовами CLI.
+ * One live rig for the whole scenario: a shared DuckDB + a shared state store,
+ * as in a real project between CLI invocations.
  */
 const testLayer = Layer.mergeAll(DuckDBEngineLive(), SqliteStateLive())
 
 const scenario = <A, E>(body: Effect.Effect<A, E, EngineAdapter | import("../src/state/store.ts").StateStore>) =>
   Effect.runPromise(body.pipe(Effect.provide(testLayer)))
 
-describe("F0: стоп-условие SPEC §13", () => {
-  test("plan→apply→изменение→plan→apply; prod не пересчитывается", async () => {
+describe("F0: the stop condition SPEC §13", () => {
+  test("plan→apply→change→plan→apply; prod is not recomputed", async () => {
     await scenario(
       Effect.gen(function* () {
         const engine = yield* EngineAdapter
         const v1: ReadonlyArray<AnyModel> = [moves, staysV1]
         const v2: ReadonlyArray<AnyModel> = [moves, staysV2]
 
-        // — первый план в dev: обе модели added, обе собираются
+        // — the first plan in dev: both models added, both are built
         const plan1 = yield* Efmesh.plan("dev", v1)
         expect(plan1.actions.map((a) => a.change)).toEqual(["added", "added"])
         const applied1 = yield* Efmesh.apply("dev", v1)
@@ -63,18 +63,18 @@ describe("F0: стоп-условие SPEC §13", () => {
         const devRows = yield* engine.query(`SELECT count(*)::INT AS n FROM dev__med.stays`)
         expect(devRows).toEqual([{ n: 2 }])
 
-        // — повторный apply в dev: изменений нет, ничего не собирается
+        // — a repeated apply in dev: no changes, nothing is built
         const applied2 = yield* Efmesh.apply("dev", v1)
         expect(applied2.plan.hasChanges).toBe(false)
         expect(applied2.built).toEqual([])
 
-        // ★ промоушен в prod: снапшоты уже собраны dev'ом — только view-swap
+        // ★ promotion to prod: the snapshots are already built by dev — view-swap only
         const appliedProd = yield* Efmesh.apply("prod", v1)
-        expect(appliedProd.built).toEqual([]) // prod НЕ пересчитывает
+        expect(appliedProd.built).toEqual([]) // prod does NOT recompute
         const prodRows = yield* engine.query(`SELECT count(*)::INT AS n FROM med.stays`)
         expect(prodRows).toEqual([{ n: 2 }])
 
-        // — правка stays: в dev пересобирается только stays, moves не тронут
+        // — editing stays: in dev only stays is rebuilt, moves untouched
         const plan2 = yield* Efmesh.plan("dev", v2)
         const changes = new Map(plan2.actions.map((a) => [a.name, a.change]))
         expect(changes.get("med.moves")).toBe("unchanged")
@@ -84,11 +84,11 @@ describe("F0: стоп-условие SPEC §13", () => {
         const devRows2 = yield* engine.query(`SELECT count(*)::INT AS n FROM dev__med.stays`)
         expect(devRows2).toEqual([{ n: 1 }])
 
-        // prod живёт на старой версии, пока его не промоутнули
+        // prod lives on the old version until it is promoted
         const prodStill = yield* engine.query(`SELECT count(*)::INT AS n FROM med.stays`)
         expect(prodStill).toEqual([{ n: 2 }])
 
-        // ★ промоушен правки в prod: снова без сборки
+        // ★ promoting the edit to prod: again without a build
         const appliedProd2 = yield* Efmesh.apply("prod", v2)
         expect(appliedProd2.built).toEqual([])
         const prodRows2 = yield* engine.query(`SELECT count(*)::INT AS n FROM med.stays`)
@@ -97,7 +97,7 @@ describe("F0: стоп-условие SPEC §13", () => {
     )
   })
 
-  test("удаление модели из проекта сносит view при промоушене", async () => {
+  test("removing a model from the project drops its view on promotion", async () => {
     await scenario(
       Effect.gen(function* () {
         const engine = yield* EngineAdapter
@@ -110,7 +110,7 @@ describe("F0: стоп-условие SPEC §13", () => {
     )
   })
 
-  test("view-модель материализуется как view поверх физики родителя", async () => {
+  test("a view model is materialized as a view over the parent's physical table", async () => {
     await scenario(
       Effect.gen(function* () {
         const engine = yield* EngineAdapter

@@ -6,60 +6,61 @@ export class StateError extends Data.TaggedError("StateError")<{
 }> {}
 
 /**
- * Текущая версия схемы state store. Свежий стор бутстрапится сразу
- * на неё; стор со схемой старше (в т.ч. созданный до появления версии)
- * открытие не проходит — данные догоняет явный `efmesh migrate`.
- * 1 — базовая раскладка (F4), 2 — applied_by в журнале планов (F5),
- * 3 — fingerprint_version в снапшотах (F6), 4 — журнал тиков run (0.2.0),
- * 5 — кэш канонизации canon_cache (0.2.0, #8).
+ * Current schema version of the state store. A fresh store bootstraps
+ * directly at it; a store with an older schema (including one created
+ * before versioning existed) refuses to open — data catches up via an
+ * explicit `efmesh migrate`.
+ * 1 — base layout (F4), 2 — applied_by in the plan journal (F5),
+ * 3 — fingerprint_version in snapshots (F6), 4 — run tick journal (0.2.0),
+ * 5 — canonicalization cache canon_cache (0.2.0, #8).
  */
 export const STATE_VERSION = 5
 
-/** Схема стора не совпадает с ожидаемой бинарём — нужен `efmesh migrate`. */
+/** Store schema doesn't match the binary's expectation — `efmesh migrate` is needed. */
 export class StateSchemaError extends Data.TaggedError("StateSchemaError")<{
   readonly found: number
   readonly wanted: number
 }> {}
 
-/** Итог миграции для CLI. */
+/** Migration outcome for the CLI. */
 export interface MigrationReport {
   readonly from: number
   readonly to: number
-  /** Куда сложена копия стора перед апгрейдом схемы (SQLite; F6). */
+  /** Where the store's copy was stashed before the schema upgrade (SQLite; F6). */
   readonly backup?: string
 }
 
-/** Версия модели, известная state store (SPEC §6). */
+/** A model version known to the state store (SPEC §6). */
 export interface SnapshotRecord {
   readonly name: string
   readonly fingerprint: string
-  /** Canonical-рендер SQL — для diff-показа и отладки. */
+  /** Canonical SQL rendering — for diff display and debugging. */
   readonly renderedSql: string
-  /** Канонический AST тела (JSON) — для категоризации изменений (SPEC §5.2). */
+  /** Canonical AST of the body (JSON) — for categorizing changes (SPEC §5.2). */
   readonly canonicalAst: string
   /**
-   * Fingerprint, чьей физической таблицей/префиксом пользуется снапшот.
-   * Обычно равен собственному; при forward-only (SPEC §5.2) — наследуется
-   * от предыдущей версии: физика переиспользуется, история не переигрывается.
+   * Fingerprint whose physical table/prefix this snapshot uses.
+   * Usually its own; under forward-only (SPEC §5.2) it is inherited
+   * from the previous version: physics is reused, history is not replayed.
    */
   readonly physicalFp: string
   readonly kind: string
   /**
-   * Версия алгоритма fingerprint, которым посчитан снапшот (SPEC §4).
-   * План сравнивает только одноверсионные отпечатки; иная версия —
-   * громкая остановка, не тихий «всё breaking».
+   * Version of the fingerprint algorithm used to compute this snapshot (SPEC §4).
+   * Plan only compares same-version fingerprints; a different version is
+   * a loud stop, not a silent "everything is breaking".
    */
   readonly fingerprintVersion: number
   readonly createdAt: string
   /**
-   * Когда снапшот перестал быть указан хоть одним окружением (ISO UTC);
-   * null — на него ссылаются. Ставится и снимается при промоушене,
-   * ttl janitor'а отсчитывается отсюда (SPEC §5.4).
+   * When the snapshot stopped being pointed to by any environment (ISO UTC);
+   * null means it is still referenced. Set and cleared on promotion,
+   * the janitor's ttl is counted from here (SPEC §5.4).
    */
   readonly orphanedAt: string | null
 }
 
-/** Строка окружения: логическое имя → снапшот, на который указывает view. */
+/** Environment row: logical name → snapshot the view points to. */
 export interface EnvironmentRecord {
   readonly env: string
   readonly name: string
@@ -72,15 +73,15 @@ export interface PlanRecord {
   readonly env: string
   readonly summary: string
   readonly appliedAt: string
-  /** Кто применил план (ОС-пользователь или ApplyOptions.appliedBy); '' у записей до v2. */
+  /** Who applied the plan (OS user or ApplyOptions.appliedBy); '' for records predating v2. */
   readonly appliedBy: string
 }
 
 /**
- * Запись журнала тиков run (SPEC §7, issue #2): упавший в три часа ночи
- * cron-тик должен быть дебажим задним числом. outcome:
- * ok — тик прошёл; awaiting-human — есть неприменённые изменения (exit 2);
- * lock-held — окружение занято другим процессом; error — настоящий сбой.
+ * Run tick journal entry (SPEC §7, issue #2): a cron tick that fails at
+ * three in the morning must be debuggable after the fact. outcome:
+ * ok — tick succeeded; awaiting-human — there are unapplied changes (exit 2);
+ * lock-held — the environment is held by another process; error — an actual failure.
  */
 export interface RunRecord {
   readonly id: number
@@ -88,14 +89,14 @@ export interface RunRecord {
   readonly startedAt: string
   readonly finishedAt: string
   readonly outcome: "ok" | "awaiting-human" | "lock-held" | "error"
-  /** ok: JSON-массив собранных моделей; awaiting-human: список изменений; error: тег ошибки. */
+  /** ok: JSON array of collected models; awaiting-human: list of changes; error: error tag. */
   readonly detail: string
 }
 
 /**
- * Учёт заполненных интервалов снапшота (SPEC §6) — единственный источник
- * правды о том, что посчитано: физическая таблица без записей здесь
- * считается пустой. Границы — ISO UTC (сортируются лексикографически).
+ * Bookkeeping of a snapshot's filled intervals (SPEC §6) — the single source
+ * of truth for what has been computed: a physical table with no records here
+ * is considered empty. Bounds are ISO UTC (sorted lexicographically).
  */
 export interface IntervalRecord {
   readonly snapshotFp: string
@@ -106,7 +107,7 @@ export interface IntervalRecord {
 }
 
 export interface StateStoreShape {
-  /** Идемпотентно: (name, fingerprint) уникальны, повторная запись — no-op. */
+  /** Idempotent: (name, fingerprint) is unique, a repeated write is a no-op. */
   readonly upsertSnapshot: (
     snapshot: Omit<SnapshotRecord, "createdAt" | "orphanedAt">,
   ) => Effect.Effect<void, StateError>
@@ -114,17 +115,18 @@ export interface StateStoreShape {
     name: string,
     fingerprint: string,
   ) => Effect.Effect<SnapshotRecord | undefined, StateError>
-  /** Все снапшоты, на которые ссылается хоть одно окружение, — для janitor. */
+  /** All snapshots referenced by at least one environment — for the janitor. */
   readonly listReferencedFingerprints: () => Effect.Effect<ReadonlySet<string>, StateError>
   readonly listSnapshots: () => Effect.Effect<ReadonlyArray<SnapshotRecord>, StateError>
-  /** Удаляет запись снапшота и его учёт интервалов (физику убирает janitor). */
+  /** Deletes the snapshot record and its interval bookkeeping (the janitor removes the physics). */
   readonly deleteSnapshot: (name: string, fingerprint: string) => Effect.Effect<void, StateError>
   /**
-   * Транзакционный «claim» сироты janitor'ом (SPEC §5.4, F6): запись и учёт
-   * интервалов удаляются, только если снапшот ВСЁ ЕЩЁ не referenced ни одним
-   * окружением и осиротел не позже deadline (ISO UTC) — обе проверки в одной
-   * транзакции с удалением, поэтому параллельный apply, воскресивший версию,
-   * не даст её унести. true — снесено, false — состояние изменилось.
+   * Transactional "claim" of an orphan by the janitor (SPEC §5.4, F6): the
+   * record and its interval bookkeeping are deleted only if the snapshot is
+   * STILL not referenced by any environment and orphaned no later than the
+   * deadline (ISO UTC) — both checks run in the same transaction as the
+   * delete, so a concurrent apply that revived the version can't lose it to
+   * removal. true — removed, false — state changed underneath.
    */
   readonly deleteSnapshotIfDoomed: (
     name: string,
@@ -135,10 +137,10 @@ export interface StateStoreShape {
     env: string,
   ) => Effect.Effect<ReadonlyArray<EnvironmentRecord>, StateError>
   /**
-   * Транзакционно заменяет весь набор окружения. Записи с
-   * `requireSnapshot: true` проверяются на живость снапшота в той же
-   * транзакции: если janitor успел его унести, промоушен громко падает —
-   * view никогда не переключается на снесённую физику.
+   * Transactionally replaces the environment's whole set. Entries with
+   * `requireSnapshot: true` are checked for the snapshot's liveness in the
+   * same transaction: if the janitor already removed it, promotion fails
+   * loudly — the view never switches to demolished physics.
    */
   readonly promote: (
     env: string,
@@ -148,35 +150,36 @@ export interface StateStoreShape {
       readonly requireSnapshot?: boolean
     }>,
   ) => Effect.Effect<void, StateError>
-  /** Журнал применённых планов. */
+  /** Journal of applied plans. */
   readonly recordPlan: (
     env: string,
     summary: string,
     appliedBy: string,
   ) => Effect.Effect<void, StateError>
   /**
-   * Кэш канонизации (#8): ключ уже включает диалект и FINGERPRINT_VERSION —
-   * смена алгоритма или движка не может отдать протухший канон. Кэш — не
-   * данные: промах или сбой безопасны, вызывающий обязан их глотать.
+   * Canonicalization cache (#8): the key already includes the dialect and
+   * FINGERPRINT_VERSION — a change in algorithm or engine can never hand back
+   * a stale canon. The cache is not data: a miss or failure is safe, the
+   * caller must swallow it.
    */
   readonly getCanon: (key: string) => Effect.Effect<string | undefined, StateError>
   readonly putCanon: (key: string, canonical: string) => Effect.Effect<void, StateError>
-  /** Журнал тиков run (SPEC §7): исход каждого тика, включая неуспешные. */
+  /** Run tick journal (SPEC §7): the outcome of every tick, including unsuccessful ones. */
   readonly recordRun: (record: Omit<RunRecord, "id">) => Effect.Effect<void, StateError>
-  /** Последние тики окружения, свежие первыми. */
+  /** The environment's most recent ticks, newest first. */
   readonly listRuns: (
     env: string,
     limit: number,
   ) => Effect.Effect<ReadonlyArray<RunRecord>, StateError>
   readonly listPlans: (env: string) => Effect.Effect<ReadonlyArray<PlanRecord>, StateError>
   /**
-   * Межпроцессная блокировка (SPEC §7): true — получена, false — держит
-   * другой процесс. Протухшие (expires) локи перехватываются — упавший
-   * процесс не оставляет вечный замок.
+   * Cross-process lock (SPEC §7): true — acquired, false — held by another
+   * process. Stale (expired) locks are reclaimed — a crashed process
+   * doesn't leave a lock held forever.
    */
   readonly acquireLock: (name: string, ttlMs: number) => Effect.Effect<boolean, StateError>
   readonly releaseLock: (name: string) => Effect.Effect<void, StateError>
-  /** Транзакционный upsert интервалов снапшота (повторная отметка — обновление статуса). */
+  /** Transactional upsert of snapshot intervals (re-marking updates the status). */
   readonly markIntervals: (
     snapshotFp: string,
     intervals: ReadonlyArray<{ readonly startTs: string; readonly endTs: string }>,

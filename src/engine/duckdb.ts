@@ -4,9 +4,9 @@ import type { Engine, EngineColumn } from "./adapter.ts"
 import { EngineAdapter, EngineError, SqlParseError } from "./adapter.ts"
 
 /**
- * AST от json_serialize_sql содержит позиции токенов (query_location) —
- * единственное, чем отличаются одинаковые по смыслу, но по-разному
- * отформатированные запросы. Вычищаем — остаётся формат-инвариантное ядро.
+ * The AST from json_serialize_sql contains token positions (query_location) —
+ * the only thing that differs between semantically identical but differently
+ * formatted queries. We strip it — leaving a format-invariant core.
  */
 const stripLocations = (value: unknown): unknown => {
   if (Array.isArray(value)) return value.map(stripLocations)
@@ -22,7 +22,7 @@ const stripLocations = (value: unknown): unknown => {
 }
 
 export interface DuckDBEngineOptions {
-  /** Путь к файлу базы; по умолчанию in-memory. */
+  /** Path to the database file; by default in-memory. */
   readonly path?: string
 }
 
@@ -65,8 +65,8 @@ export const DuckDBEngineLive = (
           ),
         )
 
-      // одно соединение: параллельные транзакции сериализуются семафором,
-      // чтобы фибры не перемежали чужие BEGIN/COMMIT
+      // single connection: parallel transactions are serialized by a semaphore
+      // so fibers do not interleave each other's BEGIN/COMMIT
       const transactionLock = yield* Semaphore.make(1)
 
       const service: Engine = {
@@ -101,7 +101,7 @@ export const DuckDBEngineLive = (
                 readonly error: boolean
                 readonly error_message?: string
               }
-              // ошибка парсинга приходит содержимым JSON, не исключением
+              // a parse error arrives as JSON content, not as an exception
               if (ast.error) {
                 return new SqlParseError({
                   sql: sqlText,

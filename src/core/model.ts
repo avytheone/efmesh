@@ -6,57 +6,57 @@ import { ModelDefinitionError } from "./errors.ts"
 import type { BoundValue, IdentsValue, RefValue, SqlFragment } from "./sql.ts"
 import { collectRefs, parseSqlText, sql, usesBounds } from "./sql.ts"
 
-/** Вид материализации (SPEC §3.1). */
+/** Materialization kind (SPEC §3.1). */
 export type ModelKind =
   | { readonly _tag: "full" }
   | { readonly _tag: "view" }
   | {
-      /** Подставляется в потребителей как подзапрос, без материализации (SPEC §3.1). */
+      /** Inlined into consumers as a subquery, without materialization (SPEC §3.1). */
       readonly _tag: "embedded"
     }
   | {
       readonly _tag: "incrementalByTimeRange"
-      /** Колонка времени, по которой режутся и перечитываются интервалы. */
+      /** Time column that intervals are sliced and reread by. */
       readonly timeColumn: string
-      /** С какого момента бэкфиллить (ISO UTC). */
+      /** Point in time to backfill from (ISO UTC). */
       readonly start: string
-      /** Зерно интервала. */
+      /** Interval grain. */
       readonly interval: IntervalUnit
-      /** Сколько интервалов зерна исполняется одним DELETE+INSERT. */
+      /** How many grain intervals a single DELETE+INSERT executes. */
       readonly batchSize: number
-      /** Сколько последних done-интервалов пересчитывать заново (поздние данные). */
+      /** How many of the most recent done intervals to recompute (late-arriving data). */
       readonly lookback: number
     }
   | { readonly _tag: "external"; readonly source: ExternalSource }
   | {
       readonly _tag: "seed"
-      /** CSV/JSON-файл с данными; содержимое входит в fingerprint. */
+      /** CSV/JSON file with the data; its contents feed into the fingerprint. */
       readonly file: string
       readonly format: "csv" | "json"
     }
   | {
       readonly _tag: "incrementalByUniqueKey"
-      /** Логический ключ upsert'а; каждый apply перегоняет запрос и заменяет строки по ключу. */
+      /** Logical upsert key; every apply reruns the query and replaces rows by key. */
       readonly key: ReadonlyArray<string>
     }
   | {
       /**
-       * Медленно меняющееся измерение, тип 2 (SPEC §3.1): история версий
-       * строк. Каждый apply сверяет запрос с открытыми строками: изменившиеся
-       * и исчезнувшие закрываются (validTo = сейчас), новые версии
-       * вставляются открытыми (validTo IS NULL).
+       * Slowly changing dimension, type 2 (SPEC §3.1): row version history.
+       * Every apply compares the query against the currently open rows: rows
+       * that changed or disappeared are closed (validTo = now), new versions
+       * are inserted open (validTo IS NULL).
        */
       readonly _tag: "scdType2"
       readonly key: ReadonlyArray<string>
-      /** Колонки версионирования — ведёт efmesh: в схеме объявлены, в запросе отсутствуют. */
+      /** Versioning columns — managed by efmesh: declared in the schema, absent from the query. */
       readonly validFrom: string
       readonly validTo: string
     }
 
 /**
- * Определение внешнего источника (SPEC §9.3): таблица движка/ATTACH-базы
- * или файлы по пути/URL (`read_parquet`/`read_csv`/`read_json`, включая
- * HTTPS — REST-JSON ложится сюда же).
+ * External source definition (SPEC §9.3): an engine table/ATTACH database,
+ * or files by path/URL (`read_parquet`/`read_csv`/`read_json`, including
+ * HTTPS — REST-JSON lands here too).
  */
 export type ExternalSource =
   | { readonly _tag: "table"; readonly table: string }
@@ -110,7 +110,7 @@ export const external = {
   }),
 } as const
 
-/** Имя модели: `<схема>.<таблица>`. */
+/** Model name: `<schema>.<table>`. */
 const MODEL_NAME = /^[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*$/
 
 export interface ModelName {
@@ -131,10 +131,11 @@ export const parseModelName = (raw: string): ModelName => {
 }
 
 /**
- * Куда складывать физический слой (SPEC §3.3): нативная таблица движка,
- * parquet-файлы озера (интервал = партиция, view поверх read_parquet) или
- * DuckLake-каталог (SPEC §14.5: таблица-на-fingerprint в ATTACH-каталоге —
- * снапшоты и time travel самого DuckLake в довесок, версионность наша).
+ * Where to put the physical layer (SPEC §3.3): a native engine table,
+ * lake parquet files (interval = partition, a view over read_parquet), or
+ * a DuckLake catalog (SPEC §14.5: a table-per-fingerprint in an ATTACH
+ * catalog — DuckLake's own snapshots and time travel come along for free,
+ * but versioning stays ours).
  */
 export type MaterializationTarget = "table" | "parquet" | "ducklake"
 
@@ -143,20 +144,20 @@ export interface ModelConfig<Fields extends Schema.Struct.Fields> {
   readonly kind: ModelKind
   readonly schema: Schema.Struct<Fields>
   readonly description?: string
-  /** Логический первичный ключ; пока метаданные (аудит unique — F2). */
+  /** Logical primary key; metadata only for now (unique audit — F2). */
   readonly grain?: ReadonlyArray<Extract<keyof Fields, string>>
-  /** Цель материализации; по умолчанию — таблица движка. */
+  /** Materialization target; defaults to a native engine table. */
   readonly target?: MaterializationTarget
-  /** Аудиты качества (SPEC §8); в fingerprint не входят. */
+  /** Quality audits (SPEC §8); excluded from the fingerprint. */
   readonly audits?: ReadonlyArray<Audit>
   /**
-   * Экспорт наружу (SPEC §9.3): после аудитов и промоушена готовый
-   * результат уезжает в ATTACH-базу (`attach` — алиас из конфига).
+   * Export outward (SPEC §9.3): after audits and promotion, the finished
+   * result is shipped to an ATTACH database (`attach` — an alias from config).
    */
   readonly export?: { readonly attach: string; readonly table: string }
 }
 
-/** Контекст рендера тела модели. Тело обязано быть чистым: всё изменчивое приходит отсюда. */
+/** Rendering context for a model body. The body must be pure: all mutable state flows in from here. */
 export interface ModelCtx {
   readonly sql: typeof sql
   readonly ref: (model: AnyModel) => RefValue
@@ -165,9 +166,9 @@ export interface ModelCtx {
     ...names: ReadonlyArray<Extract<keyof Fields, string>>
   ) => IdentsValue
   /**
-   * Границы обрабатываемого интервала `[start, end)` — только для
-   * incrementalByTimeRange. При исполнении подставляются литералами,
-   * в canonical-текст попадают плейсхолдерами (SPEC §3).
+   * Bounds of the interval being processed `[start, end)` — only for
+   * incrementalByTimeRange. Substituted with literals at execution time;
+   * rendered as placeholders in the canonical text (SPEC §3).
    */
   readonly start: BoundValue
   readonly end: BoundValue
@@ -182,11 +183,11 @@ export interface Model<Fields extends Schema.Struct.Fields = Schema.Struct.Field
   readonly grain: ReadonlyArray<string>
   readonly target: MaterializationTarget
   readonly audits: ReadonlyArray<Audit>
-  /** Тело, отрендеренное в фрагмент один раз при определении. */
+  /** Body, rendered into a fragment once at definition time. */
   readonly fragment: SqlFragment
-  /** Имена моделей, на которые тело ссылается через `ctx.ref`. */
+  /** Names of the models the body references via `ctx.ref`. */
   readonly deps: ReadonlySet<string>
-  /** Сами модели-источники по имени — схемы для валидации фикстур в testModel. */
+  /** The source models themselves, by name — schemas for fixture validation in testModel. */
   readonly refs: ReadonlyMap<string, AnyModel>
   readonly export?: { readonly attach: string; readonly table: string }
 }
@@ -197,7 +198,7 @@ export type AnyModel = Model<any>
 export const columnNames = (model: AnyModel): ReadonlyArray<string> =>
   Object.keys(model.schema.fields)
 
-/** Общие проверки конфигурации вида модели — для defineModel и defineSqlModel. */
+/** Shared model-kind config checks — for defineModel and defineSqlModel. */
 const validateKindConfig = <Fields extends Schema.Struct.Fields>(
   name: ModelName,
   config: ModelConfig<Fields>,
@@ -288,7 +289,7 @@ const validateKindConfig = <Fields extends Schema.Struct.Fields>(
   }
 }
 
-/** Финальная сборка модели из фрагмента — общие инварианты тела. */
+/** Final assembly of a model from a fragment — shared body invariants. */
 const assembleModel = <Fields extends Schema.Struct.Fields>(
   name: ModelName,
   config: ModelConfig<Fields>,
@@ -322,9 +323,9 @@ const assembleModel = <Fields extends Schema.Struct.Fields>(
 }
 
 /**
- * Определяет модель. Вызывается на верхнем уровне модуля; тело выполняется
- * ровно один раз — сразу, поэтому ссылки (`ctx.ref`) известны статически
- * и DAG строится без парсинга SQL.
+ * Defines a model. Called at module top level; the body runs exactly once,
+ * immediately, so references (`ctx.ref`) are known statically and the DAG
+ * is built without parsing SQL.
  */
 export const defineModel = <const Fields extends Schema.Struct.Fields>(
   config: ModelConfig<Fields>,
@@ -343,7 +344,7 @@ export const defineModel = <const Fields extends Schema.Struct.Fields>(
       const known = new Set(Object.keys(model.schema.fields))
       for (const column of names) {
         if (!known.has(column)) {
-          // недостижимо при честной типизации; защита от `as any`
+          // unreachable under honest typing; guards against `as any`
           throw new ModelDefinitionError({
             model: config.name,
             reason: `колонки «${column}» нет в схеме модели ${model.name.full}`,
@@ -360,20 +361,20 @@ export const defineModel = <const Fields extends Schema.Struct.Fields>(
 
 export interface SqlModelConfig<Fields extends Schema.Struct.Fields>
   extends ModelConfig<Fields> {
-  /** Путь к .sql-файлу тела: `@ref(схема.таблица)`, `@start`, `@end`. */
+  /** Path to the .sql body file: `@ref(schema.table)`, `@start`, `@end`. */
   readonly file: string
   /**
-   * Модели, на которые SQL-текст ссылается через `@ref` — значениями,
-   * чтобы DAG и testModel работали как у обычных моделей.
+   * Models the SQL text references via `@ref` — passed by value, so the
+   * DAG and testModel work the same way as for ordinary models.
    */
   readonly refs?: ReadonlyArray<AnyModel>
 }
 
 /**
- * Модель из сырого .sql-файла (SPEC §14.1) — для миграции существующих
- * dbt/sqlmesh-проектов. Типизация ссылок теряется (это честная цена):
- * каждая `@ref` в тексте обязана быть объявлена в `refs`, лишние
- * объявления — ошибка.
+ * Model from a raw .sql file (SPEC §14.1) — for migrating existing
+ * dbt/sqlmesh projects. Reference typing is lost (an honest price to pay):
+ * every `@ref` in the text must be declared in `refs`, and extra
+ * declarations are an error.
  */
 export const defineSqlModel = <const Fields extends Schema.Struct.Fields>(
   config: SqlModelConfig<Fields>,
@@ -419,10 +420,10 @@ export interface ExternalConfig<Fields extends Schema.Struct.Fields> {
 }
 
 /**
- * Внешний источник (SPEC §3.1, §9.3): не материализуется, но участвует
- * в DAG и lineage, схема объявляется. В fingerprint входит только
- * *определение* источника — содержимое меняется между запусками, и это
- * нормально для сырья.
+ * External source (SPEC §3.1, §9.3): not materialized, but participates
+ * in the DAG and lineage, and declares a schema. Only the source's
+ * *definition* feeds into the fingerprint — the contents change between
+ * runs, which is normal for raw data.
  */
 export const defineExternal = <const Fields extends Schema.Struct.Fields>(
   config: ExternalConfig<Fields>,
@@ -433,7 +434,7 @@ export const defineExternal = <const Fields extends Schema.Struct.Fields>(
   schema: config.schema,
   description: config.description,
   grain: [],
-  target: "table", // не материализуется — поле не используется
+  target: "table", // not materialized — field is unused
   audits: [],
   fragment: { _tag: "SqlFragment", nodes: [] },
   deps: new Set(),
@@ -442,7 +443,7 @@ export const defineExternal = <const Fields extends Schema.Struct.Fields>(
 
 export interface SeedConfig<Fields extends Schema.Struct.Fields> {
   readonly name: string
-  /** Путь к CSV/JSON-файлу; формат — по расширению или явно. */
+  /** Path to the CSV/JSON file; format inferred from the extension or given explicitly. */
   readonly file: string
   readonly format?: "csv" | "json"
   readonly schema: Schema.Struct<Fields>
@@ -451,9 +452,9 @@ export interface SeedConfig<Fields extends Schema.Struct.Fields> {
 }
 
 /**
- * Seed (SPEC §3.1): справочник из файла. В отличие от external, содержимое
- * файла входит в fingerprint — правка данных = новая версия и пересборка;
- * форма проверяется контрактом схемы при сборке.
+ * Seed (SPEC §3.1): a reference table from a file. Unlike external, the
+ * file's contents feed into the fingerprint — editing the data means a new
+ * version and a rebuild; shape is checked by the schema contract at build time.
  */
 export const defineSeed = <const Fields extends Schema.Struct.Fields>(
   config: SeedConfig<Fields>,

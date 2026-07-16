@@ -40,8 +40,8 @@ const changeOf = async (before: ReadonlyArray<AnyModel>, after: ReadonlyArray<An
     }),
   )
 
-describe("категоризация изменений по AST (SPEC §5.2)", () => {
-  test("колонка добавлена в конец SELECT — non-breaking", async () => {
+describe("change categorization by AST (SPEC §5.2)", () => {
+  test("a column appended to the end of SELECT — non-breaking", async () => {
     const widened = defineModel(
       {
         name: "med.src",
@@ -54,7 +54,7 @@ describe("категоризация изменений по AST (SPEC §5.2)", 
     expect(changes.get("med.src")).toBe("non-breaking")
   })
 
-  test("изменение выражения существующей колонки — breaking", async () => {
+  test("changing the expression of an existing column — breaking", async () => {
     const reworked = defineModel(
       {
         name: "med.src",
@@ -67,7 +67,7 @@ describe("категоризация изменений по AST (SPEC §5.2)", 
     expect(changes.get("med.src")).toBe("breaking")
   })
 
-  test("удаление колонки и вставка в середину — breaking", async () => {
+  test("dropping a column and inserting into the middle — breaking", async () => {
     const dropped = defineModel(
       {
         name: "med.src",
@@ -88,7 +88,7 @@ describe("категоризация изменений по AST (SPEC §5.2)", 
     expect((await changeOf([src], [middle])).get("med.src")).toBe("breaking")
   })
 
-  test("изменение WHERE — breaking; потомок с нетронутым телом — indirect", async () => {
+  test("changing WHERE — breaking; a child with an untouched body — indirect", async () => {
     const filtered = defineModel(
       {
         name: "med.src",
@@ -102,7 +102,7 @@ describe("категоризация изменений по AST (SPEC §5.2)", 
     expect(changes.get("med.consumer")).toBe("indirect")
   })
 
-  test("non-breaking родителя каскадится потомку как indirect", async () => {
+  test("a parent's non-breaking cascades to the child as indirect", async () => {
     const widened = defineModel(
       {
         name: "med.src",

@@ -9,10 +9,10 @@ import { SqliteStateLive } from "../src/state/sqlite.ts"
 import type { StateStore } from "../src/state/store.ts"
 
 /**
- * #6: diff --data — сравнение данных view-слоёв двух окружений: счётчики
- * строк, пересечение по ключу (grain), помодельные расхождения по колонкам.
- * Дрейф устраивается честно: dev применяется, источник мутирует, prod
- * применяется уже с другими данными — view смотрят в разные снапшоты.
+ * #6: diff --data — comparing the data of two environments' view layers: row
+ * counts, key intersection (grain), per-model column divergences.
+ * Drift is arranged honestly: dev is applied, the source mutates, prod is
+ * applied with already-different data — the views look at different snapshots.
  */
 
 const testLayer = Layer.mergeAll(DuckDBEngineLive(), SqliteStateLive())
@@ -46,7 +46,7 @@ const keyless = defineModel(
 )
 
 describe("diff --data (#6)", () => {
-  test("счётчики, пересечение по ключу, расхождения по колонкам; без ключа — только счётчики", async () => {
+  test("counts, key intersection, column divergences; without a key — counts only", async () => {
     const report = await scenario(
       Effect.gen(function* () {
         const engine = yield* EngineAdapter
@@ -58,27 +58,27 @@ describe("diff --data (#6)", () => {
         `)
         const models = [raw, visits, keyless]
         yield* Efmesh.apply("dev", models)
-        // источник дрейфует: v2 подорожал, v3 исчез, появился v4 —
-        // prod собирает УЖЕ другие данные (breaking-правка тут не нужна:
-        // окружения указывают на разные снапшоты одной модели? нет — full
-        // пересобирается только на новый fingerprint, поэтому дрейф ловим
-        // руками по физике prod-снапшота после промоушена)
+        // the source drifts: v2 got pricier, v3 vanished, v4 appeared —
+        // prod builds ALREADY-different data (a breaking edit is not needed
+        // here: do environments point at different snapshots of one model?
+        // no — full rebuilds only on a new fingerprint, so we induce the
+        // drift by hand via the prod snapshot's physical table after promotion)
         yield* Efmesh.apply("prod", models)
-        // окружения указывают на ОДИН снапшот — расхождений быть не должно
+        // the environments point at ONE snapshot — there should be no divergence
         const cleanReport = yield* dataDiffEnvironments("dev", "prod", models)
         expect(cleanReport.models.map((m) => m.model)).toEqual(["med.keyless", "med.visits"])
         const cleanVisits = cleanReport.models.find((m) => m.model === "med.visits")!
         expect(cleanVisits).toMatchObject({ rowsA: 3, rowsB: 3, onlyInA: 0, onlyInB: 0, matched: 3, columns: [] })
 
-        // дрейф: prod-view руками переключается на копию с правками —
-        // так выглядит расхождение окружений, указывающих на разные версии
+        // drift: the prod view is switched by hand to an edited copy —
+        // this is what a divergence of environments pointing at different versions looks like
         yield* engine.execute(`CREATE SCHEMA IF NOT EXISTS prod_phys`)
         yield* engine.execute(`
           CREATE TABLE prod_phys.visits AS SELECT * FROM (VALUES
             ('v1', 'icu', 100), ('v2', 'icu', 250), ('v4', 'surgery', 70)
           ) t(id, dept, cost)
         `)
-        // prod — особый env: его view живут в голой схеме модели (naming.ts)
+        // prod is a special env: its views live in the model's bare schema (naming.ts)
         yield* engine.execute(
           `CREATE OR REPLACE VIEW "med"."visits" AS SELECT * FROM prod_phys.visits`,
         )
@@ -100,7 +100,7 @@ describe("diff --data (#6)", () => {
     expect(counted.onlyInA).toBeUndefined()
   })
 
-  test("выборка md5-бакетов выровнена: сэмпл не рождает ложных only-in", async () => {
+  test("md5-bucket sampling is aligned: the sample does not create false only-in", async () => {
     const report = await scenario(
       Effect.gen(function* () {
         const engine = yield* EngineAdapter
@@ -118,15 +118,15 @@ describe("diff --data (#6)", () => {
     )
     const sampled = report.models.find((m) => m.model === "med.visits")!
     expect(sampled.sampledPercent).toBe(25)
-    expect(sampled.rowsA).toBe(1000) // счётчики строк — полные
-    expect(sampled.onlyInA).toBe(0) // выборка выровнена — пары не теряются
+    expect(sampled.rowsA).toBe(1000) // row counts — full
+    expect(sampled.onlyInA).toBe(0) // the sample is aligned — pairs are not lost
     expect(sampled.onlyInB).toBe(0)
-    expect(sampled.matched).toBeGreaterThan(100) // ~250 при 25%
+    expect(sampled.matched).toBeGreaterThan(100) // ~250 at 25%
     expect(sampled.matched!).toBeLessThan(500)
     expect(sampled.columns).toEqual([])
   })
 
-  test("модель не в обоих окружениях/не в проекте — DataDiffError", async () => {
+  test("a model not in both environments/not in the project — DataDiffError", async () => {
     const failure = await scenario(
       Effect.gen(function* () {
         const engine = yield* EngineAdapter

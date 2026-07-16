@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS locks (
 `
 
 export interface SqliteStateOptions {
-  /** Путь к файлу состояния; по умолчанию in-memory (тесты). */
+  /** Path to the state file; defaults to in-memory (tests). */
   readonly path?: string
 }
 
@@ -78,7 +78,7 @@ const tableExists = (db: Database, name: string): boolean =>
     .query(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?1`)
     .get(name) !== null
 
-/** 0 — стор без таблицы meta (создан до появления версионирования, F0–F3). */
+/** 0 — a store with no meta table (created before versioning existed, F0–F3). */
 const readVersion = (db: Database): number => {
   if (!tableExists(db, "meta")) return 0
   const row = db.query(`SELECT version FROM meta`).get() as { version: number } | null
@@ -86,11 +86,11 @@ const readVersion = (db: Database): number => {
 }
 
 /**
- * Догоняет схему до STATE_VERSION. Версия 1 = базовая раскладка F4,
- * версия 2 = applied_by в журнале планов (F5); ALTER-ы ниже подхватывают
- * сторы, созданные до соответствующих колонок (canonical_ast — F2,
- * orphaned_at/physical_fp — F3, applied_by — F5), — на новом сторе
- * они no-op через try/catch. Будущие версии — новые записи здесь же.
+ * Catches the schema up to STATE_VERSION. Version 1 = base layout F4,
+ * version 2 = applied_by in the plan journal (F5); the ALTERs below pick up
+ * stores created before the corresponding columns existed (canonical_ast —
+ * F2, orphaned_at/physical_fp — F3, applied_by — F5) — on a fresh store
+ * they are a no-op via try/catch. Future versions get new entries right here.
  */
 const applyMigrations = (db: Database): void => {
   db.exec(SCHEMA)
@@ -104,7 +104,7 @@ const applyMigrations = (db: Database): void => {
     try {
       db.exec(alter)
     } catch {
-      // колонка уже есть
+      // column already exists
     }
   }
   db.exec(`CREATE TABLE IF NOT EXISTS meta (version INTEGER NOT NULL)`)
@@ -113,9 +113,9 @@ const applyMigrations = (db: Database): void => {
 }
 
 /**
- * `efmesh migrate`: явное обновление схемы существующего стора.
- * Перед апгрейдом файл копируется в `<path>.backup-v<from>` — откат
- * на старую версию efmesh иначе односторонний (F6).
+ * `efmesh migrate`: an explicit schema upgrade of an existing store.
+ * Before the upgrade, the file is copied to `<path>.backup-v<from>` —
+ * otherwise rolling back to an older efmesh version would be a one-way trip (F6).
  */
 export const migrateSqliteState = (
   options?: SqliteStateOptions,
@@ -157,9 +157,9 @@ export const SqliteStateLive = (
         }),
         (db) => Effect.sync(() => db.close()),
       )
-      // свежий стор бутстрапится на текущую версию; существующий со схемой
-      // старше требует явного `efmesh migrate` — молча менять чужие данные
-      // при открытии нельзя (SPEC §6)
+      // a fresh store bootstraps at the current version; an existing store
+      // with an older schema requires an explicit `efmesh migrate` — silently
+      // rewriting someone else's data on open is not allowed (SPEC §6)
       const fresh = yield* Effect.try({
         try: () => !tableExists(db, "snapshots"),
         catch: (cause) => new StateError({ operation: "open", cause }),
@@ -187,10 +187,10 @@ export const SqliteStateLive = (
           isoNow.pipe(
             Effect.flatMap((now) =>
               attempt("upsertSnapshot", () => {
-                // воскрешение версии (повторный apply старого fingerprint)
-                // снимает сиротство И освежает created_at СРАЗУ: между upsert
-                // и промоушеном janitor не сочтёт её обречённой ни по
-                // orphaned_at, ни по старому created_at (гонка F6)
+                // reviving a version (a repeated apply of an old fingerprint)
+                // clears orphan status AND refreshes created_at IMMEDIATELY: between
+                // the upsert and promotion, the janitor won't judge it doomed by
+                // either orphaned_at or a stale created_at (race, F6)
                 db.query(
                   `INSERT INTO snapshots (name, fingerprint, rendered_sql, canonical_ast, physical_fp, kind, fingerprint_version, created_at)
                    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
@@ -294,9 +294,9 @@ export const SqliteStateLive = (
             Effect.flatMap((now) =>
               attempt("promote", () => {
                 const replace = db.transaction(() => {
-                  // живость снапшотов — в той же транзакции: если janitor
-                  // успел унести версию, промоушен громко падает, а view
-                  // не переключается на снесённую физику (гонка F6)
+                  // snapshot liveness — in the same transaction: if the janitor
+                  // already removed the version, promotion fails loudly, and the
+                  // view never switches to demolished physics (race, F6)
                   const alive = db.query(
                     `SELECT 1 FROM snapshots WHERE name = ?1 AND fingerprint = ?2`,
                   )
@@ -315,9 +315,9 @@ export const SqliteStateLive = (
                   for (const entry of entries) {
                     insert.run(env, entry.name, entry.fingerprint, now)
                   }
-                  // ссылочность меняется только здесь — тут же и учёт сиротства:
-                  // потерявшие последнюю ссылку получают отметку, вернувшиеся
-                  // (откат на старую версию) — теряют её (SPEC §5.4)
+                  // referencing changes only here — so orphan bookkeeping happens
+                  // right here too: those losing their last reference get marked,
+                  // those returning (rollback to an old version) lose the mark (SPEC §5.4)
                   db.query(
                     `UPDATE snapshots SET orphaned_at = ?1
                      WHERE orphaned_at IS NULL
@@ -396,8 +396,8 @@ export const SqliteStateLive = (
                 const now = new Date(nowMs).toISOString()
                 const expires = new Date(nowMs + ttlMs).toISOString()
                 const acquire = db.transaction(() => {
-                  // протухший лок упавшего процесса перехватывается;
-                  // <= — лок, истёкший в момент T, свободен с T (ttl=0 в ту же мс)
+                  // a stale lock from a crashed process is reclaimed;
+                  // <= — a lock that expires at instant T is free as of T (ttl=0 in the same ms)
                   db.query(`DELETE FROM locks WHERE name = ?1 AND expires_at <= ?2`).run(name, now)
                   const result = db
                     .query(

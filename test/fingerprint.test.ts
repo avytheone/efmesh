@@ -37,20 +37,20 @@ const movesOther = defineModel(
   (ctx) => ctx.sql`SELECT case_id, dept FROM src.raw_moves WHERE dept = 'терапия'`,
 )
 
-describe("fingerprint по каноническому AST (SPEC §4)", () => {
-  test("переформатирование и кавычки идентификаторов не меняют fingerprint", async () => {
+describe("fingerprint over the canonical AST (SPEC §4)", () => {
+  test("reformatting and identifier quoting do not change the fingerprint", async () => {
     const ugly = await fingerprintsOf([movesUgly])
     const pretty = await fingerprintsOf([movesPretty])
     expect(ugly.get("med.moves")).toBe(pretty.get("med.moves")!)
   })
 
-  test("смысловая правка меняет fingerprint", async () => {
+  test("a semantic edit changes the fingerprint", async () => {
     const before = await fingerprintsOf([movesPretty])
     const after = await fingerprintsOf([movesOther])
     expect(before.get("med.moves")).not.toBe(after.get("med.moves")!)
   })
 
-  test("external: версия определяется источником", async () => {
+  test("external: the version is determined by the source", async () => {
     const src = (path: string) =>
       defineExternal({
         name: "raw.moves",
@@ -64,7 +64,7 @@ describe("fingerprint по каноническому AST (SPEC §4)", () => {
     expect(a.get("raw.moves")).toBe(a2.get("raw.moves")!)
   })
 
-  test("смена timeColumn — новая версия, смена batchSize — нет", async () => {
+  test("changing timeColumn — a new version, changing batchSize — not", async () => {
     const incremental = (timeColumn: "case_id" | "dept", batchSize: number) =>
       defineModel(
         {

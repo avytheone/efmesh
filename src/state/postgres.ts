@@ -12,11 +12,11 @@ import type {
 import { STATE_VERSION, StateError, StateSchemaError, StateStore } from "./store.ts"
 
 /**
- * State store в Postgres (SPEC §6, F3) — для командной/прод-работы:
- * состояние переживает конкурентные запуски из разных процессов и машин.
- * Схема `efmesh_state`, семантика один в один с bun:sqlite-реализацией;
- * временные метки — ISO UTC текстом (лексикографически сортируемы),
- * как и в SQLite: содержимое стора переносимо между бэкендами.
+ * State store on Postgres (SPEC §6, F3) — for team/production work: state
+ * survives concurrent runs from different processes and machines.
+ * Schema `efmesh_state`, semantics identical to the bun:sqlite implementation;
+ * timestamps are ISO UTC text (lexicographically sortable), same as in
+ * SQLite: the store's contents are portable between backends.
  */
 
 const SCHEMA = `
@@ -75,9 +75,9 @@ CREATE TABLE IF NOT EXISTS efmesh_state.locks (
 `
 
 export interface PostgresStateOptions {
-  /** postgres://… или unix-сокет через ?host=/путь. */
+  /** postgres://… or a unix socket via ?host=/path. */
   readonly url: string
-  /** Размер пула; состоянию хватает пары соединений. */
+  /** Pool size; a couple of connections are enough for state. */
   readonly max?: number
 }
 
@@ -88,7 +88,7 @@ const regclass = async (pool: SQL, table: string): Promise<boolean> => {
   return rows[0]?.r != null
 }
 
-/** 0 — стор без таблицы meta (создан до появления версионирования, F0–F3). */
+/** 0 — a store with no meta table (created before versioning existed, F0–F3). */
 const readVersion = async (pool: SQL): Promise<number> => {
   if (!(await regclass(pool, "meta"))) return 0
   const rows = (await pool.unsafe(
@@ -97,7 +97,7 @@ const readVersion = async (pool: SQL): Promise<number> => {
   return rows[0]?.version ?? 0
 }
 
-/** Догоняет схему до STATE_VERSION (см. sqlite-реализацию — семантика та же). */
+/** Catches the schema up to STATE_VERSION (see the sqlite implementation — same semantics). */
 const applyMigrations = async (pool: SQL): Promise<void> => {
   await pool.unsafe(SCHEMA)
   await pool.unsafe(`
@@ -114,7 +114,7 @@ const applyMigrations = async (pool: SQL): Promise<void> => {
   })
 }
 
-/** `efmesh migrate`: явное обновление схемы существующего стора. */
+/** `efmesh migrate`: an explicit schema upgrade of an existing store. */
 export const migratePostgresState = (
   options: PostgresStateOptions,
 ): Effect.Effect<MigrationReport, StateError> =>
@@ -153,8 +153,8 @@ export const PostgresStateLive = (
         }),
         (pool) => Effect.promise(() => pool.end()).pipe(Effect.ignore),
       )
-      // свежий стор бутстрапится на текущую версию; существующий со схемой
-      // старше требует явного `efmesh migrate` (SPEC §6)
+      // a fresh store bootstraps at the current version; an existing store
+      // with an older schema requires an explicit `efmesh migrate` (SPEC §6)
       const fresh = yield* Effect.tryPromise({
         try: async () => !(await regclass(sql, "snapshots")),
         catch: (cause) => new StateError({ operation: "open", cause }),
@@ -190,7 +190,7 @@ export const PostgresStateLive = (
             Effect.flatMap((now) =>
               attempt("upsertSnapshot", async () => {
                 await sql.unsafe(
-                  // воскрешение снимает сиротство и освежает created_at — как в sqlite (гонка F6)
+                  // reviving clears orphan status and refreshes created_at — same as sqlite (race, F6)
                   `INSERT INTO efmesh_state.snapshots
                      (name, fingerprint, rendered_sql, canonical_ast, physical_fp, kind, fingerprint_version, created_at)
                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -284,8 +284,8 @@ export const PostgresStateLive = (
             Effect.flatMap((now) =>
               attempt("promote", () =>
                 sql.begin(async (tx) => {
-                  // живость снапшотов — в той же транзакции (гонка F6):
-                  // janitor унёс версию → громкая ошибка, view не трогается
+                  // snapshot liveness — in the same transaction (race, F6):
+                  // janitor removed the version → loud error, the view is left alone
                   for (const entry of entries) {
                     if (entry.requireSnapshot !== true) continue
                     const alive = (await tx.unsafe(
@@ -306,7 +306,7 @@ export const PostgresStateLive = (
                       [env, entry.name, entry.fingerprint, now],
                     )
                   }
-                  // учёт сиротства — как в sqlite-реализации (SPEC §5.4)
+                  // orphan bookkeeping — same as the sqlite implementation (SPEC §5.4)
                   await tx.unsafe(
                     `UPDATE efmesh_state.snapshots SET orphaned_at = $1
                      WHERE orphaned_at IS NULL
@@ -387,8 +387,8 @@ export const PostgresStateLive = (
                 sql.begin(async (tx) => {
                   const now = new Date(nowMs).toISOString()
                   const expires = new Date(nowMs + ttlMs).toISOString()
-                  // протухший лок упавшего процесса перехватывается;
-                  // <= — лок, истёкший в момент T, свободен с T
+                  // a stale lock from a crashed process is reclaimed;
+                  // <= — a lock that expires at instant T is free as of T
                   await tx.unsafe(
                     `DELETE FROM efmesh_state.locks WHERE name = $1 AND expires_at <= $2`,
                     [name, now],

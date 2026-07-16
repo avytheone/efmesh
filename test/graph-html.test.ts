@@ -21,7 +21,7 @@ const top = defineModel(
 )
 
 describe("graph --html", () => {
-  test("самодостаточная страница: все узлы, рёбра по deps, слои слева направо", async () => {
+  test("self-contained page: all nodes, edges by deps, layers left to right", async () => {
     const graph = await Effect.runPromise(buildGraph([raw, mid, top]))
     const html = renderGraphHtml(graph)
 
@@ -31,11 +31,11 @@ describe("graph --html", () => {
     }
     expect(html).toContain(`data-from="src.rows" data-to="med.mid"`)
     expect(html).toContain(`data-from="med.mid" data-to="med.top"`)
-    // никаких внешних ресурсов (xmlns-URI неймспейса — не загрузка)
+    // no external resources (the xmlns namespace URI is not a fetch)
     expect(html).not.toContain("<link")
     expect(html).not.toContain("src=")
     expect(html).not.toContain("@import")
-    // родитель левее потомка
+    // the parent is to the left of the child
     const xOf = (name: string): number =>
       Number(html.match(new RegExp(`data-name="${name}" transform="translate\\((\\d+)`))![1])
     expect(xOf("src.rows")).toBeLessThan(xOf("med.mid"))

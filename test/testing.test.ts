@@ -33,7 +33,7 @@ const stays = defineModel(
 )
 
 describe("testModel (SPEC §8)", () => {
-  test("фикстуры → CTE → результат сравнивается", async () => {
+  test("fixtures → CTE → result is compared", async () => {
     await testModel(stays, {
       inputs: {
         [moves.name.full]: [
@@ -48,7 +48,7 @@ describe("testModel (SPEC §8)", () => {
     })
   })
 
-  test("несовпадение — понятная ошибка с обеими сторонами", async () => {
+  test("a mismatch — a clear error with both sides", async () => {
     await expect(
       testModel(stays, {
         inputs: {
@@ -59,7 +59,7 @@ describe("testModel (SPEC §8)", () => {
     ).rejects.toThrow("не совпал с ожиданием")
   })
 
-  test("невалидная по Schema фикстура отвергается", async () => {
+  test("a fixture invalid per Schema is rejected", async () => {
     await expect(
       testModel(stays, {
         inputs: {
@@ -70,7 +70,7 @@ describe("testModel (SPEC §8)", () => {
     ).rejects.toThrow()
   })
 
-  test("отсутствующая фикстура и опечатка в имени — ошибки до запуска", async () => {
+  test("a missing fixture and a typo in the name — errors before the run", async () => {
     await expect(testModel(stays, { expect: [] })).rejects.toThrow("нет фикстуры")
     await expect(
       testModel(stays, {
@@ -80,7 +80,7 @@ describe("testModel (SPEC §8)", () => {
     ).rejects.toThrow("не является источником")
   })
 
-  test("incremental: interval обязателен и фильтрует фикстуры", async () => {
+  test("incremental: interval is required and filters fixtures", async () => {
     const daily = defineModel(
       {
         name: "med.daily",
@@ -108,7 +108,7 @@ describe("testModel (SPEC §8)", () => {
     expect(rows.map((r) => r["case_id"])).toEqual(["in"])
   })
 
-  test("пустая фикстура даёт пустой типизированный вход", async () => {
+  test("an empty fixture yields an empty typed input", async () => {
     await testModel(stays, {
       inputs: { [moves.name.full]: [] },
       expect: [],

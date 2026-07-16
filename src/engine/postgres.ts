@@ -5,17 +5,17 @@ import type { Engine, EngineColumn } from "./adapter.ts"
 import { EngineAdapter, EngineError, SqlParseError } from "./adapter.ts"
 
 /**
- * Postgres-адаптер (SPEC §9.1, F3) поверх встроенного клиента Bun (`Bun.SQL`):
- * пул соединений из коробки — транзакция закрепляется за одним соединением
- * через sql.begin, остальные запросы свободно распределяются по пулу,
- * что и даёт честный параллелизм бэкфилла (SPEC §5.3).
+ * Postgres adapter (SPEC §9.1, F3) over Bun's built-in client (`Bun.SQL`):
+ * a connection pool out of the box — a transaction is pinned to a single
+ * connection via sql.begin, the rest of the queries are distributed freely
+ * across the pool, which is what gives honest backfill parallelism (SPEC §5.3).
  *
- * Канонизация — libpg_query (WASM-сборка парсера самого Postgres, SPEC §9.2):
- * дерево разбора с вычищенными позициями токенов формат-инвариантно,
- * как и json_serialize_sql у DuckDB.
+ * Canonicalization — libpg_query (a WASM build of Postgres's own parser, SPEC
+ * §9.2): the parse tree with token positions stripped is format-invariant,
+ * just like DuckDB's json_serialize_sql.
  */
 
-/** Позиции токенов (location) — единственная формат-зависимость дерева libpg_query. */
+/** Token positions (location) — the only format-dependency of the libpg_query tree. */
 const stripLocations = (value: unknown): unknown => {
   if (Array.isArray(value)) return value.map(stripLocations)
   if (value !== null && typeof value === "object") {
@@ -30,15 +30,15 @@ const stripLocations = (value: unknown): unknown => {
 }
 
 /**
- * Канонизация Postgres-SQL — чистая (libpg_query, сервер не нужен);
- * вынесена из Layer, чтобы golden-тесты могли заморозить канон
- * независимо от пула (SPEC §4: канонизация = контракт fingerprint).
+ * Postgres-SQL canonicalization is pure (libpg_query, no server needed);
+ * lifted out of the Layer so golden tests can freeze the canon independently
+ * of the pool (SPEC §4: canonicalization = the fingerprint contract).
  */
 export const canonicalizePostgresSql = (
   sqlText: string,
 ): Effect.Effect<string, SqlParseError> => {
-  // $start/$end канонического рендера — не синтаксис Postgres;
-  // детерминированная замена на $1/$2 сохраняет стабильность fingerprint
+  // $start/$end of the canonical render are not Postgres syntax;
+  // a deterministic replacement with $1/$2 keeps the fingerprint stable
   const parameterized = sqlText.replace(/\$start\b/g, "$1").replace(/\$end\b/g, "$2")
   return Effect.tryPromise({
     try: () => parse(parameterized),
@@ -51,9 +51,9 @@ export const canonicalizePostgresSql = (
 }
 
 export interface PostgresEngineOptions {
-  /** postgres://… или unix-сокет через ?host=/путь. */
+  /** postgres://… or a unix socket via ?host=/path. */
   readonly url: string
-  /** Размер пула соединений; по умолчанию 8. */
+  /** Connection pool size; by default 8. */
   readonly max?: number
 }
 
@@ -89,8 +89,8 @@ export const PostgresEngineLive = (
               }),
             catch: (cause) => new EngineError({ sql: statements.join(";\n"), cause }),
           }).pipe(Effect.asVoid),
-        // DESCRIBE у Postgres нет: временный view на одном соединении
-        // (sql.begin) даёт имена и типы из каталога без выполнения запроса
+        // Postgres has no DESCRIBE: a temporary view on a single connection
+        // (sql.begin) gives names and types from the catalog without running the query
         describe: (sqlText) =>
           Effect.tryPromise({
             try: () =>

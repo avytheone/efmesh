@@ -1,24 +1,24 @@
 /**
- * Объяснение категоризации (#4, SPEC §5.2): `plan --explain` показывает,
- * КАКИЕ узлы канонического AST разошлись и почему категория именно такая.
- * Пути идут по дереву канона движка (json_serialize_sql у DuckDB,
- * libpg_query у Postgres) — это отладочная подсказка, а не контракт:
- * форма путей меняется вместе с каноном и semver-события не образует.
- * Категорию считает categorize.ts; здесь — только её обоснование.
+ * Categorization explanation (#4, SPEC §5.2): `plan --explain` shows WHICH
+ * nodes of the canonical AST diverged and why the category is what it is.
+ * Paths follow the engine's canon tree (json_serialize_sql on DuckDB,
+ * libpg_query on Postgres) — this is a debugging hint, not a contract:
+ * the shape of the paths moves with the canon and is not a semver event.
+ * The category itself is computed by categorize.ts; here — only its rationale.
  */
 
 import { topSelect } from "./categorize.ts"
 
 export interface ChangeExplanation {
-  /** Пути разошедшихся узлов канонического AST (не больше MAX_DIVERGED). */
+  /** Paths of diverged canonical-AST nodes (no more than MAX_DIVERGED). */
   readonly diverged: ReadonlyArray<string>
-  /** Почему категория именно такая. */
+  /** Why the category is what it is. */
   readonly reason: string
-  /** Изменившиеся прямые родители — источник каскада indirect/forward-only. */
+  /** Changed direct parents — the source of the indirect/forward-only cascade. */
   readonly cascadeFrom?: ReadonlyArray<string>
 }
 
-/** Дальше точечные пути перестают помогать — лучше открыть render/diff. */
+/** Beyond this, pointwise paths stop helping — better to open render/diff. */
 const MAX_DIVERGED = 8
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -42,7 +42,7 @@ const walk = (before: unknown, after: unknown, path: string, out: Array<string>)
     return
   }
   if (isRecord(before) && isRecord(after)) {
-    // узел заменён выражением другого типа — точечные пути внутри бессмысленны
+    // node replaced by an expression of another type — pointwise paths inside are meaningless
     if (before["type"] !== after["type"]) {
       out.push(path === "" ? "(корень)" : path)
       return
@@ -54,12 +54,12 @@ const walk = (before: unknown, after: unknown, path: string, out: Array<string>)
   out.push(path === "" ? "(корень)" : path)
 }
 
-/** Служебная обёртка стейтмента в пути не интересна — режем до тела запроса. */
+/** The statement's boilerplate wrapper in the path is uninteresting — trim to the query body. */
 const trimStatement = (path: string): string =>
   path.replace(/^statements\[0\]\.node\.?/, "").replace(/^stmts\[0\]\.stmt\.?/, "") ||
   "(корень)"
 
-/** Пути расхождения двух канонических AST (JSON-строки); мусор на входе — пусто. */
+/** Divergence paths of two canonical ASTs (JSON strings); garbage input — empty. */
 export const divergedPaths = (oldAst: string, newAst: string): ReadonlyArray<string> => {
   try {
     const out: Array<string> = []
@@ -71,10 +71,10 @@ export const divergedPaths = (oldAst: string, newAst: string): ReadonlyArray<str
 }
 
 /**
- * Гвардрейл override'а (#5): в новом верхнем SELECT колонок меньше — они
- * удалены, потомки читают их по именам, «non-breaking» очевидно противоречит
- * AST. Непарсибельный канон противоречием не считается: решение — за
- * оператором, override явный и журналируется.
+ * Override guardrail (#5): the new top SELECT has fewer columns — they were
+ * removed, descendants read them by name, so «non-breaking» plainly contradicts
+ * the AST. An unparseable canon does not count as a contradiction: the decision
+ * is the operator's, the override is explicit and journaled.
  */
 export const dropsColumns = (oldAst: string, newAst: string): boolean => {
   const before = topSelect(oldAst)
@@ -84,8 +84,8 @@ export const dropsColumns = (oldAst: string, newAst: string): boolean => {
 }
 
 /**
- * Обоснование вердикта categorizeAstChange теми же правилами, которыми он
- * вынесен (SPEC §5.2): non-breaking — только суффикс верхнего SELECT.
+ * Justifies the categorizeAstChange verdict by the same rules that produced
+ * it (SPEC §5.2): non-breaking — only a suffix of the top SELECT.
  */
 export const explainCategorized = (
   oldAst: string,

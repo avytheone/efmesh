@@ -9,12 +9,12 @@ import { viewRef } from "./naming.ts"
 import { StateStore } from "../state/store.ts"
 import type { StateError } from "../state/store.ts"
 
-/** Чем окружения отличаются (SPEC §11: `efmesh diff <envA> <envB>`). */
+/** How two environments differ (SPEC §11: `efmesh diff <envA> <envB>`). */
 export interface EnvDiff {
-  /** Модель есть только в A. */
+  /** Model present only in A. */
   readonly onlyInA: ReadonlyArray<string>
   readonly onlyInB: ReadonlyArray<string>
-  /** Разные версии: имя + fp8 обеих сторон. */
+  /** Differing versions: name + fp8 of both sides. */
   readonly different: ReadonlyArray<{ readonly name: string; readonly a: string; readonly b: string }>
   readonly same: ReadonlyArray<string>
 }
@@ -43,38 +43,38 @@ export const diffEnvironments = (
   })
 
 /**
- * Сравнение ДАННЫХ двух окружений (#6, класс table_diff sqlmesh): счётчики
- * строк, пересечение по ключу, помодельные доли расхождений по колонкам —
- * между view-слоями A и B одной базы. На DuckDB-классе данных это дёшево;
- * для больших таблиц — детерминированная выборка по md5 ключа: обе стороны
- * фильтруются одинаковыми бакетами, поэтому выборка выровнена и пары
- * ключей не теряются.
+ * DATA comparison of two environments (#6, sqlmesh's table_diff class): row
+ * counts, intersection by key, per-model column-mismatch rates — between the
+ * A and B view-layers of one database. On DuckDB-class data this is cheap;
+ * for large tables — a deterministic sample by md5 of the key: both sides are
+ * filtered by the same buckets, so the sample is aligned and key pairs are
+ * not lost.
  */
 
 export interface ColumnDrift {
   readonly column: string
-  /** Сколько сопоставленных ключей разошлись в этой колонке. */
+  /** How many matched keys diverged in this column. */
   readonly mismatches: number
-  /** Доля от matched, 0..1. */
+  /** Fraction of matched, 0..1. */
   readonly rate: number
 }
 
 export interface ModelDataDiff {
   readonly model: string
-  /** Полные счётчики строк (не задеты выборкой). */
+  /** Full row counts (not affected by sampling). */
   readonly rowsA: number
   readonly rowsB: number
-  /** Ключ сопоставления: grain или ключ вида (uniqueKey/scdType2). */
+  /** Matching key: grain or a kind's key (uniqueKey/scdType2). */
   readonly key?: ReadonlyArray<string>
-  /** Дальше — только при ключе; при выборке счётчики по выбранным бакетам. */
+  /** Below — only when there is a key; under sampling, counts over selected buckets. */
   readonly onlyInA?: number
   readonly onlyInB?: number
   readonly matched?: number
   readonly columns?: ReadonlyArray<ColumnDrift>
-  /** Колонки только одной стороны — дрейф схемы между окружениями. */
+  /** Columns present on only one side — schema drift between environments. */
   readonly columnsOnlyInA?: ReadonlyArray<string>
   readonly columnsOnlyInB?: ReadonlyArray<string>
-  /** Процент md5-бакетов ключа в сравнении; нет поля — сравнение полное. */
+  /** Percentage of the key's md5 buckets compared; no field — full comparison. */
   readonly sampledPercent?: number
 }
 
@@ -85,9 +85,9 @@ export interface DataDiffReport {
 }
 
 export interface DataDiffOptions {
-  /** Только эти модели; по умолчанию — все материализуемые из обоих окружений. */
+  /** Only these models; by default — all materializable ones from both environments. */
   readonly models?: ReadonlyArray<string>
-  /** 1–99: сравнивать долю ключей (md5-бакеты, выровнено между сторонами). */
+  /** 1–99: compare a fraction of keys (md5 buckets, aligned across sides). */
   readonly samplePercent?: number
 }
 
@@ -96,7 +96,7 @@ export class DataDiffError extends Data.TaggedError("DataDiffError")<{
   readonly reason: string
 }> {}
 
-/** Виды с view-слоем в окружении — их данные есть с чем сравнивать. */
+/** Kinds with a view-layer in the environment — their data is comparable. */
 const COMPARABLE_KINDS: ReadonlySet<string> = new Set([
   "full",
   "view",
@@ -115,9 +115,9 @@ const keyOf = (model: AnyModel): ReadonlyArray<string> | undefined => {
 }
 
 /**
- * Детерминированный фильтр выборки: md5 от склейки ключа, первые два
- * hex-символа = 256 бакетов. Работает и на DuckDB, и на Postgres,
- * одинаково на обеих сторонах diff'а.
+ * Deterministic sampling filter: md5 of the concatenated key, first two
+ * hex chars = 256 buckets. Works on both DuckDB and Postgres, identically
+ * on both sides of the diff.
  */
 const samplePredicate = (key: ReadonlyArray<string>, percent: number): string => {
   const buckets = Math.max(1, Math.min(255, Math.floor((256 * percent) / 100)))
@@ -173,8 +173,8 @@ export const dataDiffEnvironments = (
         (yield* engine.query(`SELECT count(*) AS n FROM ${refB}`))[0]?.["n"],
       )
 
-      // реальные колонки обеих сторон: окружения могут указывать на разные
-      // версии модели — сравниваются только общие, дрейф схемы фиксируется
+      // actual columns of both sides: environments may point at different
+      // model versions — only common ones are compared, schema drift is recorded
       const colsA = (yield* engine.describe(`SELECT * FROM ${refA}`)).map((c) => c.name)
       const colsB = (yield* engine.describe(`SELECT * FROM ${refB}`)).map((c) => c.name)
       const setB = new Set(colsB)
@@ -186,8 +186,8 @@ export const dataDiffEnvironments = (
       const key = keyOf(model)
       const commonSet = new Set(common)
       if (key === undefined || !key.every((column) => commonSet.has(column))) {
-        // сопоставлять нечем (нет grain/ключа или ключ не на обеих сторонах) —
-        // честные счётчики строк без пары
+        // nothing to match on (no grain/key, or the key is not on both sides) —
+        // honest row counts without pairing
         reports.push({
           model: name,
           rowsA,

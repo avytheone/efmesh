@@ -23,7 +23,7 @@ const freshDucklake = () => {
   return { catalog: join(dir, "catalog.sqlite"), dataPath: join(dir, "data") }
 }
 
-/** Таблицы, физически живущие в DuckLake-каталоге. */
+/** Tables physically living in the DuckLake catalog. */
 const lakeTables = (engine: {
   readonly query: (sql: string) => Effect.Effect<ReadonlyArray<Record<string, unknown>>, unknown>
 }) =>
@@ -34,7 +34,7 @@ const lakeTables = (engine: {
     .pipe(Effect.map((rows) => rows.map((row) => String(row["table_name"]))))
 
 describe("target: ducklake (SPEC §14.5)", () => {
-  test("full: физика в каталоге, view поверх, в _efmesh таблицы нет", async () => {
+  test("full: physical table in the catalog, view on top, no table in _efmesh", async () => {
     const ducklake = freshDucklake()
     await scenario(
       Effect.gen(function* () {
@@ -52,7 +52,7 @@ describe("target: ducklake (SPEC §14.5)", () => {
         expect(applied.built).toEqual(["med.totals"])
         expect(yield* engine.query(`SELECT n FROM dev__med.totals`)).toEqual([{ n: 42 }])
         expect(yield* lakeTables(engine)).toEqual([expect.stringMatching(/^med__totals__/)])
-        // в нативной физике этой модели нет
+        // this model has no native physical table
         const native = yield* engine.query(
           `SELECT table_name FROM duckdb_tables() WHERE schema_name = '_efmesh'`,
         )
@@ -61,7 +61,7 @@ describe("target: ducklake (SPEC §14.5)", () => {
     )
   })
 
-  test("инкрементальная модель: бэкфилл DELETE+INSERT работает в каталоге", async () => {
+  test("incremental model: DELETE+INSERT backfill works in the catalog", async () => {
     const ducklake = freshDucklake()
     await scenario(
       Effect.gen(function* () {
@@ -98,14 +98,14 @@ describe("target: ducklake (SPEC §14.5)", () => {
         yield* Efmesh.apply("dev", [raw, events], { ducklake, now: jan3 })
         const rows = yield* engine.query(`SELECT count(*)::INT AS n FROM dev__med.events`)
         expect(rows).toEqual([{ n: 2 }])
-        // идемпотентность: интервалы done, второй apply ничего не делает
+        // idempotency: intervals are done, the second apply does nothing
         const again = yield* Efmesh.apply("dev", [raw, events], { ducklake, now: jan3 })
         expect(again.plan.hasChanges).toBe(false)
       }),
     )
   })
 
-  test("без конфига каталога — DucklakeNotConfiguredError до любых действий", async () => {
+  test("without a catalog config — DucklakeNotConfiguredError before any actions", async () => {
     await scenario(
       Effect.gen(function* () {
         const totals = defineModel(
@@ -123,7 +123,7 @@ describe("target: ducklake (SPEC §14.5)", () => {
     )
   })
 
-  test("janitor сносит осиротевшую таблицу из каталога", async () => {
+  test("janitor removes an orphaned table from the catalog", async () => {
     const ducklake = freshDucklake()
     await scenario(
       Effect.gen(function* () {

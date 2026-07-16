@@ -10,9 +10,9 @@ import {
 } from "../src/plan/schedule.ts"
 
 /**
- * #10: efmesh schedule. Регистрация в OS-шедулере в тестах не гоняется
- * (она мутирует crontab машины) — проверяются чистые части: заголовок,
- * воркер, systemd-фоллбэк, валидация выражений парсером Bun.cron.
+ * #10: efmesh schedule. Registration in the OS scheduler is not exercised in
+ * tests (it mutates the machine's crontab) — the pure parts are checked: the
+ * title, the worker, the systemd fallback, expression validation via Bun.cron.
  */
 
 const target = {
@@ -22,14 +22,14 @@ const target = {
 }
 
 describe("efmesh schedule (#10)", () => {
-  test("заголовок Bun.cron: только [A-Za-z0-9_-], проект и окружение внутри", () => {
+  test("Bun.cron title: only [A-Za-z0-9_-], project and environment inside", () => {
     expect(scheduleTitle(target)).toBe("efmesh-my-warehouse-prod")
     expect(scheduleTitle({ project: "/x/жёсткий.проект", env: "dev/eu" })).toBe(
       "efmesh----------------dev-eu",
     )
   })
 
-  test("воркер: абсолютные пути, bin этого пакета, exit-код тика доносится", () => {
+  test("worker: absolute paths, this package's bin, the tick exit code is propagated", () => {
     const source = workerSource(target)
     expect(source).toContain(`"run", "prod"`)
     expect(source).toContain(JSON.stringify(target.config))
@@ -39,7 +39,7 @@ describe("efmesh schedule (#10)", () => {
     expect(workerPath(target)).toBe("/data/my warehouse/.efmesh/schedule-prod.ts")
   })
 
-  test("systemd-фоллбэк: oneshot, Persistent=true, никнеймы переведены", () => {
+  test("systemd fallback: oneshot, Persistent=true, nicknames translated", () => {
     expect(cronToOnCalendar("@hourly")).toBe("hourly")
     expect(cronToOnCalendar("@midnight")).toBe("daily")
     expect(cronToOnCalendar("*/5 * * * *")).toBeUndefined()
@@ -49,11 +49,11 @@ describe("efmesh schedule (#10)", () => {
     expect(units.service).toContain("run prod --config /data/my warehouse/efmesh.config.ts")
     expect(units.timer).toContain("OnCalendar=daily")
     expect(units.timer).toContain("Persistent=true")
-    // произвольный cron не переводится молча — TODO прямо в юните
+    // an arbitrary cron is not translated silently — a TODO right in the unit
     expect(systemdUnits(target, "*/5 * * * *").timer).toContain("TODO")
   })
 
-  test("валидация выражений — парсером Bun.cron", async () => {
+  test("expression validation — via the Bun.cron parser", async () => {
     await Effect.runPromise(validateCron("@hourly"))
     await Effect.runPromise(validateCron("*/15 9-17 * * MON-FRI"))
     const failure = await Effect.runPromise(Effect.flip(validateCron("каждый час")))

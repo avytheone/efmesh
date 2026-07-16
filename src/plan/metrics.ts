@@ -1,6 +1,6 @@
 import { Metric } from "effect"
 
-/** Наблюдаемость из коробки (SPEC §10): счётчики конвейера. */
+/** Observability out of the box (SPEC §10): pipeline counters. */
 export const intervalsDone = Metric.counter("efmesh_intervals_done_total", {
   description: "Сколько интервалов досчитано и помечено done",
 })

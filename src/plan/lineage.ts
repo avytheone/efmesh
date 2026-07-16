@@ -6,12 +6,12 @@ import { EngineAdapter } from "../engine/adapter.ts"
 import { canonicalSql } from "./fingerprint.ts"
 
 /**
- * Колоночный lineage (SPEC §9.4): цепочка от колонки модели до сырьевых
- * колонок external/seed-моделей. Точность best-effort — выражение колонки
- * берётся из канонического AST (родной парсер движка), ссылки на колонки
- * сопоставляются схемам родителей по имени, квалификаторы и алиасы CTE
- * не разворачиваются. Граф моделей при этом точен всегда: зависимости
- * известны из `ctx.ref`, не из парсинга текста.
+ * Column-level lineage (SPEC §9.4): the chain from a model's column down to
+ * the raw columns of external/seed models. Precision is best-effort — a
+ * column's expression is taken from the canonical AST (the engine's native
+ * parser), column references are matched to parents' schemas by name,
+ * qualifiers and CTE aliases are not resolved. The model graph itself is
+ * always exact: dependencies are known from `ctx.ref`, not from text parsing.
  */
 
 export class LineageError extends Data.TaggedError("LineageError")<{
@@ -22,12 +22,12 @@ export class LineageError extends Data.TaggedError("LineageError")<{
 export interface LineageNode {
   readonly model: string
   readonly column: string
-  /** Вид модели — external/seed являются листьями (сырьё). */
+  /** Model kind — external/seed are leaves (raw sources). */
   readonly kind: string
   readonly sources: ReadonlyArray<LineageNode>
 }
 
-/** Все COLUMN_REF в поддереве выражения — имена колонок без квалификаторов. */
+/** All COLUMN_REFs in the expression subtree — column names without qualifiers. */
 const collectColumnRefs = (node: unknown, out: Set<string>): void => {
   if (Array.isArray(node)) {
     for (const item of node) collectColumnRefs(item, out)
@@ -49,9 +49,9 @@ const selectItems = (ast: unknown): ReadonlyArray<Record<string, unknown>> => {
 }
 
 /**
- * Колонки, от которых зависит `column` в select_list: выражение с алиасом
- * или одноимённый COLUMN_REF; `SELECT *` — сквозной проброс имени.
- * undefined — выражение колонки не найдено (движковый сахар) — best-effort.
+ * The columns `column` depends on in select_list: an aliased expression or a
+ * same-named COLUMN_REF; `SELECT *` — a pass-through of the name.
+ * undefined — the column's expression was not found (engine sugar) — best-effort.
  */
 const sourceColumnsOf = (ast: unknown, column: string): ReadonlySet<string> | undefined => {
   const items = selectItems(ast)
@@ -115,7 +115,7 @@ export const lineage = (
           kind: model.kind._tag,
           sources: [],
         }
-        // сырьё: дальше цепочка упирается во внешний мир
+        // raw source: beyond here the chain hits the outside world
         if (model.kind._tag === "external" || model.kind._tag === "seed" || model.deps.size === 0) {
           return leaf
         }
@@ -134,7 +134,7 @@ export const lineage = (
     return yield* trace(root, column)
   })
 
-/** Плоская печать lineage-дерева для CLI. */
+/** Flat printout of the lineage tree for the CLI. */
 export const formatLineage = (node: LineageNode, indent = ""): ReadonlyArray<string> => {
   const marker =
     node.kind === "external" || node.kind === "seed" ? `  [${node.kind}]` : ""

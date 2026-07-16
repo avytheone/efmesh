@@ -3,14 +3,14 @@ import type { AnyModel } from "../core/model.ts"
 import type { Engine, EngineError } from "../engine/adapter.ts"
 
 /**
- * Контракт схемы (SPEC §3.2): объявленная Schema — не документация.
- * Перед сборкой снапшота efmesh делает DESCRIBE запроса (движок отдаёт
- * имена и типы, не выполняя его) и сверяет с объявлением. Дрейф типов
- * ловится до бэкфилла, а не после.
+ * Schema contract (SPEC §3.2): the declared Schema is not documentation.
+ * Before building a snapshot efmesh runs a DESCRIBE of the query (the engine
+ * returns names and types without executing it) and checks it against the
+ * declaration. Type drift is caught before the backfill, not after.
  *
- * Сверка по семействам типов: точное соответствие TS-типов типам движка
- * невозможно (Number — это и INTEGER, и DOUBLE), а имена проверяются
- * строго. Nullability DESCRIBE не отдаёт — это территория аудитов (§14.2).
+ * Checked by type families: an exact match of TS types to engine types is
+ * impossible (Number is both INTEGER and DOUBLE), while names are checked
+ * strictly. DESCRIBE does not report nullability — that is audit territory (§14.2).
  */
 
 export class SchemaMismatchError extends Data.TaggedError("SchemaMismatchError")<{
@@ -20,7 +20,7 @@ export class SchemaMismatchError extends Data.TaggedError("SchemaMismatchError")
 
 export type TypeFamily = "text" | "numeric" | "boolean" | "temporal" | "any"
 
-/** Семейство, ожидаемое от поля Effect Schema (по AST). Реюз: testModel рендерит фикстуры по нему. */
+/** Family expected from an Effect Schema field (by AST). Reuse: testModel renders fixtures from it. */
 export const familyOfAst = (ast: unknown): TypeFamily => {
   const node = ast as {
     readonly _tag: string
@@ -40,7 +40,7 @@ export const familyOfAst = (ast: unknown): TypeFamily => {
       return constructorTag.startsWith("effect/DateTime") ? "temporal" : "any"
     }
     case "Union": {
-      // NullOr(X) и подобные: единственное распознанное семейство среди членов
+      // NullOr(X) and the like: the single recognized family among the members
       const families = new Set(
         (node.types ?? [])
           .map(familyOfAst)
@@ -53,7 +53,7 @@ export const familyOfAst = (ast: unknown): TypeFamily => {
   }
 }
 
-/** Семейство фактического типа DuckDB из DESCRIBE. */
+/** Family of an actual DuckDB type from DESCRIBE. */
 const familyOfEngineType = (engineType: string): TypeFamily => {
   const base = engineType.toUpperCase()
   if (base === "VARCHAR" || base.startsWith("VARCHAR(")) return "text"
@@ -69,11 +69,11 @@ const familyOfEngineType = (engineType: string): TypeFamily => {
 }
 
 /**
- * Сверяет объявленную схему модели с фактическим результатом запроса.
- * `renderedSql` — исполнимый рендер тела (ссылки уже в физике/источниках).
- * `managed` — колонки, которые efmesh ведёт сам (scdType2: valid_from/
- * valid_to): в схеме объявлены — потребители их видят, — но запрос
- * их не возвращает.
+ * Checks the model's declared schema against the query's actual result.
+ * `renderedSql` — the executable render of the body (references already point
+ * at physical storage/sources). `managed` — columns efmesh maintains itself
+ * (scdType2: valid_from/valid_to): declared in the schema — consumers see
+ * them — but the query does not return them.
  */
 export const checkContract = (
   engine: Engine,

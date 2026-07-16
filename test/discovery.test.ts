@@ -4,7 +4,7 @@ import { join } from "node:path"
 import { Effect } from "effect"
 import { discoverModels } from "../src/discovery.ts"
 
-// временная директория ВНУТРИ репо: иначе bun не резолвит "effect" из файлов
+// a temp directory INSIDE the repo: otherwise bun does not resolve "effect" from the files
 const root = mkdtempSync(join(import.meta.dir, "..", "efmesh-discovery-test-"))
 const srcIndex = join(import.meta.dir, "..", "src", "index.ts")
 
@@ -48,20 +48,20 @@ write(
   `export const notDiscovered = true\n`,
 )
 
-describe("discovery моделей по glob (SPEC §12)", () => {
-  test("собирает экспорты-модели по маске, не-модели и реэкспорты не мешают", async () => {
+describe("model discovery by glob (SPEC §12)", () => {
+  test("collects model exports by mask, non-models and re-exports do not interfere", async () => {
     const models = await Effect.runPromise(discoverModels("models/**/*.ts", root))
     expect(models.map((model) => model.name.full).sort()).toEqual(["med.moves", "raw.moves"])
   })
 
-  test("несколько масок объединяются, файл вне масок не участвует", async () => {
+  test("multiple masks are merged, a file outside the masks does not participate", async () => {
     const models = await Effect.runPromise(
       discoverModels(["models/*.ts", "models/med/*.ts"], root),
     )
     expect(models.map((model) => model.name.full).sort()).toEqual(["med.moves", "raw.moves"])
   })
 
-  test("два разных определения с одним именем — ошибка загрузки", async () => {
+  test("two different definitions with one name — a load error", async () => {
     write(
       "models/dup.ts",
       `import { Schema } from "effect"

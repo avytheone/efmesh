@@ -41,22 +41,22 @@ const seedSource = Effect.gen(function* () {
   )
 })
 
-describe("efmesh status + журнал тиков (#1, #2)", () => {
-  test("несуществующее окружение — models: 0, без ошибок", async () => {
+describe("efmesh status + tick journal (#1, #2)", () => {
+  test("a nonexistent environment — models: 0, no errors", async () => {
     const report = await scenario(environmentStatus("dev", [raw, events]))
     expect(report.models).toBe(0)
     expect(report.promotedAt).toBeNull()
     expect(report.lastPlan).toBeNull()
   })
 
-  test("журнал: ok-тик с собранными моделями; awaiting-human при изменениях", async () => {
+  test("journal: an ok tick with the built models; awaiting-human on changes", async () => {
     await scenario(
       Effect.gen(function* () {
         const store = yield* StateStore
         yield* seedSource
         const models = [raw, events]
 
-        // изменения не применены — run отказывается И журналирует awaiting-human
+        // changes not applied — run refuses AND journals awaiting-human
         yield* Effect.flip(run("dev", models, { now: fromIso("2026-01-02T00:00:00Z") }))
         let ticks = yield* store.listRuns("dev", 10)
         expect(ticks.map((t) => t.outcome)).toEqual(["awaiting-human"])
@@ -65,7 +65,7 @@ describe("efmesh status + журнал тиков (#1, #2)", () => {
         yield* Efmesh.apply("dev", models, { now: fromIso("2026-01-02T00:00:00Z") })
         yield* run("dev", models, { now: fromIso("2026-01-03T00:00:00Z") })
         ticks = yield* store.listRuns("dev", 10)
-        // свежие первыми
+        // newest first
         expect(ticks.map((t) => t.outcome)).toEqual(["ok", "awaiting-human"])
         expect(JSON.parse(ticks[0]!.detail)).toEqual(["med.events"])
         expect(ticks[0]!.finishedAt >= ticks[0]!.startedAt).toBe(true)
@@ -73,14 +73,14 @@ describe("efmesh status + журнал тиков (#1, #2)", () => {
     )
   })
 
-  test("status: отставание, догнанность и последний план", async () => {
+  test("status: lag, being caught up, and the last plan", async () => {
     await scenario(
       Effect.gen(function* () {
         yield* seedSource
         const models = [raw, events]
         yield* Efmesh.apply("dev", models, { now: fromIso("2026-01-02T00:00:00Z") })
 
-        // «сейчас» уехало на 3 дня вперёд — модель отстаёт на 2 суточных интервала
+        // "now" moved 3 days ahead — the model lags by 2 daily intervals
         const behind = yield* environmentStatus("dev", models, {
           now: fromIso("2026-01-04T00:00:00Z"),
         })
@@ -96,7 +96,7 @@ describe("efmesh status + журнал тиков (#1, #2)", () => {
           },
         ])
 
-        // run догнал — отставание нулевое, тик в отчёте
+        // run caught up — lag is zero, the tick is in the report
         yield* run("dev", models, { now: fromIso("2026-01-04T00:00:00Z") })
         const caught = yield* environmentStatus("dev", models, {
           now: fromIso("2026-01-04T00:00:00Z"),

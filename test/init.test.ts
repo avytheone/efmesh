@@ -10,7 +10,7 @@ import { scaffold } from "../src/init.ts"
 import { SqliteStateLive } from "../src/state/sqlite.ts"
 
 describe("efmesh init (SPEC §12, F4)", () => {
-  test("скаффолд создаёт проект, повторный init — честная ошибка", async () => {
+  test("scaffold creates a project, a repeated init — an honest error", async () => {
     const dir = mkdtempSync(join(tmpdir(), "efmesh-init-"))
     const created = await Effect.runPromise(scaffold(dir))
     expect(created).toEqual(["efmesh.config.ts", "models.ts", "seeds/departments.csv"])
@@ -20,13 +20,13 @@ describe("efmesh init (SPEC §12, F4)", () => {
     expect(again._tag).toBe("InitError")
   })
 
-  test("скаффолд-проект живой: plan → apply проходят", async () => {
-    // внутри репозитория — чтобы import "effect" резолвился через node_modules
+  test("scaffolded project is alive: plan → apply pass", async () => {
+    // inside the repository — so that import "effect" resolves via node_modules
     const dir = mkdtempSync(join(import.meta.dir, "..", "efmesh-init-test-"))
     try {
       await Effect.runPromise(scaffold(dir))
-      // в скаффолде импорт из пакета «efmesh» и относительный путь seed —
-      // для прогона из теста подменяем на локальный src и абсолютный путь
+      // the scaffold imports from the «efmesh» package and a relative seed path —
+      // to run from the test we swap them for the local src and an absolute path
       const models = readFileSync(join(dir, "models.ts"), "utf8")
         .replaceAll(`"@avytheone/efmesh"`, `"${join(import.meta.dir, "../src/index.ts")}"`)
         .replaceAll(`"seeds/departments.csv"`, `"${join(dir, "seeds/departments.csv")}"`)

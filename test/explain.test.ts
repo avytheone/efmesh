@@ -9,9 +9,9 @@ import type { StateStore } from "../src/state/store.ts"
 import type { PlanAction } from "../src/plan/planner.ts"
 
 /**
- * #4: plan --explain. Категорию замораживает categorize.test.ts; здесь —
- * что к каждой категории приложено правдивое обоснование: КАКИЕ узлы
- * канонического AST разошлись и откуда каскад.
+ * #4: plan --explain. The category is frozen by categorize.test.ts; here —
+ * that each category comes with a truthful justification: WHICH nodes of the
+ * canonical AST diverged and where the cascade came from.
  */
 
 const testLayer = Layer.mergeAll(DuckDBEngineLive(), SqliteStateLive())
@@ -51,7 +51,7 @@ const actionsAfter = async (
   )
 
 describe("plan --explain (#4)", () => {
-  test("суффикс SELECT: non-breaking, разошёлся только хвост списка", async () => {
+  test("SELECT suffix: non-breaking, only the tail of the list diverged", async () => {
     const widened = defineModel(
       {
         name: "med.src",
@@ -66,7 +66,7 @@ describe("plan --explain (#4)", () => {
     expect(action.explain?.diverged).toEqual(["select_list[2] (добавлен)"])
   })
 
-  test("правка выражения колонки: breaking, путь указывает в её значение", async () => {
+  test("editing a column expression: breaking, the path points into its value", async () => {
     const reworked = defineModel(
       {
         name: "med.src",
@@ -83,7 +83,7 @@ describe("plan --explain (#4)", () => {
     ).toBe(true)
   })
 
-  test("удаление колонки: breaking с причиной про удаление", async () => {
+  test("dropping a column: breaking with a reason about the removal", async () => {
     const dropped = defineModel(
       {
         name: "med.src",
@@ -98,7 +98,7 @@ describe("plan --explain (#4)", () => {
     expect(action.explain?.diverged).toContain("select_list[1] (удалён)")
   })
 
-  test("правка WHERE: breaking, дерево разошлось вне списка SELECT", async () => {
+  test("editing WHERE: breaking, the tree diverged outside the SELECT list", async () => {
     const filtered = defineModel(
       {
         name: "med.src",
@@ -115,7 +115,7 @@ describe("plan --explain (#4)", () => {
     ).toBe(true)
   })
 
-  test("потомок с нетронутым телом: indirect с cascadeFrom на родителя", async () => {
+  test("a child with an untouched body: indirect with cascadeFrom pointing at the parent", async () => {
     const filtered = defineModel(
       {
         name: "med.src",
@@ -132,7 +132,7 @@ describe("plan --explain (#4)", () => {
     expect(action.explain?.reason).toContain("med.src")
   })
 
-  test("смена метаданных (grain): indirect с причиной про метаданные", async () => {
+  test("a metadata change (grain): indirect with a reason about metadata", async () => {
     const regrained = defineModel(
       {
         name: "med.src",
@@ -148,7 +148,7 @@ describe("plan --explain (#4)", () => {
     expect(action.explain?.reason).toContain("метаданные")
   })
 
-  test("unchanged и added — без explain (сравнивать не с чем)", async () => {
+  test("unchanged and added — no explain (nothing to compare against)", async () => {
     const actions = await actionsAfter([src], [src, consumerOf(src)])
     expect(actions.get("med.src")!.change).toBe("unchanged")
     expect(actions.get("med.src")!.explain).toBeUndefined()

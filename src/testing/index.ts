@@ -7,22 +7,22 @@ import { DuckDBEngineLive } from "../engine/duckdb.ts"
 import { familyOfAst, type TypeFamily } from "../plan/contract.ts"
 
 /**
- * Юнит-тест модели на фикстурах (SPEC §8): `ctx.ref` рендерится в CTE
- * с VALUES из фикстур, валидированных через Schema модели-источника
- * (модель помнит источники значениями — model.refs), запрос выполняется
- * на одноразовом in-memory DuckDB, результат сравнивается с ожидаемым.
- * Живёт в bun test:
+ * Unit-tests a model against fixtures (SPEC §8): `ctx.ref` is rendered into a
+ * CTE with VALUES from the fixtures, validated against the source model's
+ * Schema (the model remembers its sources by value — model.refs); the query
+ * runs on a throwaway in-memory DuckDB, and the result is compared to the
+ * expectation. Lives in bun test:
  *
  *   test("stays", () => testModel(stays, { inputs: {...}, expect: [...] }))
  */
 
 export interface TestModelSpec {
-  /** Фикстуры по полным именам моделей-источников; нужны для всех deps. */
+  /** Fixtures keyed by source models' full names; required for every dep. */
   readonly inputs?: Readonly<Record<string, ReadonlyArray<Record<string, unknown>>>>
-  /** Границы интервала [start, end) — обязательны для incremental-моделей. */
+  /** Interval bounds [start, end) — required for incremental models. */
   readonly interval?: readonly [string, string]
   readonly expect: ReadonlyArray<Record<string, unknown>>
-  /** Сравнивать порядок строк; по умолчанию порядок не важен. */
+  /** Whether row order matters; unordered by default. */
   readonly strictOrder?: boolean
 }
 
@@ -34,7 +34,7 @@ const DUCK_TYPE: Record<TypeFamily, string> = {
   any: "VARCHAR",
 }
 
-/** Литерал фикстуры по семейству колонки (ISO-строки времени → TIMESTAMP). */
+/** Fixture literal by column family (ISO time strings → TIMESTAMP). */
 const fixtureLiteral = (value: unknown, family: TypeFamily): string => {
   if (value === null || value === undefined) return "NULL"
   if (family === "temporal") return sqlTimestamp(fromIso(String(value)))
@@ -50,10 +50,11 @@ const fixtureLiteral = (value: unknown, family: TypeFamily): string => {
 }
 
 /**
- * Фикстура не может врать о форме входа: значения сверяются с семействами
- * типов Schema источника (строки времени — ISO; Schema.DateTimeUtc в v4
- * декодирует готовый DateTime.Utc, не строку, поэтому проверка по семейству,
- * не через decode), лишние ключи — опечатки — отвергаются.
+ * A fixture cannot lie about the shape of its input: values are checked
+ * against the source Schema's type families (time strings are ISO; in v4
+ * Schema.DateTimeUtc decodes to a ready DateTime.Utc, not a string, so the
+ * check is by family rather than via decode), and extra keys — typos — are
+ * rejected.
  */
 const validateFixture = (
   source: AnyModel,
@@ -88,7 +89,7 @@ const validateFixture = (
   }
 }
 
-/** CTE источника: VALUES из фикстур или пустой SELECT с типами схемы. */
+/** Source CTE: VALUES from fixtures, or an empty SELECT typed by the schema. */
 const fixtureCte = (source: AnyModel, rows: ReadonlyArray<Record<string, unknown>>): string => {
   const fields = Object.entries(source.schema.fields) as ReadonlyArray<
     [string, { readonly ast: unknown }]
@@ -109,7 +110,7 @@ const fixtureCte = (source: AnyModel, rows: ReadonlyArray<Record<string, unknown
   return `SELECT * FROM (VALUES ${tuples.join(", ")}) AS t(${columns})`
 }
 
-/** DuckDB-значения → сравнимые примитивы (bigint → number, объекты времени → строка). */
+/** DuckDB values → comparable primitives (bigint → number, time objects → string). */
 const normalize = (row: Record<string, unknown>): Record<string, unknown> =>
   Object.fromEntries(
     Object.entries(row).map(([key, value]) => {
@@ -130,7 +131,7 @@ const canonical = (
   return strictOrder ? normalized : [...normalized].sort()
 }
 
-/** Прогоняет модель на фикстурах, возвращает строки — для нестандартных проверок. */
+/** Runs the model against fixtures, returning rows — for non-standard checks. */
 export const runModel = async (
   model: AnyModel,
   spec: Pick<TestModelSpec, "inputs" | "interval">,
@@ -174,7 +175,7 @@ export const runModel = async (
   )
 }
 
-/** Прогоняет модель на фикстурах и сверяет результат с ожиданием. */
+/** Runs the model against fixtures and checks the result against the expectation. */
 export const testModel = async (model: AnyModel, spec: TestModelSpec): Promise<void> => {
   const rows = await runModel(model, spec)
   const got = canonical(rows, spec.strictOrder ?? false)

@@ -13,8 +13,8 @@ const scenario = <A, E>(body: Effect.Effect<A, E, EngineAdapter | StateStore>) =
     body.pipe(Effect.provide(Layer.mergeAll(DuckDBEngineLive(), SqliteStateLive()))),
   )
 
-describe("DAG-конкурентность apply (SPEC §5.3)", () => {
-  test("ромб: ветки сходятся, потомок видит физику обоих родителей", async () => {
+describe("DAG concurrency of apply (SPEC §5.3)", () => {
+  test("diamond: branches converge, the child sees the physical tables of both parents", async () => {
     await scenario(
       Effect.gen(function* () {
         const engine = yield* EngineAdapter
@@ -39,7 +39,7 @@ describe("DAG-конкурентность apply (SPEC §5.3)", () => {
         const applied = yield* Efmesh.apply("dev", [root, left, right, bottom], {
           modelConcurrency: 4,
         })
-        // built — в топологическом порядке независимо от фактического старта
+        // built — in topological order regardless of the actual start
         expect(applied.built).toEqual(["dag.root", "dag.left", "dag.right", "dag.bottom"])
         const rows = yield* engine.query(`SELECT n FROM dev__dag.bottom`)
         expect(rows).toEqual([{ n: 112 }])
@@ -47,7 +47,7 @@ describe("DAG-конкурентность apply (SPEC §5.3)", () => {
     )
   })
 
-  test("упавший родитель не открывает гейт: потомок не строится", async () => {
+  test("a failed parent does not open the gate: the child is not built", async () => {
     await scenario(
       Effect.gen(function* () {
         const engine = yield* EngineAdapter
@@ -68,7 +68,7 @@ describe("DAG-конкурентность apply (SPEC §5.3)", () => {
         const models = [dirty, child]
         const error = yield* Effect.flip(Efmesh.apply("dev", models, { modelConcurrency: 4 }))
         expect(error._tag).toBe("AuditFailure")
-        // ни физики потомка, ни view-слоя, ни снапшота
+        // neither the child's physical table, nor a view layer, nor a snapshot
         const missing = yield* Effect.flip(engine.query(`SELECT * FROM dev__dag.child`))
         expect(missing._tag).toBe("EngineError")
         const plan = yield* Efmesh.plan("dev", models)

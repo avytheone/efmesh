@@ -22,7 +22,7 @@ const incremental = defineModel(
 )
 
 describe("kinds F1", () => {
-  test("incrementalByTimeRange: дефолты зерна/батча/lookback", () => {
+  test("incrementalByTimeRange: grain/batch/lookback defaults", () => {
     const k = incremental.kind
     if (k._tag !== "incrementalByTimeRange") throw new Error("не тот вид")
     expect(k.interval).toBe("day")
@@ -30,7 +30,7 @@ describe("kinds F1", () => {
     expect(k.lookback).toBe(0)
   })
 
-  test("ctx.start/ctx.end: без interval — плейсхолдеры, с interval — литералы", () => {
+  test("ctx.start/ctx.end: without interval — placeholders, with interval — literals", () => {
     const canonical = render(incremental.fragment, { resolveRef: (r) => r })
     expect(canonical).toContain("moved_at >= $start AND moved_at < $end")
 
@@ -42,7 +42,7 @@ describe("kinds F1", () => {
     expect(executable).toContain("moved_at < TIMESTAMP '2026-01-02 00:00:00'")
   })
 
-  test("ctx.start в full-модели — ошибка определения", () => {
+  test("ctx.start in a full model — a definition error", () => {
     try {
       defineModel(
         {
@@ -58,7 +58,7 @@ describe("kinds F1", () => {
     }
   })
 
-  test("timeColumn вне схемы — ошибка определения", () => {
+  test("timeColumn outside the schema — a definition error", () => {
     try {
       defineModel(
         {
@@ -74,7 +74,7 @@ describe("kinds F1", () => {
     }
   })
 
-  test("external: участвует в deps потребителя, сам без зависимостей", () => {
+  test("external: participates in the consumer's deps, has no deps itself", () => {
     expect(incremental.deps.has("raw.moves")).toBe(true)
     expect(rawMoves.deps.size).toBe(0)
     expect(rawMoves.kind._tag).toBe("external")

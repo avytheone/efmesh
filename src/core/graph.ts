@@ -4,15 +4,15 @@ import type { AnyModel } from "./model.ts"
 
 export interface ModelGraph {
   readonly models: ReadonlyMap<string, AnyModel>
-  /** Топологический порядок: родители раньше детей. */
+  /** Topological order: parents before children. */
   readonly order: ReadonlyArray<string>
-  /** Прямые потомки: кто ссылается на данную модель. */
+  /** Direct dependents: who references this model. */
   readonly dependents: ReadonlyMap<string, ReadonlySet<string>>
 }
 
 export type GraphError = DuplicateModelError | UnknownDependencyError | DagCycleError
 
-/** Собирает DAG из набора моделей: дубликаты, неизвестные зависимости, циклы — типизированные ошибки. */
+/** Builds a DAG from a set of models: duplicates, unknown dependencies, cycles — typed errors. */
 export const buildGraph = (
   input: Iterable<AnyModel>,
 ): Effect.Effect<ModelGraph, GraphError> =>
@@ -36,10 +36,10 @@ export const buildGraph = (
       }
     }
 
-    // Кан: считаем входящие степени (число зависимостей), снимаем нулевые.
+    // Kahn's algorithm: count in-degrees (number of dependencies), drain the zeros.
     const inDegree = new Map<string, number>()
     for (const [name, model] of models) inDegree.set(name, model.deps.size)
-    // сортировка очереди — чтобы порядок был детерминированным между запусками
+    // sort the queue so the order is deterministic across runs
     const queue = [...inDegree.entries()].filter(([, d]) => d === 0).map(([n]) => n).sort()
     const order: Array<string> = []
     while (queue.length > 0) {
@@ -60,7 +60,7 @@ export const buildGraph = (
     return { models, order, dependents }
   })
 
-/** Все транзитивные потомки модели (для breaking-каскада в плане). */
+/** All transitive dependents of a model (for the breaking cascade in a plan). */
 export const transitiveDependents = (graph: ModelGraph, name: string): ReadonlySet<string> => {
   const out = new Set<string>()
   const stack = [name]

@@ -4,9 +4,9 @@ import { SqliteStateLive } from "../src/state/sqlite.ts"
 import { StateStore, type StateStoreShape } from "../src/state/store.ts"
 
 /**
- * Гонка janitor↔apply (F6): примитивы, на которых держится целостность —
- * claim сироты атомарен с проверками, воскрешение снимает сиротство,
- * промоушен не переключает view на снесённый снапшот.
+ * The janitor↔apply race (F6): the primitives that integrity rests on —
+ * an orphan claim is atomic with its checks, resurrection clears orphaning,
+ * promotion does not switch a view to a swept-away snapshot.
  */
 
 const withStore = <A, E>(body: (store: StateStoreShape) => Effect.Effect<A, E>) =>
@@ -25,33 +25,33 @@ const base = {
   fingerprintVersion: 1,
 } as const
 
-const FUTURE = "9999-01-01T00:00:00.000Z" // deadline, до которого «осиротел» любой
+const FUTURE = "9999-01-01T00:00:00.000Z" // deadline before which anything is "orphaned"
 
-describe("гонка janitor↔apply (F6)", () => {
-  test("claim: referenced снапшот не сносится, сирота сносится ровно один раз", async () => {
+describe("the janitor↔apply race (F6)", () => {
+  test("claim: a referenced snapshot is not swept, an orphan is swept exactly once", async () => {
     await withStore((store) =>
       Effect.gen(function* () {
         yield* store.upsertSnapshot({ ...base, fingerprint: "f1", physicalFp: "f1" })
         yield* store.promote("dev", [{ name: "med.a", fingerprint: "f1" }])
-        // referenced — claim проигрывает, даже если по времени «пора»
+        // referenced — the claim loses, even if by time it is "due"
         expect(yield* store.deleteSnapshotIfDoomed("med.a", "f1", FUTURE)).toBe(false)
 
-        // осиротим: окружение уехало на f2
+        // orphan it: the environment moved on to f2
         yield* store.upsertSnapshot({ ...base, fingerprint: "f2", physicalFp: "f2" })
         yield* store.promote("dev", [{ name: "med.a", fingerprint: "f2" }])
         expect(yield* store.deleteSnapshotIfDoomed("med.a", "f1", FUTURE)).toBe(true)
-        // повторный claim — уже нечего
+        // a repeated claim — nothing left
         expect(yield* store.deleteSnapshotIfDoomed("med.a", "f1", FUTURE)).toBe(false)
         expect(yield* store.getSnapshot("med.a", "f1")).toBeUndefined()
       }),
     )
   })
 
-  test("свежая сирота (моложе deadline) не сносится", async () => {
+  test("a fresh orphan (younger than the deadline) is not swept", async () => {
     await withStore((store) =>
       Effect.gen(function* () {
         yield* store.upsertSnapshot({ ...base, fingerprint: "f1", physicalFp: "f1" })
-        // не referenced, но created_at = сейчас > deadline в прошлом
+        // not referenced, but created_at = now > a deadline in the past
         const past = "2000-01-01T00:00:00.000Z"
         expect(yield* store.deleteSnapshotIfDoomed("med.a", "f1", past)).toBe(false)
         expect(yield* store.getSnapshot("med.a", "f1")).toBeDefined()
@@ -59,7 +59,7 @@ describe("гонка janitor↔apply (F6)", () => {
     )
   })
 
-  test("воскрешение: повторный upsert снимает orphaned_at — claim проигрывает", async () => {
+  test("resurrection: a repeated upsert clears orphaned_at — the claim loses", async () => {
     await withStore((store) =>
       Effect.gen(function* () {
         yield* store.upsertSnapshot({ ...base, fingerprint: "f1", physicalFp: "f1" })
@@ -70,13 +70,13 @@ describe("гонка janitor↔apply (F6)", () => {
 
         const before = yield* store.getSnapshot("med.a", "f1")
 
-        // «apply» воскрешает старую версию: сиротство снято, created_at освежён
+        // "apply" resurrects the old version: orphaning cleared, created_at refreshed
         yield* store.upsertSnapshot({ ...base, fingerprint: "f1", physicalFp: "f1" })
         const revived = yield* store.getSnapshot("med.a", "f1")
         expect(revived?.orphanedAt).toBeNull()
 
-        // janitor, решивший снести её ДО воскрешения (deadline из прошлого),
-        // claim проигрывает: COALESCE(orphaned_at, created_at) теперь свежий
+        // a janitor that decided to sweep it BEFORE resurrection (deadline in the past),
+        // the claim loses: COALESCE(orphaned_at, created_at) is now fresh
         const deadline = new Date(Date.parse(before!.createdAt) - 1).toISOString()
         expect(yield* store.deleteSnapshotIfDoomed("med.a", "f1", deadline)).toBe(false)
         expect(yield* store.getSnapshot("med.a", "f1")).toBeDefined()
@@ -84,11 +84,11 @@ describe("гонка janitor↔apply (F6)", () => {
     )
   })
 
-  test("промоушен падает, если janitor унёс снапшот из набора", async () => {
+  test("promotion fails if the janitor took a snapshot out of the set", async () => {
     const failure = await withStore((store) =>
       Effect.gen(function* () {
         yield* store.upsertSnapshot({ ...base, fingerprint: "f1", physicalFp: "f1" })
-        yield* store.deleteSnapshot("med.a", "f1") // «janitor успел»
+        yield* store.deleteSnapshot("med.a", "f1") // "the janitor got there first"
         return yield* Effect.flip(
           store.promote("dev", [
             { name: "med.a", fingerprint: "f1", requireSnapshot: true },
@@ -100,7 +100,7 @@ describe("гонка janitor↔apply (F6)", () => {
     expect(String((failure as { cause: unknown }).cause)).toContain("исчез из стора")
   })
 
-  test("промоушен external без снапшота проходит (requireSnapshot: false)", async () => {
+  test("promoting an external without a snapshot succeeds (requireSnapshot: false)", async () => {
     await withStore((store) =>
       Effect.gen(function* () {
         yield* store.promote("dev", [

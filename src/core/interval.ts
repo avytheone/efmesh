@@ -1,11 +1,11 @@
 /**
- * Интервальная арифметика (SPEC §2, §5.3): полуинтервалы `[start, end)`
- * времени UTC, выровненные по зерну модели. Учёт заполненных интервалов —
- * основа инкрементальности и бэкфилла; здесь только чистая математика,
- * состояние живёт в state store.
+ * Interval arithmetic (SPEC §2, §5.3): half-open `[start, end)` UTC time
+ * intervals, aligned to the model's grain. Tracking which intervals are
+ * filled is the basis of incrementality and backfill; this module is pure
+ * math only, state lives in the state store.
  *
- * Внутреннее представление — epoch millis: зёрна day/hour в UTC не зависят
- * от календаря, деление с округлением вниз даёт выравнивание.
+ * Internal representation is epoch millis: day/hour grains in UTC don't
+ * depend on the calendar, and floor division gives alignment.
  */
 
 export type IntervalUnit = "day" | "hour"
@@ -26,9 +26,9 @@ export const floorTo = (unit: IntervalUnit, ms: number): number => {
 }
 
 /**
- * Все завершённые интервалы зерна от `startMs` до `nowMs`:
- * начало выравнивается вниз, последний интервал — тот, что уже закончился
- * (`end <= floor(now)` — недописанное «сегодня» не считается).
+ * All completed grain intervals from `startMs` to `nowMs`:
+ * the start is floor-aligned, and the last interval is one that has
+ * already ended (`end <= floor(now)` — an unfinished "today" doesn't count).
  */
 export const enumerateIntervals = (
   unit: IntervalUnit,
@@ -45,7 +45,7 @@ export const enumerateIntervals = (
   return intervals
 }
 
-/** `wanted` минус `covered` (сравнение по `start`; интервалы одного зерна). */
+/** `wanted` minus `covered` (compared by `start`; intervals of the same grain). */
 export const missingIntervals = (
   wanted: ReadonlyArray<Interval>,
   covered: ReadonlyArray<Interval>,
@@ -54,7 +54,7 @@ export const missingIntervals = (
   return wanted.filter((i) => !done.has(i.start))
 }
 
-/** Смежные интервалы сливаются в непрерывные диапазоны (вход — отсортированный). */
+/** Adjacent intervals merge into contiguous ranges (input must be sorted). */
 export const mergeIntervals = (
   intervals: ReadonlyArray<Interval>,
 ): ReadonlyArray<Interval> => {
@@ -71,8 +71,8 @@ export const mergeIntervals = (
 }
 
 /**
- * Режет диапазон на батчи не длиннее `batchSize` интервалов зерна.
- * Батч — единица исполнения (один DELETE+INSERT), интервал — единица учёта.
+ * Slices a range into batches no longer than `batchSize` grain intervals.
+ * A batch is the unit of execution (one DELETE+INSERT); an interval is the unit of tracking.
  */
 export const splitIntoBatches = (
   range: Interval,
@@ -90,7 +90,7 @@ export const splitIntoBatches = (
   return batches
 }
 
-/** Интервалы зерна внутри диапазона (для поинтервальной отметки done после батча). */
+/** Grain intervals within a range (for marking each one done after a batch). */
 export const intervalsWithin = (
   range: Interval,
   unit: IntervalUnit,
@@ -103,7 +103,7 @@ export const intervalsWithin = (
   return intervals
 }
 
-/** ISO-8601 UTC — формат хранения границ в state store (сортируется лексикографически). */
+/** ISO-8601 UTC — the storage format for bounds in the state store (sorts lexicographically). */
 export const toIso = (ms: number): string => new Date(ms).toISOString()
 
 export const fromIso = (iso: string): number => {
@@ -112,7 +112,7 @@ export const fromIso = (iso: string): number => {
   return ms
 }
 
-/** Литерал для подстановки границы интервала в SQL DuckDB. */
+/** Literal for substituting an interval bound into DuckDB SQL. */
 export const sqlTimestamp = (ms: number): string => {
   const iso = new Date(ms).toISOString()
   return `TIMESTAMP '${iso.slice(0, 10)} ${iso.slice(11, 19)}'`

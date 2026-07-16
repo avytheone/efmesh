@@ -1,9 +1,9 @@
 import type { ModelGraph } from "../core/graph.ts"
 
 /**
- * `efmesh graph --html` (SPEC §11): самодостаточная страница с DAG моделей —
- * SVG без внешних зависимостей, слои по длиннейшему пути от корней,
- * рёбра — кривые Безье, подсветка соседей по наведению.
+ * `efmesh graph --html` (SPEC §11): a self-contained page with the model DAG —
+ * SVG with no external dependencies, layers by the longest path from the
+ * roots, edges are Bézier curves, neighbors highlighted on hover.
  */
 
 const KIND_COLOR: Record<string, string> = {
@@ -27,7 +27,7 @@ const ROW_GAP = 26
 const PAD = 32
 
 export const renderGraphHtml = (graph: ModelGraph): string => {
-  // слой = длиннейший путь от корней: родители всегда левее потомков
+  // layer = longest path from the roots: parents are always left of descendants
   const depth = new Map<string, number>()
   for (const name of graph.order) {
     const model = graph.models.get(name)!

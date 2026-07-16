@@ -7,8 +7,8 @@ import {
   parseReclassify,
 } from "../src/cli.ts"
 
-describe("--reclassify — разбор флага (#5)", () => {
-  test("пары модель=категория; пусто — undefined; мусор — ошибка", async () => {
+describe("--reclassify — flag parsing (#5)", () => {
+  test("model=category pairs; empty — undefined; garbage — an error", async () => {
     expect(
       await Effect.runPromise(parseReclassify("med.a=non-breaking, med.b=breaking")),
     ).toEqual({ "med.a": "non-breaking", "med.b": "breaking" })
@@ -20,43 +20,43 @@ describe("--reclassify — разбор флага (#5)", () => {
   })
 })
 
-describe("подтверждение плана (F4)", () => {
-  test("y/yes/д/да — согласие, регистр и пробелы не мешают", () => {
+describe("plan confirmation (F4)", () => {
+  test("y/yes/д/да — affirmative, case and spaces don't matter", () => {
     for (const answer of ["y", "Y", "yes", " YES ", "д", "Да", "да"]) {
       expect(isAffirmative(answer)).toBe(true)
     }
   })
 
-  test("пусто, null (EOF) и всё прочее — отказ", () => {
+  test("empty, null (EOF) and everything else — refusal", () => {
     for (const answer of [null, "", " ", "n", "no", "нет", "ok", "apply"]) {
       expect(isAffirmative(answer)).toBe(false)
     }
   })
 })
 
-describe("судьба плана в apply (F6: не-TTY без --yes = отказ)", () => {
-  test("без изменений применяется всегда — view-swap безопасен", () => {
+describe("the plan's fate in apply (F6: non-TTY without --yes = refusal)", () => {
+  test("no changes always applies — view-swap is safe", () => {
     expect(decideApply(false, false, false)).toBe("apply")
     expect(decideApply(false, false, true)).toBe("apply")
   })
 
-  test("--yes применяет изменения где угодно", () => {
+  test("--yes applies changes anywhere", () => {
     expect(decideApply(true, true, false)).toBe("apply")
     expect(decideApply(true, true, true)).toBe("apply")
   })
 
-  test("изменения: TTY спрашивает, не-TTY отказывает", () => {
+  test("changes: TTY asks, non-TTY refuses", () => {
     expect(decideApply(true, false, true)).toBe("ask")
     expect(decideApply(true, false, false)).toBe("refuse")
   })
 
-  test("код «ждёт человека» отличим от ошибки", () => {
+  test("the 'awaiting a human' code is distinct from an error", () => {
     expect(EXIT_AWAITING_HUMAN).toBe(2)
   })
 })
 
-describe("plan --json — контракт формы (#3)", () => {
-  test("интервалы — ISO UTC, поля стабильны", async () => {
+describe("plan --json — the shape contract (#3)", () => {
+  test("intervals — ISO UTC, fields are stable", async () => {
     const { planToJson } = await import("../src/cli.ts")
     const json = planToJson({
       env: "dev",

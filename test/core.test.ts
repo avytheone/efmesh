@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { Effect, Schema } from "effect"
 import { defineModel, kind } from "../src/index.ts"
-// внутренности графа и рендера — не публичное API, тестируются напрямую
+// graph and render internals — not public API, tested directly
 import { buildGraph, transitiveDependents } from "../src/core/graph.ts"
 import { render } from "../src/core/sql.ts"
 
@@ -33,19 +33,19 @@ const stays = defineModel(
 )
 
 describe("defineModel", () => {
-  test("собирает зависимости из ref", () => {
+  test("collects dependencies from ref", () => {
     expect([...stays.deps]).toEqual(["med.moves"])
     expect(moves.deps.size).toBe(0)
   })
 
-  test("рендер: ref резолвится, cols квотируются, литералы экранируются", () => {
+  test("render: ref resolves, cols are quoted, literals are escaped", () => {
     const text = render(stays.fragment, { resolveRef: (n) => `<${n}>` })
     expect(text).toContain(`FROM <med.moves>`)
     expect(text).toContain(`"move_id", "dept"`)
     expect(text).toContain(`dept = 'ОРИТ'`)
   })
 
-  test("битое имя модели — ModelDefinitionError", () => {
+  test("malformed model name — ModelDefinitionError", () => {
     try {
       defineModel(
         { name: "плохое имя", kind: kind.full(), schema: Schema.Struct({}) },
@@ -57,7 +57,7 @@ describe("defineModel", () => {
     }
   })
 
-  test("экранирование кавычки в строковом литерале", () => {
+  test("escaping a quote in a string literal", () => {
     const m = defineModel(
       { name: "t.q", kind: kind.full(), schema: Schema.Struct({ x: Schema.String }) },
       (ctx) => ctx.sql`SELECT ${"o'brien"} AS x`,
@@ -67,18 +67,18 @@ describe("defineModel", () => {
 })
 
 describe("buildGraph", () => {
-  test("топологический порядок: родители раньше детей", () => {
+  test("topological order: parents before children", () => {
     const graph = Effect.runSync(buildGraph([stays, moves]))
     expect(graph.order.indexOf("med.moves")).toBeLessThan(graph.order.indexOf("med.stays"))
     expect(transitiveDependents(graph, "med.moves")).toEqual(new Set(["med.stays"]))
   })
 
-  test("неизвестная зависимость — UnknownDependencyError", () => {
+  test("unknown dependency — UnknownDependencyError", () => {
     const error = Effect.runSync(Effect.flip(buildGraph([stays])))
     expect(error._tag).toBe("UnknownDependencyError")
   })
 
-  test("дубликат имени — DuplicateModelError", () => {
+  test("duplicate name — DuplicateModelError", () => {
     const error = Effect.runSync(Effect.flip(buildGraph([moves, moves])))
     expect(error._tag).toBe("DuplicateModelError")
   })

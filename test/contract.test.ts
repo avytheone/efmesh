@@ -15,13 +15,13 @@ const scenario = <A, E>(body: Effect.Effect<A, E, EngineAdapter | StateStore>) =
 const applyOne = (model: Parameters<typeof Efmesh.apply>[1] extends Iterable<infer M> ? M : never) =>
   scenario(Effect.flip(Efmesh.apply("dev", [model])))
 
-describe("контракт схемы (SPEC §3.2)", () => {
-  test("тип разошёлся — SchemaMismatchError до сборки, с внятным перечнем", async () => {
+describe("schema contract (SPEC §3.2)", () => {
+  test("type diverged — SchemaMismatchError before building, with a clear list", async () => {
     const bad = defineModel(
       {
         name: "med.stats",
         kind: kind.full(),
-        // n на самом деле INTEGER, ts — TIMESTAMP
+        // n is actually INTEGER, ts — TIMESTAMP
         schema: Schema.Struct({ n: Schema.String, ts: Schema.DateTimeUtc }),
       },
       (ctx) => ctx.sql`SELECT 1::INTEGER AS n, TIMESTAMP '2026-01-01' AS ts`,
@@ -34,7 +34,7 @@ describe("контракт схемы (SPEC §3.2)", () => {
     expect(mismatch.problems[0]).toContain("INTEGER")
   })
 
-  test("недостающие и лишние колонки перечисляются", async () => {
+  test("missing and extraneous columns are listed", async () => {
     const bad = defineModel(
       {
         name: "med.cols",
@@ -50,7 +50,7 @@ describe("контракт схемы (SPEC §3.2)", () => {
     expect(problems.some((p) => p.includes("«extra»"))).toBe(true)
   })
 
-  test("совместимые семейства проходят: Number покрывает INTEGER и DOUBLE, NullOr прозрачен", async () => {
+  test("compatible families pass: Number covers INTEGER and DOUBLE, NullOr is transparent", async () => {
     const ok = defineModel(
       {
         name: "med.ok",

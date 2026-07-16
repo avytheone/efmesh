@@ -1,6 +1,6 @@
 /**
- * Сырьё примера: пишет lake/raw/moves.parquet — как будто выгрузка из КИС.
- * Запуск: bun seed.ts (из examples/hospital).
+ * Example raw data: writes lake/raw/moves.parquet — as if dumped from the HIS.
+ * Run: bun seed.ts (from examples/hospital).
  */
 import { mkdirSync } from "node:fs"
 import { DuckDBInstance } from "@duckdb/node-api"

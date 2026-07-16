@@ -12,14 +12,14 @@ import { SqliteStateLive } from "../src/state/sqlite.ts"
 import { StateStore } from "../src/state/store.ts"
 
 /**
- * #7: перехват протухшего лока под НАСТОЯЩИЙ kill -9 — не юнит-эмуляция.
- * Чужой bun-процесс берёт env-лок через file-based стор и убивается
- * SIGKILL: освобождения не будет никогда, только ttl. Проверяем обе
- * стороны: пока лок жив — LockHeldError, после протухания — run
- * перехватывает и работает.
+ * #7: reclaiming a stale lock under a REAL kill -9 — not a unit emulation.
+ * Another bun process takes the env lock via the file-based store and is
+ * killed with SIGKILL: there will never be a release, only ttl. We check both
+ * sides: while the lock is alive — LockHeldError, after it goes stale — run
+ * reclaims it and works.
  */
 
-// директория ВНУТРИ репо: дочерний процесс импортирует src (резолв effect)
+// a directory INSIDE the repo: the child process imports src (effect resolution)
 const dir = mkdtempSync(join(import.meta.dir, "..", "efmesh-kill9-test-"))
 const storePath = join(dir, "state.sqlite")
 
@@ -51,9 +51,9 @@ const layer = Layer.mergeAll(
 const scenario = <A, E>(body: Effect.Effect<A, E, EngineAdapter | StateStore>) =>
   Effect.runPromise(body.pipe(Effect.provide(layer)))
 
-describe("лок под kill -9 (#7)", () => {
-  test("убитый процесс не оставляет вечный замок: ttl перехватывается живым run", async () => {
-    // бутстрап окружения обычным apply
+describe("lock under kill -9 (#7)", () => {
+  test("a killed process leaves no eternal lock: the ttl is reclaimed by a live run", async () => {
+    // bootstrap the environment with a normal apply
     await scenario(
       Effect.gen(function* () {
         const engine = yield* EngineAdapter
@@ -65,7 +65,7 @@ describe("лок под kill -9 (#7)", () => {
       }),
     )
 
-    // чужой процесс берёт env:dev с ttl 900 мс и виснет
+    // another process takes env:dev with a 900 ms ttl and hangs
     const TTL = 900
     const holder = Bun.spawn(
       ["bun", join(import.meta.dir, "helpers", "lock-holder.ts"), storePath, "env:dev", String(TTL)],
@@ -76,24 +76,24 @@ describe("лок под kill -9 (#7)", () => {
     expect(first.trim()).toBe("LOCKED")
     const grabbedAt = Date.now()
 
-    holder.kill(9) // SIGKILL: ни finally, ни releaseLock не выполнятся
+    holder.kill(9) // SIGKILL: neither finally nor releaseLock will run
     await holder.exited
     expect(holder.signalCode).toBe("SIGKILL")
 
-    // лок мёртвого процесса ещё жив по ttl — честный LockHeldError
+    // the dead process's lock is still alive by ttl — an honest LockHeldError
     const held = await scenario(
       Effect.flip(run("dev", [raw, events], { now: fromIso("2026-01-03T00:00:00Z") })),
     )
     expect(held._tag).toBe("LockHeldError")
 
-    // после протухания run перехватывает лок и работает
+    // after it goes stale run reclaims the lock and works
     await Bun.sleep(Math.max(0, grabbedAt + TTL - Date.now()) + 100)
     const tick = await scenario(
       run("dev", [raw, events], { now: fromIso("2026-01-03T00:00:00Z") }),
     )
     expect(tick.built).toEqual(["med.events"])
 
-    // и освобождает за собой: следующий захват мгновенный
+    // and releases it after itself: the next acquire is instant
     const reclaimed = await scenario(
       Effect.gen(function* () {
         const store = yield* StateStore

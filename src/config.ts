@@ -1,43 +1,43 @@
 import type { AnyModel } from "./core/model.ts"
 
 /**
- * Конфиг проекта — `efmesh.config.ts` (SPEC §11): типизированный TS-модуль,
- * никакого YAML. CLI импортирует его и собирает слои движка и состояния.
+ * Project config — `efmesh.config.ts` (SPEC §11): a typed TS module, no
+ * YAML. The CLI imports it and assembles the engine and state layers.
  */
 export interface EfmeshConfig {
-  /** Модели значениями; можно вместе с discovery — дубликат имени = ошибка. */
+  /** Models by value; can be combined with discovery — a duplicate name is an error. */
   readonly models?: ReadonlyArray<AnyModel>
   /**
-   * Glob-маски файлов моделей относительно конфига (SPEC §12):
-   * все экспорты-модели найденных файлов попадают в проект.
+   * Glob masks for model files, relative to the config (SPEC §12):
+   * every model export found in matched files joins the project.
    */
   readonly discovery?: string | ReadonlyArray<string>
   readonly engine?: {
-    /** Путь к файлу DuckDB; по умолчанию `efmesh.duckdb` рядом с конфигом. */
+    /** Path to the DuckDB file; defaults to `efmesh.duckdb` next to the config. */
     readonly path?: string
-    /** postgres://… — движком становится Postgres (F3); path игнорируется. */
+    /** postgres://… — switches the engine to Postgres (F3); path is ignored. */
     readonly url?: string
-    /** Размер пула соединений Postgres — параллелизм бэкфилла (SPEC §5.3). */
+    /** Postgres connection pool size — backfill parallelism (SPEC §5.3). */
     readonly max?: number
   }
   readonly state?: {
-    /** Путь к SQLite-файлу состояния; по умолчанию `efmesh.state.sqlite`. */
+    /** Path to the SQLite state file; defaults to `efmesh.state.sqlite`. */
     readonly path?: string
-    /** postgres://… — состояние в Postgres (схема efmesh_state, SPEC §6). */
+    /** postgres://… — state lives in Postgres (schema efmesh_state, SPEC §6). */
     readonly url?: string
   }
   readonly lake?: {
-    /** Корень parquet-озера (SPEC §3.3) — локальная директория или s3://…. */
+    /** Root of the parquet lake (SPEC §3.3) — a local directory or s3://…. */
     readonly path: string
   }
-  /** DuckLake-каталог для target: "ducklake" (SPEC §14.5). DuckDB-only. */
+  /** DuckLake catalog for target: "ducklake" (SPEC §14.5). DuckDB-only. */
   readonly ducklake?: {
-    /** Путь к SQLite-файлу каталога DuckLake. */
+    /** Path to the DuckLake catalog's SQLite file. */
     readonly catalog: string
-    /** Куда DuckLake кладёт parquet-данные; по умолчанию — рядом с каталогом. */
+    /** Where DuckLake writes parquet data; defaults to next to the catalog. */
     readonly dataPath?: string
   }
-  /** ATTACH-базы по алиасам (SPEC §9.3): url + опции (`TYPE postgres` и т.п.). */
+  /** ATTACH databases by alias (SPEC §9.3): url + options (`TYPE postgres` etc.). */
   readonly attach?: Readonly<Record<string, { readonly url: string; readonly options?: string }>>
 }
 

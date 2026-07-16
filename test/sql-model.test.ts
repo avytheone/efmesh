@@ -39,8 +39,8 @@ const makeSqlModel = () =>
     refs: [raw],
   })
 
-describe("сырые .sql-модели (SPEC §14.1)", () => {
-  test("@ref/@start/@end парсятся; модель живёт полным циклом plan→apply", async () => {
+describe("raw .sql models (SPEC §14.1)", () => {
+  test("@ref/@start/@end are parsed; the model lives a full plan→apply cycle", async () => {
     await scenario(
       Effect.gen(function* () {
         const engine = yield* EngineAdapter
@@ -62,12 +62,12 @@ describe("сырые .sql-модели (SPEC §14.1)", () => {
     )
   })
 
-  test("testModel работает: источники объявлены значениями", async () => {
+  test("testModel works: sources are declared as values", async () => {
     const rows = await runModel(makeSqlModel(), {
       inputs: {
         "src.events": [
           { id: "x", happened_at: "2026-01-01T05:00:00Z" },
-          { id: "y", happened_at: "2026-02-01T05:00:00Z" }, // вне интервала
+          { id: "y", happened_at: "2026-02-01T05:00:00Z" }, // outside the interval
         ],
       },
       interval: ["2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z"],
@@ -75,7 +75,7 @@ describe("сырые .sql-модели (SPEC §14.1)", () => {
     expect(rows.map((row) => row.id)).toEqual(["x"])
   })
 
-  test("@ref без объявления в refs и лишний ref — ошибки определения", () => {
+  test("@ref not declared in refs and an extraneous ref — definition errors", () => {
     const attempt = (refs: ReadonlyArray<import("../src/core/model.ts").AnyModel>) => {
       try {
         defineSqlModel({

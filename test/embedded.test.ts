@@ -18,7 +18,7 @@ const raw = defineExternal({
   schema: Schema.Struct({ id: Schema.String, dept: Schema.String }),
 })
 
-/** Встраиваемый фильтр: не материализуется, подставляется потребителям. */
+/** Embeddable filter: not materialized, inlined into consumers. */
 const makeIcu = (dept: string): AnyModel =>
   defineModel(
     {
@@ -50,7 +50,7 @@ const seedSource = Effect.gen(function* () {
 })
 
 describe("embedded (SPEC §3.1)", () => {
-  test("подставляется потребителю подзапросом; ни физики, ни view", async () => {
+  test("inlined into the consumer as a subquery; neither physical table nor view", async () => {
     await scenario(
       Effect.gen(function* () {
         const engine = yield* EngineAdapter
@@ -61,7 +61,7 @@ describe("embedded (SPEC §3.1)", () => {
         const count = yield* engine.query(`SELECT n FROM dev__med.icu_count`)
         expect(count).toEqual([{ n: 2 }])
 
-        // embedded не оставил ни view окружения, ни физической таблицы
+        // embedded left neither an environment view nor a physical table
         const noView = yield* Effect.flip(engine.query(`SELECT * FROM dev__med.icu_moves`))
         expect(noView._tag).toBe("EngineError")
         const physics = yield* engine.query(
@@ -72,7 +72,7 @@ describe("embedded (SPEC §3.1)", () => {
     )
   })
 
-  test("правка тела embedded каскадит на потребителя (indirect) и меняет данные", async () => {
+  test("editing an embedded body cascades to the consumer (indirect) and changes data", async () => {
     await scenario(
       Effect.gen(function* () {
         const engine = yield* EngineAdapter
@@ -92,7 +92,7 @@ describe("embedded (SPEC §3.1)", () => {
     )
   })
 
-  test("renderFor инлайнит embedded и источник external", async () => {
+  test("renderFor inlines embedded and the external source", async () => {
     const icu = makeIcu("ОРИТ")
     const sql = await Effect.runPromise(Efmesh.renderFor([raw, icu, makeCount(icu)], "med.icu_count", "dev"))
     expect(sql).toContain("(SELECT id, dept FROM src.moves WHERE dept = 'ОРИТ')")

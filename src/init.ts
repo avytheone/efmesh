@@ -3,9 +3,9 @@ import * as NodePath from "node:path"
 import { Data, Effect } from "effect"
 
 /**
- * `efmesh init` (SPEC §12): скаффолд минимального проекта — конфиг,
- * пара моделей (seed + витрина с аудитом) и данные к ним. Ничего не
- * перезаписывает: существующий efmesh.config.ts — честная ошибка.
+ * `efmesh init` (SPEC §12): scaffold a minimal project — config, a
+ * couple of models (seed + audited mart) and their data. Overwrites
+ * nothing: an existing efmesh.config.ts is an honest error.
  */
 
 export class InitError extends Data.TaggedError("InitError")<{

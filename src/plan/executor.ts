@@ -40,16 +40,16 @@ import type {
 
 export interface AppliedPlan {
   readonly plan: Plan
-  /** Имена моделей, для которых собиралась физика или гнался бэкфилл. */
+  /** Names of models for which physics was built or backfill was run. */
   readonly built: ReadonlyArray<string>
 }
 
-/** В проекте есть parquet-модели, но путь озера не задан в конфиге. */
+/** The project has parquet models, but the lake path is not set in the config. */
 export class LakeNotConfiguredError extends Data.TaggedError("LakeNotConfiguredError")<{
   readonly model: string
 }> {}
 
-/** В проекте есть ducklake-модели, но каталог не задан в конфиге. */
+/** The project has ducklake models, but the catalog is not set in the config. */
 export class DucklakeNotConfiguredError extends Data.TaggedError("DucklakeNotConfiguredError")<{
   readonly model: string
 }> {}
@@ -72,41 +72,41 @@ export type ApplyError =
   | EngineFeatureError
 
 export interface ApplyOptions {
-  /** «Сейчас» для scdType2-версионирования; по умолчанию — Clock. Инъекция для тестов. */
+  /** "Now" for scdType2 versioning; defaults to Clock. Injection point for tests. */
   readonly now?: number
-  /** Корень parquet-озера — локальная директория или s3://… (httpfs). */
+  /** Root of the parquet lake — a local directory or s3://… (httpfs). */
   readonly lakePath?: string
-  /** ATTACH-базы по алиасам (SPEC §9.3) — для export-моделей. */
+  /** ATTACH databases by alias (SPEC §9.3) — for export models. */
   readonly attach?: Readonly<Record<string, { readonly url: string; readonly options?: string }>>
-  /** DuckLake-каталог для target: "ducklake" (SPEC §14.5). DuckDB-only. */
+  /** DuckLake catalog for target: "ducklake" (SPEC §14.5). DuckDB-only. */
   readonly ducklake?: { readonly catalog: string; readonly dataPath?: string }
   /**
-   * Сколько батчей бэкфилла одной модели считать одновременно (SPEC §5.3).
-   * Осмыслен только на движке с пулом соединений (Postgres); DuckDB держит
-   * одно соединение — там бэкфилл последовательный независимо от значения.
+   * How many backfill batches of one model to compute concurrently (SPEC §5.3).
+   * Meaningful only on an engine with a connection pool (Postgres); DuckDB holds
+   * a single connection — there backfill is sequential regardless of the value.
    */
   readonly concurrency?: number
   /**
-   * Межмодельная DAG-конкурентность (SPEC §5.3): сколько моделей строить
-   * одновременно. Модель стартует, как только готовы её родители из этого
-   * плана — независимые ветки DAG идут параллельно. Осмыслен на движке
-   * с пулом (Postgres); DuckDB держит одно соединение — там модели строятся
-   * последовательно, иначе чужие стейтменты вклинивались бы в BEGIN/COMMIT.
+   * Inter-model DAG concurrency (SPEC §5.3): how many models to build at once.
+   * A model starts as soon as its parents from this plan are ready —
+   * independent DAG branches run in parallel. Meaningful on an engine with a
+   * pool (Postgres); DuckDB holds a single connection — there models build
+   * sequentially, otherwise foreign statements would wedge into a BEGIN/COMMIT.
    */
   readonly modelConcurrency?: number
   /**
-   * Ретраи упавшего батча бэкфилла (SPEC §5.3): Schedule.exponential от
-   * baseDelayMs (по умолчанию 500 мс), не больше attempts повторов. Батч
-   * транзакционен (DELETE+INSERT в одной транзакции, COPY перезаписывает
-   * партицию целиком) — повтор безопасен. Аудиты не ретраятся: провал
-   * аудита детерминирован, это не транзиентный сбой.
+   * Retries of a failed backfill batch (SPEC §5.3): Schedule.exponential from
+   * baseDelayMs (500 ms by default), no more than attempts retries. A batch is
+   * transactional (DELETE+INSERT in one transaction, COPY overwrites the whole
+   * partition) — a retry is safe. Audits are not retried: an audit failure is
+   * deterministic, it is not a transient fault.
    */
   readonly retry?: { readonly attempts: number; readonly baseDelayMs?: number }
-  /** Кто применяет план — в журнал (SPEC §6); по умолчанию ОС-пользователь. */
+  /** Who applies the plan — into the journal (SPEC §6); defaults to the OS user. */
   readonly appliedBy?: string
 }
 
-/** ОС-пользователь для журнала планов; в стерильных окружениях (CI) — ''. */
+/** OS user for the plan journal; in sterile environments (CI) — ''. */
 const osUser = (): string => {
   try {
     return userInfo().username
@@ -115,26 +115,26 @@ const osUser = (): string => {
   }
 }
 
-/** Модель просит экспорт в ATTACH-алиас, которого нет в конфиге. */
+/** The model asks to export to an ATTACH alias that is not in the config. */
 export class AttachNotConfiguredError extends Data.TaggedError("AttachNotConfiguredError")<{
   readonly model: string
   readonly attach: string
 }> {}
 
-/** Возможность DuckDB-федерации, недоступная на текущем движке (SPEC §9.3). */
+/** A DuckDB federation feature unavailable on the current engine (SPEC §9.3). */
 export class EngineFeatureError extends Data.TaggedError("EngineFeatureError")<{
   readonly model: string
   readonly feature: string
   readonly dialect: string
 }> {}
 
-/** Несколько стейтментов одной транзакцией движка; откат при любой ошибке. */
+/** Several statements in one engine transaction; rollback on any error. */
 const transactional = (
   engine: Engine,
   statements: ReadonlyArray<string>,
 ): Effect.Effect<void, EngineError> => engine.transaction(statements)
 
-/** Ретраи транзиентного сбоя записи батча; без retry в опциях — как было. */
+/** Retries of a transient batch-write failure; without retry in the options — as before. */
 const withBatchRetry =
   (retry: ApplyOptions["retry"]) =>
   <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
@@ -145,16 +145,16 @@ const withBatchRetry =
           schedule: Schedule.exponential(retry.baseDelayMs ?? 500),
         })
 
-/** Для s3://-путей mkdir не нужен (и невозможен) — httpfs пишет напрямую. */
+/** For s3:// paths mkdir is not needed (and impossible) — httpfs writes directly. */
 const ensureDir = (path: string): Effect.Effect<void> =>
   path.startsWith("s3://")
     ? Effect.void
     : Effect.sync(() => mkdirSync(path, { recursive: true }))
 
 /**
- * Прогон аудитов модели (SPEC §8): `self` — физика снапшота или подзапрос
- * только что загруженного интервала. Запрос аудита возвращает нарушения:
- * blocking → AuditFailure, warn → лог и дальше.
+ * Runs a model's audits (SPEC §8): `self` is the snapshot's physics or a
+ * subquery of the just-loaded interval. The audit query returns violations:
+ * blocking → AuditFailure, warn → log and continue.
  */
 const runAudits = (
   engine: Engine,
@@ -182,10 +182,10 @@ const runAudits = (
   })
 
 /**
- * Эволюция унаследованной таблицы при forward-only (SPEC §5.2): колонки,
- * появившиеся в новом запросе, добавляются через ALTER (история получает
- * NULL — она не переигрывается), удаление колонок реюзом не выражается —
- * это честный breaking с пересборкой.
+ * Evolution of an inherited table under forward-only (SPEC §5.2): columns
+ * that appeared in the new query are added via ALTER (history gets NULL — it
+ * is not replayed); dropping columns cannot be expressed by reuse — that is
+ * an honest breaking change with a rebuild.
  */
 const evolveTableForForwardOnly = (
   engine: Engine,
@@ -217,11 +217,11 @@ const evolveTableForForwardOnly = (
   })
 
 /**
- * Бэкфилл incrementalByTimeRange в таблицу (SPEC §5.3): каждый диапазон
- * плана режется на батчи ≤ batchSize; батч — транзакция DELETE-диапазона +
- * INSERT, после успеха его интервалы помечаются done. Упавший батч
- * помечается failed и прерывает apply; уже отмеченное не пересчитывается
- * при повторе — бэкфилл продолжается с места остановки.
+ * Backfill of incrementalByTimeRange into a table (SPEC §5.3): each range of
+ * the plan is cut into batches ≤ batchSize; a batch is a transaction of a
+ * range DELETE + INSERT, and after success its intervals are marked done. A
+ * failed batch is marked failed and aborts apply; what is already marked is
+ * not recomputed on retry — backfill resumes from where it stopped.
  */
 const backfillIntoTable = (
   engine: Engine,
@@ -236,8 +236,8 @@ const backfillIntoTable = (
   Effect.gen(function* () {
     if (model.kind._tag !== "incrementalByTimeRange") return
     const kind = model.kind
-    // вставка по именам: после forward-only-эволюции порядок колонок физики
-    // может отличаться от запроса; контракт схемы гарантирует совпадение имён
+    // insert by name: after forward-only evolution the physics' column order
+    // may differ from the query; the schema contract guarantees the names match
     const columns = columnNames(model).map(quoteIdent).join(", ")
 
     const runBatch = (batch: Interval) =>
@@ -255,7 +255,7 @@ const backfillIntoTable = (
           `DELETE FROM ${target} WHERE ${quoteIdent(kind.timeColumn)} >= ${start} AND ${quoteIdent(kind.timeColumn)} < ${end}`,
           `INSERT INTO ${target} (${columns}) SELECT ${columns} FROM (${body}) q`,
         ]).pipe(withBatchRetry(retry), Effect.tapError(markFailed))
-        // аудит свежезагруженного интервала — до отметки done (SPEC §8)
+        // audit of the freshly loaded interval — before marking done (SPEC §8)
         yield* runAudits(
           engine,
           model,
@@ -265,8 +265,8 @@ const backfillIntoTable = (
         yield* Metric.update(intervalsDone, marks.length)
       })
 
-    // пул соединений (Postgres) → батчи параллельно: интервалы не пересекаются,
-    // каждый — своя транзакция; DuckDB (одно соединение) — последовательно
+    // connection pool (Postgres) → batches in parallel: intervals do not
+    // overlap, each is its own transaction; DuckDB (single connection) — sequentially
     const batches = action.backfill.flatMap((range) =>
       splitIntoBatches(range, kind.interval, kind.batchSize),
     )
@@ -277,9 +277,9 @@ const backfillIntoTable = (
   })
 
 /**
- * Бэкфилл в parquet-озеро (SPEC §3.3): интервал = партиция, пересчёт —
- * перезапись файла партиции. Транзакция не нужна: недописанная партиция
- * не помечена done и будет перезаписана при повторе.
+ * Backfill into the parquet lake (SPEC §3.3): interval = partition, a
+ * recompute is a rewrite of the partition file. No transaction is needed: an
+ * unfinished partition is not marked done and will be overwritten on retry.
  */
 const backfillIntoParquet = (
   engine: Engine,
@@ -304,10 +304,10 @@ const backfillIntoParquet = (
         const mark = [{ startTs: toIso(interval.start), endTs: toIso(interval.end) }]
         const markFailed = () =>
           store.markIntervals(action.fingerprint, mark, "failed").pipe(Effect.ignore)
-        // локально COPY пишет во временный файл, rename атомарен (POSIX):
-        // kill посреди записи не оставит битую партицию, а lookback-пересчёт
-        // не подсунет читателю view недописанный файл; s3 — прямая запись
-        // (rename нет; недописанный ключ не помечен done и перезапишется)
+        // locally COPY writes to a temp file, rename is atomic (POSIX): a kill
+        // mid-write leaves no broken partition, and a lookback recompute does
+        // not hand the view reader an unfinished file; s3 — direct write
+        // (no rename; the unfinished key is not marked done and gets overwritten)
         const target = `${partition}/data.parquet`
         const writePath = partition.startsWith("s3://") ? target : `${target}.tmp`
         yield* engine
@@ -317,7 +317,7 @@ const backfillIntoParquet = (
           yield* Effect.sync(() => renameSync(writePath, target))
         }
         const file = target.replaceAll(`'`, `''`)
-        // аудит записанной партиции — до отметки done; провал = не done → перезапись
+        // audit of the written partition — before marking done; failure = not done → rewrite
         yield* runAudits(engine, model, `(SELECT * FROM read_parquet('${file}'))`).pipe(
           Effect.tapError(markFailed),
         )
@@ -328,11 +328,11 @@ const backfillIntoParquet = (
   })
 
 /**
- * Применяет план (SPEC §5): в топологическом порядке собирает недостающую
- * физику и догоняет интервалы (ссылки в SQL резолвятся в физические таблицы
- * ЭТОГО плана, не во view окружения — середина apply не видна снаружи),
- * затем промоушен — пересоздание view + транзакционная запись набора
- * в state store.
+ * Applies the plan (SPEC §5): in topological order it builds the missing
+ * physics and catches up intervals (refs in SQL resolve to the physical
+ * tables of THIS plan, not to the environment's views — the middle of apply
+ * is not visible from outside), then promotion — recreating the views + a
+ * transactional write of the set into the state store.
  */
 export const applyPlan = (
   plan: Plan,
@@ -345,13 +345,13 @@ export const applyPlan = (
     const lakePath = options?.lakePath
     const nowMs = options?.now ?? (yield* Clock.currentTimeMillis)
 
-    // физика модели — то, что увидят её потребители и view окружения;
-    // ключ — physicalFingerprint: при forward-only это физика старой версии
+    // a model's physics — what its consumers and the environment views will
+    // see; the key is physicalFingerprint: under forward-only it is the old version's physics
     const physicalFpOf = new Map(plan.actions.map((a) => [a.name, a.physicalFingerprint]))
     const physicalFor = (model: AnyModel, fingerprint: string): string => {
       if (model.kind._tag === "external") return externalSourceRef(model.kind.source)
-      // embedded не материализуется — подставляется потребителю подзапросом,
-      // его собственные ссылки резолвятся рекурсивно (DAG ацикличен)
+      // embedded is not materialized — it is inlined into the consumer as a
+      // subquery, its own refs resolve recursively (the DAG is acyclic)
       if (model.kind._tag === "embedded") return `(${render(model.fragment, { resolveRef })})`
       if (model.target === "parquet") {
         if (lakePath === undefined) throw new LakeNotConfiguredError({ model: model.name.full })
@@ -359,7 +359,7 @@ export const applyPlan = (
       }
       return tableRef(model, fingerprint)
     }
-    // нативная физика или таблица DuckLake-каталога — по цели модели
+    // native physics or a DuckLake-catalog table — by the model's target
     const tableRef = (model: AnyModel, fingerprint: string): string =>
       model.target === "ducklake"
         ? ducklakeRef(model.name, fingerprint)
@@ -373,7 +373,7 @@ export const applyPlan = (
       return physicalFor(model, fingerprint)
     }
 
-    // parquet-модели без озера — падение до любых действий
+    // parquet models without a lake — fail before any actions
     for (const action of plan.actions) {
       const model = graph.models.get(action.name)
       if (model === undefined) continue
@@ -383,8 +383,8 @@ export const applyPlan = (
       if (model.target === "ducklake" && options?.ducklake === undefined) {
         return yield* new DucklakeNotConfiguredError({ model: model.name.full })
       }
-      // DuckDB-федерация (SPEC §9.3) на других движках не выражается —
-      // честная ошибка до любых действий
+      // DuckDB federation (SPEC §9.3) cannot be expressed on other engines —
+      // an honest error before any actions
       if (engine.dialect !== "duckdb") {
         const feature =
           model.target === "parquet"
@@ -408,13 +408,13 @@ export const applyPlan = (
       }
     }
 
-    // 1. Физика + бэкфилл — DAG-конкурентно (SPEC §5.3): модель стартует,
-    // как только готовы её родители из этого плана (Deferred-гейты, без
-    // волновых барьеров); независимые ветки идут параллельно на движке
-    // с пулом; упавший родитель не открывает гейт — потомки не строятся
+    // 1. Physics + backfill — DAG-concurrent (SPEC §5.3): a model starts as
+    // soon as its parents from this plan are ready (Deferred gates, no wave
+    // barriers); independent branches run in parallel on an engine with a
+    // pool; a failed parent does not open its gate — descendants are not built
     yield* engine.execute(`CREATE SCHEMA IF NOT EXISTS "${physicalSchema}"`)
-    // ducklake-каталог нужен и для сборки, и для чистого view-swap —
-    // view окружений ссылаются на таблицы каталога по алиасу
+    // the ducklake catalog is needed both for building and for a pure
+    // view-swap — environment views reference catalog tables by alias
     if (options?.ducklake !== undefined && engine.dialect === "duckdb") {
       yield* engine.execute(ducklakeAttachSql(options.ducklake))
     }
@@ -433,8 +433,8 @@ export const applyPlan = (
         case "external":
           return
         case "embedded": {
-          // физики нет — но контракт и аудиты версии проверяются здесь,
-          // чтобы потребители не унесли в себя сломанный подзапрос
+          // there is no physics — but the contract and the version's audits are
+          // checked here so consumers do not carry a broken subquery into themselves
           const body = render(model.fragment, { resolveRef })
           yield* checkContract(engine, model, body)
           yield* runAudits(engine, model, `(${body})`)
@@ -474,7 +474,7 @@ export const applyPlan = (
           yield* engine.execute(
             `CREATE TABLE IF NOT EXISTS ${target} AS SELECT * FROM (${body}) q LIMIT 0`,
           )
-          // upsert: строки с ключами из свежего запроса заменяются, остальные живут
+          // upsert: rows with keys from the fresh query are replaced, the rest live on
           const keys = model.kind.key.map(quoteIdent).join(", ")
           yield* transactional(engine, [
             `DELETE FROM ${target} WHERE (${keys}) IN (SELECT ${keys} FROM (${body}) q)`,
@@ -516,10 +516,10 @@ export const applyPlan = (
           const sameAsOpen = cols
             .map((column) => `t.${column} IS NOT DISTINCT FROM q.${column}`)
             .join(" AND ")
-          // SCD2-сверка (SPEC §3.1): открытая строка без идентичной строки в
-          // запросе закрывается (изменилась или исчезла); строка запроса без
-          // идентичной открытой строки вставляется новой открытой версией.
-          // Идентичные пары не трогаются — их valid_from не дрожит.
+          // SCD2 reconciliation (SPEC §3.1): an open row with no identical row
+          // in the query is closed (it changed or vanished); a query row with
+          // no identical open row is inserted as a new open version. Identical
+          // pairs are left alone — their valid_from does not jitter.
           yield* transactional(engine, [
             `UPDATE ${target} SET ${to} = ${ts}
              WHERE ${to} IS NULL
@@ -546,11 +546,11 @@ export const applyPlan = (
         case "view":
         case "full": {
           const body = render(model.fragment, { resolveRef })
-          // контракт схемы (SPEC §3.2): дрейф типов ловится до сборки
+          // schema contract (SPEC §3.2): type drift is caught before building
           yield* checkContract(engine, model, body)
-          // indirect-реюз (#5): данные идентичны по построению (родители
-          // non-breaking/forward-only, своё тело не менялось) — пересборка
-          // пропускается, аудиты гоняются по унаследованной физике
+          // indirect reuse (#5): the data is identical by construction (parents
+          // non-breaking/forward-only, own body unchanged) — the rebuild is
+          // skipped, audits run against the inherited physics
           if (model.kind._tag === "full" && action.reusedFrom !== undefined) {
             yield* runAudits(engine, model, physicalFor(model, action.physicalFingerprint))
             yield* store.upsertSnapshot({
@@ -577,14 +577,14 @@ export const applyPlan = (
             } else if (engine.dialect === "duckdb") {
               yield* engine.execute(`CREATE OR REPLACE TABLE ${target} AS ${body}`)
             } else {
-              // у Postgres нет CREATE OR REPLACE TABLE — атомарно через транзакцию
+              // Postgres has no CREATE OR REPLACE TABLE — atomically via a transaction
               yield* transactional(engine, [
                 `DROP TABLE IF EXISTS ${target}`,
                 `CREATE TABLE ${target} AS ${body}`,
               ])
             }
           }
-          // аудиты собранного снапшота — до промоушена (SPEC §8)
+          // audits of the built snapshot — before promotion (SPEC §8)
           yield* runAudits(engine, model, physicalFor(model, action.physicalFingerprint))
           yield* store.upsertSnapshot({
             name: action.name,
@@ -604,8 +604,8 @@ export const applyPlan = (
             interval: { start: zero, end: zero },
           })
           yield* checkContract(engine, model, emptyBody)
-          // forward-only: done-интервалы старой версии наследуются до бэкфилла —
-          // сделанное не переигрывается, пересчитывается только недостающее
+          // forward-only: the old version's done-intervals are inherited before
+          // backfill — what is done is not replayed, only the missing is recomputed
           if (action.reusedFrom !== undefined) {
             const inherited = (yield* store.listIntervals(action.reusedFrom))
               .filter((record) => record.status === "done")
@@ -633,14 +633,14 @@ export const applyPlan = (
               options?.retry,
             )
           } else {
-            // пустой скелет с формой запроса; при resume уже существует
+            // an empty skeleton with the query's shape; on resume it already exists
             const target = tableRef(model, action.physicalFingerprint)
             yield* engine.execute(
               `CREATE TABLE IF NOT EXISTS ${target} AS SELECT * FROM (${emptyBody}) q LIMIT 0`,
             )
-            // forward-only на живой таблице: колонки, появившиеся в запросе,
-            // добавляются к унаследованной физике (история получает NULL);
-            // исчезнувшие из запроса — сигнал, что реюз невозможен
+            // forward-only on a live table: columns that appeared in the query
+            // are added to the inherited physics (history gets NULL); ones that
+            // vanished from the query signal that reuse is impossible
             if (action.change === "forward-only") {
               yield* evolveTableForForwardOnly(engine, model, target, emptyBody)
             }
@@ -672,7 +672,7 @@ export const applyPlan = (
     const runOne = (action: PlanAction): Effect.Effect<void, ApplyError> =>
       Effect.gen(function* () {
         const model = graph.models.get(action.name)!
-        // ждём только родителей, которые строит этот же план; остальные готовы
+        // wait only for parents that this same plan builds; the rest are ready
         yield* Effect.forEach(
           [...model.deps].flatMap((dep) => {
             const gate = gates.get(dep)
@@ -686,9 +686,9 @@ export const applyPlan = (
         yield* Deferred.succeed(gates.get(action.name)!, undefined)
       })
 
-    // working в топологическом порядке, а forEach стартует элементы по
-    // порядку — у самого раннего незавершённого элемента родители всегда
-    // уже готовы, поэтому ожидание гейтов не выедает слоты до дедлока
+    // working is in topological order, and forEach starts elements in order —
+    // the earliest unfinished element always has its parents ready, so waiting
+    // on gates does not eat up slots into a deadlock
     yield* Effect.forEach(working, runOne, {
       concurrency:
         engine.dialect === "duckdb" ? 1 : Math.max(1, options?.modelConcurrency ?? 4),
@@ -696,11 +696,11 @@ export const applyPlan = (
     })
     const built = working.map((action) => action.name)
 
-    // 2. Промоушен: view-слой окружения
+    // 2. Promotion: the environment's view layer
     for (const action of plan.actions) {
       if (action.change === "unchanged") continue
       if (action.change === "removed") {
-        // имя модели из state store; схему восстанавливаем из полного имени
+        // the model name comes from the state store; the schema is recovered from the full name
         const [schema, table] = action.name.split(".") as [string, string]
         yield* engine.execute(
           `DROP VIEW IF EXISTS "${envSchema(plan.env, schema)}"."${table}"`,
@@ -708,7 +708,7 @@ export const applyPlan = (
         continue
       }
       const model = graph.models.get(action.name)!
-      // view-слоя у external и embedded нет — они не материализуются
+      // external and embedded have no view layer — they are not materialized
       if (model.kind._tag === "external" || model.kind._tag === "embedded") continue
       yield* engine.execute(
         `CREATE SCHEMA IF NOT EXISTS "${envSchema(plan.env, model.name.schema)}"`,
@@ -718,13 +718,13 @@ export const applyPlan = (
       )
     }
 
-    // 3. Экспорт наружу (SPEC §9.3): после аудитов и промоушена — наружу
-    // не уезжает непроверенное; готовая витрина пишется в ATTACH-базу
+    // 3. Export outward (SPEC §9.3): after audits and promotion — nothing
+    // unverified leaves; the finished mart is written to the ATTACH database
     for (const action of plan.actions) {
       if (action.change === "removed") continue
       const model = graph.models.get(action.name)!
       if (model.export === undefined) continue
-      // экспорт освежается, когда есть что везти: сборка/бэкфилл/refresh
+      // the export is refreshed when there is something to ship: build/backfill/refresh
       if (!action.build && action.backfill.length === 0 && !action.refresh) continue
       const attach = options?.attach?.[model.export.attach]
       if (attach === undefined) {
@@ -747,9 +747,9 @@ export const applyPlan = (
       )
     }
 
-    // 4. Состояние окружения + журнал; requireSnapshot — защита от гонки
-    // с janitor (F6): у материализуемых моделей снапшот обязан быть жив
-    // в момент промоушена, иначе view указал бы на снесённую физику
+    // 4. Environment state + journal; requireSnapshot guards against the race
+    // with the janitor (F6): for materialized models the snapshot must be alive
+    // at the moment of promotion, otherwise the view would point at removed physics
     yield* store.promote(
       plan.env,
       plan.actions
@@ -766,7 +766,7 @@ export const applyPlan = (
         actions: plan.actions.map((a) => ({
           name: a.name,
           change: a.change,
-          // override оператора (#5) в журнале: видно, кто и что заявил
+          // operator override (#5) in the journal: it is visible who declared what
           ...(a.reclassifiedFrom !== undefined ? { reclassifiedFrom: a.reclassifiedFrom } : {}),
           fingerprint: a.fingerprint.slice(0, 8),
           build: a.build,

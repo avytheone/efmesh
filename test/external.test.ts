@@ -17,8 +17,8 @@ const scenario = <A, E>(body: Effect.Effect<A, E, EngineAdapter | StateStore>) =
 
 const schema = Schema.Struct({ case_id: Schema.String, dept: Schema.String })
 
-describe("external-модели (SPEC §3.1, §9.3)", () => {
-  test("external.table: потребитель читает таблицу движка напрямую, external не собирается", async () => {
+describe("external models (SPEC §3.1, §9.3)", () => {
+  test("external.table: the consumer reads the engine table directly, external is not built", async () => {
     await scenario(
       Effect.gen(function* () {
         const engine = yield* EngineAdapter
@@ -34,15 +34,15 @@ describe("external-модели (SPEC §3.1, §9.3)", () => {
         )
 
         const applied = yield* Efmesh.apply("dev", [raw, stays])
-        // собирается только потребитель — у external физики нет
+        // only the consumer is built — external has no physical table
         expect(applied.built).toEqual(["med.stays"])
         const rows = yield* engine.query(`SELECT count(*)::INT AS n FROM dev__med.stays`)
         expect(rows).toEqual([{ n: 2 }])
-        // view-слоя для external не существует
+        // no view layer exists for external
         const missing = yield* Effect.flip(engine.query(`SELECT * FROM dev__src.moves`))
         expect(missing._tag).toBe("EngineError")
 
-        // повторный apply: ничего не изменилось, включая external
+        // a repeated apply: nothing changed, external included
         const again = yield* Efmesh.apply("dev", [raw, stays])
         expect(again.plan.hasChanges).toBe(false)
         expect(again.built).toEqual([])
@@ -50,7 +50,7 @@ describe("external-модели (SPEC §3.1, §9.3)", () => {
     )
   })
 
-  test("external.files: parquet по пути; смена источника — breaking у потомка", async () => {
+  test("external.files: parquet by path; changing the source — breaking for the child", async () => {
     const dir = mkdtempSync(join(tmpdir(), "efmesh-external-"))
     await scenario(
       Effect.gen(function* () {
@@ -75,8 +75,8 @@ describe("external-модели (SPEC §3.1, §9.3)", () => {
         const rows = yield* engine.query(`SELECT count(*)::INT AS n FROM dev__med.stays`)
         expect(rows).toEqual([{ n: 1 }])
 
-        // сменили путь источника — потомок пересобирается транзитивно
-        // (его собственное тело не менялось — категория indirect)
+        // changed the source path — the child is rebuilt transitively
+        // (its own body did not change — indirect category)
         const rawB = lake(join(dir, "b.parquet"))
         const plan = yield* Efmesh.plan("dev", [rawB, stays(rawB)])
         const changes = new Map(plan.actions.map((a) => [a.name, a.change]))

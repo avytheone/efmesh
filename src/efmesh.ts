@@ -28,11 +28,11 @@ import { StateStore } from "./state/store.ts"
 import { externalSourceRef, viewRef } from "./plan/naming.ts"
 
 /**
- * Фасад efmesh (SPEC §10): обычные Effect'ы, встраиваемые в любое
- * приложение; CLI — тонкая обёртка над ними.
+ * The efmesh facade (SPEC §10): plain Effects embeddable in any
+ * application; the CLI is a thin wrapper over them.
  */
 export const Efmesh = {
-  /** Посчитать план для окружения, ничего не меняя. Движок нужен для канонизации SQL. */
+  /** Compute a plan for an environment without changing anything. The engine is needed to canonicalize SQL. */
   plan: (
     env: string,
     models: Iterable<AnyModel>,
@@ -52,9 +52,10 @@ export const Efmesh = {
   > => buildGraph(models).pipe(Effect.flatMap((graph) => planChanges(env, graph, options))),
 
   /**
-   * План + применение: физика, бэкфилл интервалов, view-слой, состояние.
-   * Идёт под межпроцессным локом `env:<имя>` (SPEC §14.6) — тем же, что у
-   * run: параллельные мутации окружения из разных процессов отсекаются.
+   * Plan + apply: physics, interval backfill, view layer, state.
+   * Runs under the cross-process lock `env:<name>` (SPEC §14.6) — the same
+   * one `run` uses: concurrent environment mutations from different
+   * processes are cut off.
    */
   apply: (
     env: string,
@@ -67,11 +68,11 @@ export const Efmesh = {
       return yield* applyPlan(plan, graph, options)
     }).pipe(withStateLock(envLockName(env), options?.lockTtlMs)),
 
-  /** Canonical-рендер SQL модели (ссылки — логические имена) для отладки. */
+  /** Canonical SQL render of a model (refs are logical names), for debugging. */
   render: (models: Iterable<AnyModel>, name: string): Effect.Effect<string, GraphError> =>
     buildGraph(models).pipe(Effect.map((graph) => canonicalSql(graph, name))),
 
-  /** Рендер SQL модели против view-слоя окружения — «как выполнит движок». */
+  /** SQL render of a model against an environment's view layer — "as the engine would run it". */
   renderFor: (
     models: Iterable<AnyModel>,
     name: string,
@@ -81,7 +82,7 @@ export const Efmesh = {
       Effect.map((graph) => {
         const model = graph.models.get(name)
         if (model === undefined) throw new Error(`модели ${name} нет в проекте`)
-        // view-слоя у external и embedded нет: источник как есть / подзапрос
+        // external and embedded have no view layer: source as-is / subquery
         const resolve = (ref: string): string => {
           const source = graph.models.get(ref)!
           if (source.kind._tag === "external") return externalSourceRef(source.kind.source)

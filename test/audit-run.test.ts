@@ -14,8 +14,8 @@ const scenario = <A, E>(body: Effect.Effect<A, E, EngineAdapter | StateStore>) =
     body.pipe(Effect.provide(Layer.mergeAll(DuckDBEngineLive(), SqliteStateLive()))),
   )
 
-describe("efmesh audit — автономный прогон по окружению (SPEC §8, F4)", () => {
-  test("ловит деградацию задним числом; warn не считается blocking", async () => {
+describe("efmesh audit — standalone run over an environment (SPEC §8, F4)", () => {
+  test("catches degradation after the fact; warn does not count as blocking", async () => {
     await scenario(
       Effect.gen(function* () {
         const engine = yield* EngineAdapter
@@ -31,7 +31,7 @@ describe("efmesh audit — автономный прогон по окружен
         const models = [depts]
         yield* Efmesh.apply("dev", models)
 
-        // сразу после apply — чисто
+        // right after apply — clean
         const clean = yield* auditEnvironment("dev", models)
         expect(clean.blockingViolations).toBe(0)
         expect(clean.results.map((r) => [r.audit, r.violations])).toEqual([
@@ -39,7 +39,7 @@ describe("efmesh audit — автономный прогон по окружен
           ["accepted(dept)", 0],
         ])
 
-        // деградация задним числом: физика испорчена мимо efmesh
+        // degradation after the fact: the physical table is corrupted outside efmesh
         const [physical] = yield* engine.query(
           `SELECT table_name AS t FROM duckdb_tables() WHERE schema_name = '_efmesh'`,
         )
@@ -47,8 +47,8 @@ describe("efmesh audit — автономный прогон по окружен
           `INSERT INTO "_efmesh"."${String(physical!["t"])}" VALUES (NULL), ('морг')`,
         )
         const dirty = yield* auditEnvironment("dev", models)
-        // NULL — blocking-нарушение not_null; «морг» — warn-нарушение accepted
-        // (NULL мимо accepted: NULL NOT IN (…) = NULL — это дело not_null)
+        // NULL — a blocking not_null violation; the unaccepted dept — a warn accepted violation
+        // (NULL bypasses accepted: NULL NOT IN (…) = NULL — that is not_null's job)
         expect(dirty.blockingViolations).toBe(1)
         expect(dirty.results).toEqual([
           { model: "med.depts", audit: "not_null(dept)", blocking: true, violations: 1 },
@@ -58,7 +58,7 @@ describe("efmesh audit — автономный прогон по окружен
     )
   })
 
-  test("фильтр моделей и честная ошибка на неизвестное имя", async () => {
+  test("model filter and an honest error on an unknown name", async () => {
     await scenario(
       Effect.gen(function* () {
         const a = defineModel(

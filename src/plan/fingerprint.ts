@@ -9,24 +9,26 @@ import type { EngineError, SqlParseError } from "../engine/adapter.ts"
 import { EngineAdapter } from "../engine/adapter.ts"
 
 /**
- * Fingerprint снапшота (SPEC §4): хэш канонизированного AST (родной парсер
- * движка, переформатирование запроса fingerprint не меняет), метаданных,
- * влияющих на данные, и fingerprint'ов прямых зависимостей (транзитивность).
+ * Snapshot fingerprint (SPEC §4): hash of the canonicalized AST (engine's
+ * native parser — reformatting a query does not change the fingerprint),
+ * of the metadata that affects data, and of the fingerprints of direct
+ * dependencies (transitivity).
  *
- * `batchSize`, `lookback`, `start` и `description` в fingerprint не входят:
- * они меняют исполнение или объём истории, но не форму данных — недостающие
- * интервалы учёт увидит сам.
+ * `batchSize`, `lookback`, `start` and `description` do not enter the
+ * fingerprint: they change execution or the amount of history, not the shape
+ * of the data — the interval ledger will notice missing intervals on its own.
  */
 
 /**
- * Версия алгоритма fingerprint — КОНТРАКТ (SPEC §4). Fingerprint зависит от
- * канонизации движка (json_serialize_sql DuckDB / libpg_query) и состава
- * payload ниже: любое их изменение молча пере-фингерпринтит все модели
- * пользователя и вынуждает полный ребилд склада. Поэтому: (1) канонизация
- * заморожена golden-тестами (test/fingerprint-golden.test.ts) — красный
- * тест при апгрейде DuckDB/libpg_query означает дрейф канона; (2) осознанная
- * смена алгоритма = инкремент этой константы + история миграции, снапшоты
- * другой версии план не сравнивает, а честно останавливается.
+ * Fingerprint algorithm version — a CONTRACT (SPEC §4). The fingerprint
+ * depends on the engine canonicalization (DuckDB json_serialize_sql /
+ * libpg_query) and on the composition of the payload below: any change to
+ * them silently re-fingerprints all of a user's models and forces a full
+ * rebuild of the warehouse. Therefore: (1) canonicalization is frozen by
+ * golden tests (test/fingerprint-golden.test.ts) — a red test on a
+ * DuckDB/libpg_query upgrade means canon drift; (2) a deliberate change of
+ * algorithm = increment of this constant + a migration history; the plan does
+ * not compare snapshots of a different version, it honestly stops instead.
  */
 export const FINGERPRINT_VERSION = 1
 
@@ -36,14 +38,14 @@ const sha256 = (input: string): string => {
   return hasher.digest("hex")
 }
 
-/** Canonical-рендер: ссылки — логические имена, границы — плейсхолдеры $start/$end. */
+/** Canonical render: refs are logical names, bounds are $start/$end placeholders. */
 export const canonicalSql = (graph: ModelGraph, name: string): string => {
   const model = graph.models.get(name)
   if (model === undefined) throw new Error(`модели ${name} нет в графе`)
   return render(model.fragment, { resolveRef: (ref) => ref })
 }
 
-/** Часть kind, влияющая на данные. Для seed — хэш содержимого файла: правка данных = новая версия. */
+/** Part of kind that affects data. For seed — hash of the file contents: editing the data = a new version. */
 const kindPayload = (
   model: { readonly name: { readonly full: string } },
   kind: ModelKind,
@@ -85,25 +87,25 @@ const kindPayload = (
 
 export interface ModelVersion {
   readonly fingerprint: string
-  /** Канонический AST тела; null у external. Хранится в снапшоте для категоризации (§5.2). */
+  /** Canonical AST of the body; null for external. Stored in the snapshot for categorization (§5.2). */
   readonly ast: string | null
 }
 
 /**
- * Кэш канонизации (#8): повторный plan почти целиком состоит из
- * json_serialize_sql-раундтрипов по неизменённым моделям. Кэш — не
- * данные: get/put обязаны быть безошибочными (промах/сбой = пересчёт).
+ * Canonicalization cache (#8): a repeated plan consists almost entirely of
+ * json_serialize_sql round-trips over unchanged models. The cache is not
+ * data: get/put must be infallible (a miss/failure = recompute).
  */
 export interface CanonCache {
   readonly get: (key: string) => Effect.Effect<string | undefined>
   readonly put: (key: string, canonical: string) => Effect.Effect<void>
 }
 
-/** Ключ кэша: версия алгоритма + диалект + исходник — апгрейд канона не маскируется. */
+/** Cache key: algorithm version + dialect + source — a canon upgrade is not masked. */
 export const canonCacheKey = (dialect: string, source: string): string =>
   sha256(`${FINGERPRINT_VERSION}:${dialect}:${source}`)
 
-/** Модель в объёме, нужном fingerprint'у: kind, метаданные формы данных, цель. */
+/** The model in the scope the fingerprint needs: kind, data-shape metadata, target. */
 type FingerprintableModel = Parameters<typeof columnNames>[0] & {
   readonly name: { readonly full: string }
   readonly kind: ModelKind
@@ -112,11 +114,11 @@ type FingerprintableModel = Parameters<typeof columnNames>[0] & {
 }
 
 /**
- * Fingerprint одной модели из готового AST и подписей родителей
- * (`имя=fingerprint`, отсортированы). Нужен планировщику для проверки
- * «версию сдвинули ТОЛЬКО родители» (#5): пересчёт со старыми подписями
- * обязан дать старый fingerprint — иначе разошлись ещё и метаданные,
- * и физику реюзать нельзя.
+ * Fingerprint of a single model from a ready AST and parent signatures
+ * (`name=fingerprint`, sorted). The planner needs it to check the
+ * "version shifted by parents ONLY" case (#5): a recompute with the old
+ * signatures must yield the old fingerprint — otherwise the metadata diverged
+ * too, and the physics cannot be reused.
  */
 export const modelFingerprint = (
   model: FingerprintableModel,
@@ -129,14 +131,14 @@ export const modelFingerprint = (
       kind: yield* kindPayload(model, model.kind),
       grain: model.grain,
       columns: columnNames(model),
-      // смена цели материализации = новая физика, потребители перечитают её
+      // a change of materialization target = new physics, consumers re-read it
       target: model.target,
       parents,
     })
     return sha256(payload)
   })
 
-/** Fingerprint всех моделей графа; транзитивность — через хэши родителей. */
+/** Fingerprint of all models in the graph; transitivity via parent hashes. */
 export const fingerprintGraph = (
   graph: ModelGraph,
   cache?: CanonCache,
@@ -160,7 +162,7 @@ export const fingerprintGraph = (
     const versions = new Map<string, ModelVersion>()
     for (const name of graph.order) {
       const model = graph.models.get(name)!
-      // у external и seed нет SQL — версия определяется источником/файлом и схемой
+      // external and seed have no SQL — the version is determined by source/file and schema
       const ast =
         model.kind._tag === "external" || model.kind._tag === "seed"
           ? null

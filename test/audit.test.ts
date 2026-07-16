@@ -14,8 +14,8 @@ const testLayer = Layer.mergeAll(DuckDBEngineLive(), SqliteStateLive())
 const scenario = <A, E>(body: Effect.Effect<A, E, EngineAdapter | StateStore>) =>
   Effect.runPromise(body.pipe(Effect.provide(testLayer)))
 
-describe("аудиты (SPEC §8)", () => {
-  test("blocking notNull: провал роняет apply, view не промоутится", async () => {
+describe("audits (SPEC §8)", () => {
+  test("blocking notNull: a failure drops apply, the view is not promoted", async () => {
     await scenario(
       Effect.gen(function* () {
         const engine = yield* EngineAdapter
@@ -33,14 +33,14 @@ describe("аудиты (SPEC §8)", () => {
         const failure = error as { audit: string; violations: number }
         expect(failure.audit).toBe("not_null(id)")
         expect(failure.violations).toBe(1)
-        // view-слой не появился
+        // the view layer never appeared
         const missing = yield* Effect.flip(engine.query(`SELECT * FROM dev__med.dirty`))
         expect(missing._tag).toBe("EngineError")
       }),
     )
   })
 
-  test("unique и accepted: чистые данные проходят", async () => {
+  test("unique and accepted: clean data passes", async () => {
     await scenario(
       Effect.gen(function* () {
         const clean = defineModel(
@@ -62,7 +62,7 @@ describe("аудиты (SPEC §8)", () => {
     )
   })
 
-  test("warn-аудит: нарушения логируются, конвейер едет", async () => {
+  test("warn audit: violations are logged, the pipeline proceeds", async () => {
     await scenario(
       Effect.gen(function* () {
         const warned = defineModel(
@@ -80,7 +80,7 @@ describe("аудиты (SPEC §8)", () => {
     )
   })
 
-  test("incremental: провальный интервал помечается failed и не считается done", async () => {
+  test("incremental: a failing interval is marked failed and does not count as done", async () => {
     await scenario(
       Effect.gen(function* () {
         const engine = yield* EngineAdapter
@@ -125,7 +125,7 @@ describe("аудиты (SPEC §8)", () => {
         const error = yield* Effect.flip(Efmesh.apply("dev", [raw, events], { now: jan3 }))
         expect(error._tag).toBe("AuditFailure")
 
-        // 1 января прошло аудит и done; 2 января — failed
+        // Jan 1 passed the audit and is done; Jan 2 — failed
         const plan = yield* Efmesh.plan("dev", [raw, events], { now: jan3 })
         const fp = plan.actions.find((a) => a.name === "med.events")!.fingerprint
         const ledger = yield* store.listIntervals(fp)

@@ -4,47 +4,47 @@ import { fileURLToPath } from "node:url"
 import { Data, Effect } from "effect"
 
 /**
- * `efmesh schedule` (#10): регистрация тика `run` в OS-шедулере через
- * Bun.cron (>=1.3.11): crontab на Linux, launchd на macOS, Task Scheduler
- * на Windows. Один заголовок = одна запись, повторная регистрация
- * перезаписывает на месте (идемпотентно).
+ * `efmesh schedule` (#10): registers a `run` tick in the OS scheduler via
+ * Bun.cron (>=1.3.11): crontab on Linux, launchd on macOS, Task Scheduler
+ * on Windows. One title = one entry; re-registration overwrites in place
+ * (idempotent).
  *
- * Честные оговорки (документированы в README/SPEC): cron не догоняет
- * пропущенные запуски (systemd Persistent=true строже — есть
- * --print-systemd), OS-уровень живёт в ЛОКАЛЬНОЙ таймзоне (TZ=UTC поверх),
- * на Linux нужен живой cron-демон — семейство Arch без cronie не имеет
- * его вовсе. Наложение тиков безопасно по построению: run держит env-лок,
- * а «ждёт человека» = exit 2, не сбой.
+ * Honest caveats (documented in README/SPEC): cron does not catch up on
+ * missed runs (systemd Persistent=true is stricter — hence --print-systemd),
+ * the OS level lives in the LOCAL timezone (TZ=UTC on top), on Linux a live
+ * cron daemon is required — the Arch family without cronie has none at all.
+ * Overlapping ticks are safe by construction: run holds the env lock, and
+ * "awaiting a human" = exit 2, not a failure.
  */
 
 export class ScheduleError extends Data.TaggedError("ScheduleError")<{
   readonly reason: string
 }> {}
 
-/** Всё, что нужно воркеру, — абсолютными путями (crontab не знает cwd). */
+/** Everything the worker needs, as absolute paths (crontab has no cwd). */
 export interface ScheduleTarget {
-  /** Директория проекта (где лежит конфиг) — cwd тика. */
+  /** Project directory (where the config lives) — the tick's cwd. */
   readonly project: string
-  /** Абсолютный путь конфига. */
+  /** Absolute path of the config. */
   readonly config: string
   readonly env: string
 }
 
-/** Заголовок Bun.cron: только [A-Za-z0-9_-]; включает проект и окружение. */
+/** Bun.cron title: only [A-Za-z0-9_-]; includes the project and environment. */
 export const scheduleTitle = (target: Pick<ScheduleTarget, "project" | "env">): string =>
   `efmesh-${basename(target.project)}-${target.env}`.replaceAll(/[^A-Za-z0-9_-]/g, "-")
 
-/** Куда генерируется воркер: рядом с конфигом, в служебной .efmesh/. */
+/** Where the worker is generated: next to the config, in the internal .efmesh/. */
 export const workerPath = (target: ScheduleTarget): string =>
   join(target.project, ".efmesh", `schedule-${target.env}.ts`)
 
-/** Бинарь CLI этого же пакета — воркер зовёт его, не гадая по npm-именам. */
+/** CLI binary of this same package — the worker calls it without guessing npm names. */
 const binPath = (): string => fileURLToPath(new URL("../bin.ts", import.meta.url))
 
 /**
- * Исходник воркера для Bun.cron: OS-шедулер исполняет scheduled(), тот
- * гоняет обычный `efmesh run` — та же семантика exit-кодов (2 = «ждёт
- * человека») и тот же журнал тиков в сторе (`efmesh status`).
+ * Worker source for Bun.cron: the OS scheduler runs scheduled(), which runs
+ * an ordinary `efmesh run` — the same exit-code semantics (2 = "awaiting a
+ * human") and the same tick journal in the store (`efmesh status`).
  */
 export const workerSource = (target: ScheduleTarget): string => `// сгенерировано \`efmesh schedule\` — не редактируйте: перерегистрация перезапишет
 export default {
@@ -58,7 +58,7 @@ export default {
 }
 `
 
-/** Никнеймы cron → OnCalendar systemd; произвольные выражения не переводятся. */
+/** cron nicknames → systemd OnCalendar; arbitrary expressions are not translated. */
 export const cronToOnCalendar = (cron: string): string | undefined =>
   (
     {
@@ -73,8 +73,9 @@ export const cronToOnCalendar = (cron: string): string | undefined =>
   )[cron.trim()]
 
 /**
- * systemd-фоллбэк (--print-systemd): у cron нет догона пропущенных запусков
- * и на Arch-семействе нет демона — user-таймер с Persistent=true честнее.
+ * systemd fallback (--print-systemd): cron has no catch-up for missed runs
+ * and the Arch family has no daemon — a user timer with Persistent=true is
+ * more honest.
  */
 export const systemdUnits = (
   target: ScheduleTarget,
@@ -106,7 +107,7 @@ WantedBy=timers.target
   }
 }
 
-/** Валидация выражения тем же парсером, который будет его исполнять. */
+/** Validate the expression with the same parser that will execute it. */
 export const validateCron = (cron: string): Effect.Effect<void, ScheduleError> =>
   Effect.gen(function* () {
     const next = yield* Effect.try({
@@ -120,7 +121,7 @@ export const validateCron = (cron: string): Effect.Effect<void, ScheduleError> =
     }
   })
 
-/** Linux без crontab-бинаря (Arch-семейство) — честная ошибка с рецептом. */
+/** Linux without a crontab binary (Arch family) — an honest error with a recipe. */
 const requireCrontab = (): Effect.Effect<void, ScheduleError> =>
   Effect.gen(function* () {
     if (process.platform !== "linux" || Bun.which("crontab") !== null) return
@@ -168,14 +169,14 @@ export const removeSchedule = (
       try: () => Bun.cron.remove(title),
       catch: (cause) => new ScheduleError({ reason: `Bun.cron.remove: ${String(cause)}` }),
     })
-    // воркер больше никем не исполняется — прибираем молча
+    // the worker is no longer executed by anyone — clean it up silently
     yield* Effect.sync(() => rmSync(workerPath(target), { force: true }))
     return { title }
   })
 
 /**
- * Список efmesh-регистраций — по платформенным следам Bun.cron: маркеры
- * `# bun-cron: <title>` в crontab (Linux) / plist'ы launchd (macOS).
+ * List of efmesh registrations — by Bun.cron's platform traces: `# bun-cron:
+ * <title>` markers in crontab (Linux) / launchd plists (macOS).
  */
 export const listSchedules = (): Effect.Effect<ReadonlyArray<string>, ScheduleError> =>
   Effect.gen(function* () {
@@ -185,7 +186,7 @@ export const listSchedules = (): Effect.Effect<ReadonlyArray<string>, ScheduleEr
         try: async () => {
           const proc = Bun.spawn(["crontab", "-l"], { stdout: "pipe", stderr: "ignore" })
           const text = await proc.stdout.text()
-          await proc.exited // пустой crontab выходит с 1 — это не ошибка
+          await proc.exited // an empty crontab exits with 1 — that is not an error
           return text
         },
         catch: (cause) => new ScheduleError({ reason: `crontab -l: ${String(cause)}` }),
