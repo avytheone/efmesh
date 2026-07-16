@@ -8,6 +8,7 @@ import { Efmesh } from "./efmesh.ts"
 import { DuckDBEngineLive } from "./engine/duckdb.ts"
 import { diffEnvironments } from "./plan/diff.ts"
 import { renderGraphHtml } from "./plan/graph-html.ts"
+import { formatLineage, lineage, LineageError } from "./plan/lineage.ts"
 import { janitor } from "./plan/janitor.ts"
 import { fp8 } from "./plan/naming.ts"
 import { run } from "./plan/run.ts"
@@ -240,6 +241,36 @@ const graphCommand = Command.make(
     }),
 ).pipe(Command.withDescription("DAG моделей в топологическом порядке (или --html файл)"))
 
+const lineageCommand = Command.make(
+  "lineage",
+  { target: Argument.string("model[.column]"), config: configFlag },
+  ({ config, target }) =>
+    Effect.gen(function* () {
+      const loaded = yield* loadConfig(config)
+      const segments = target.split(".")
+      if (segments.length < 2) {
+        return yield* new LineageError({
+          model: target,
+          reason: "ожидается <схема>.<таблица>[.<колонка>]",
+        })
+      }
+      const modelName = `${segments[0]}.${segments[1]}`
+      const graph = yield* buildGraph(loaded.models)
+      const model = graph.models.get(modelName)
+      if (model === undefined) {
+        return yield* new LineageError({ model: modelName, reason: "модели нет в проекте" })
+      }
+      const columns =
+        segments.length >= 3 ? [segments.slice(2).join(".")] : Object.keys(model.schema.fields)
+      for (const column of columns) {
+        const tree = yield* lineage(graph, modelName, column).pipe(
+          Effect.provide(configLayers(loaded)),
+        )
+        for (const line of formatLineage(tree)) yield* Console.log(line)
+      }
+    }),
+).pipe(Command.withDescription("Колоночный lineage до сырьевых колонок (best-effort)"))
+
 export const rootCommand = Command.make("efmesh").pipe(
   Command.withDescription("sqlmesh на bun, typescript и Effect"),
   Command.withSubcommands([
@@ -248,6 +279,7 @@ export const rootCommand = Command.make("efmesh").pipe(
     runCommand,
     renderCommand,
     graphCommand,
+    lineageCommand,
     diffCommand,
     janitorCommand,
   ]),

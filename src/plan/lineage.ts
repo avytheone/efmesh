@@ -1,0 +1,143 @@
+import { Data, Effect } from "effect"
+import type { ModelGraph } from "../core/graph.ts"
+import type { AnyModel } from "../core/model.ts"
+import type { EngineError, SqlParseError } from "../engine/adapter.ts"
+import { EngineAdapter } from "../engine/adapter.ts"
+import { canonicalSql } from "./fingerprint.ts"
+
+/**
+ * Колоночный lineage (SPEC §9.4): цепочка от колонки модели до сырьевых
+ * колонок external/seed-моделей. Точность best-effort — выражение колонки
+ * берётся из канонического AST (родной парсер движка), ссылки на колонки
+ * сопоставляются схемам родителей по имени, квалификаторы и алиасы CTE
+ * не разворачиваются. Граф моделей при этом точен всегда: зависимости
+ * известны из `ctx.ref`, не из парсинга текста.
+ */
+
+export class LineageError extends Data.TaggedError("LineageError")<{
+  readonly model: string
+  readonly reason: string
+}> {}
+
+export interface LineageNode {
+  readonly model: string
+  readonly column: string
+  /** Вид модели — external/seed являются листьями (сырьё). */
+  readonly kind: string
+  readonly sources: ReadonlyArray<LineageNode>
+}
+
+/** Все COLUMN_REF в поддереве выражения — имена колонок без квалификаторов. */
+const collectColumnRefs = (node: unknown, out: Set<string>): void => {
+  if (Array.isArray(node)) {
+    for (const item of node) collectColumnRefs(item, out)
+    return
+  }
+  if (node === null || typeof node !== "object") return
+  const record = node as Record<string, unknown>
+  if (record.class === "COLUMN_REF" && Array.isArray(record.column_names)) {
+    const names = record.column_names as ReadonlyArray<string>
+    if (names.length > 0) out.add(names[names.length - 1]!)
+  }
+  for (const value of Object.values(record)) collectColumnRefs(value, out)
+}
+
+const selectItems = (ast: unknown): ReadonlyArray<Record<string, unknown>> => {
+  const statements = (ast as { statements?: ReadonlyArray<{ node?: unknown }> }).statements
+  const node = statements?.[0]?.node as { select_list?: ReadonlyArray<unknown> } | undefined
+  return (node?.select_list ?? []) as ReadonlyArray<Record<string, unknown>>
+}
+
+/**
+ * Колонки, от которых зависит `column` в select_list: выражение с алиасом
+ * или одноимённый COLUMN_REF; `SELECT *` — сквозной проброс имени.
+ * undefined — выражение колонки не найдено (движковый сахар) — best-effort.
+ */
+const sourceColumnsOf = (ast: unknown, column: string): ReadonlySet<string> | undefined => {
+  const items = selectItems(ast)
+  const named =
+    items.find((item) => item.alias === column) ??
+    items.find((item) => {
+      if (item.alias !== "" && item.alias !== undefined) return false
+      if (item.class !== "COLUMN_REF" || !Array.isArray(item.column_names)) return false
+      const names = item.column_names as ReadonlyArray<string>
+      return names[names.length - 1] === column
+    })
+  if (named !== undefined) {
+    const out = new Set<string>()
+    collectColumnRefs(named, out)
+    return out
+  }
+  if (items.some((item) => item.class === "STAR" || item.type === "STAR")) {
+    return new Set([column])
+  }
+  return undefined
+}
+
+export const lineage = (
+  graph: ModelGraph,
+  modelName: string,
+  column: string,
+): Effect.Effect<LineageNode, LineageError | EngineError | SqlParseError, EngineAdapter> =>
+  Effect.gen(function* () {
+    const engine = yield* EngineAdapter
+    const root = graph.models.get(modelName)
+    if (root === undefined) {
+      return yield* new LineageError({ model: modelName, reason: "модели нет в проекте" })
+    }
+    if (!(column in root.schema.fields)) {
+      return yield* new LineageError({
+        model: modelName,
+        reason: `колонки «${column}» нет в схеме`,
+      })
+    }
+
+    const asts = new Map<string, unknown>()
+    const astOf = (model: AnyModel): Effect.Effect<unknown, EngineError | SqlParseError> =>
+      Effect.gen(function* () {
+        const cached = asts.get(model.name.full)
+        if (cached !== undefined) return cached
+        const ast = JSON.parse(
+          yield* engine.canonicalize(canonicalSql(graph, model.name.full)),
+        ) as unknown
+        asts.set(model.name.full, ast)
+        return ast
+      })
+
+    const trace = (
+      model: AnyModel,
+      wanted: string,
+    ): Effect.Effect<LineageNode, EngineError | SqlParseError> =>
+      Effect.gen(function* () {
+        const leaf: LineageNode = {
+          model: model.name.full,
+          column: wanted,
+          kind: model.kind._tag,
+          sources: [],
+        }
+        // сырьё: дальше цепочка упирается во внешний мир
+        if (model.kind._tag === "external" || model.kind._tag === "seed" || model.deps.size === 0) {
+          return leaf
+        }
+        const columns = sourceColumnsOf(yield* astOf(model), wanted)
+        if (columns === undefined) return leaf
+        const sources: Array<LineageNode> = []
+        for (const source of columns) {
+          for (const parent of model.refs.values()) {
+            if (!(source in parent.schema.fields)) continue
+            sources.push(yield* trace(parent, source))
+          }
+        }
+        return { ...leaf, sources }
+      })
+
+    return yield* trace(root, column)
+  })
+
+/** Плоская печать lineage-дерева для CLI. */
+export const formatLineage = (node: LineageNode, indent = ""): ReadonlyArray<string> => {
+  const marker =
+    node.kind === "external" || node.kind === "seed" ? `  [${node.kind}]` : ""
+  const line = `${indent}${node.model}.${node.column}${marker}`
+  return [line, ...node.sources.flatMap((source) => formatLineage(source, `${indent}  `))]
+}
