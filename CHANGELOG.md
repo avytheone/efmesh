@@ -7,6 +7,13 @@ the first version gathers them in full.
 
 ## [Unreleased]
 
+- `efmesh status <env>` — what is going on in one command: the last applied
+  plan, interval lag per incremental model, failed intervals, recent run
+  ticks (#1).
+- Run tick journal in the state store (`runs`, schema v4 — `efmesh migrate`
+  with a store backup): every tick records its outcome, including
+  unsuccessful ones (#2).
+
 ## [0.1.0-beta.2] — 2026-07-16
 
 - Release pipeline: publishing to npmjs.org from GitHub Actions on a `v*`

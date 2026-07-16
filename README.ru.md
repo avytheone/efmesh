@@ -169,6 +169,7 @@ export default defineConfig({
 | `efmesh plan <env>` | diff проекта против окружения + недостающие интервалы, ничего не меняет |
 | `efmesh apply <env>` | план → подтверждение (TTY) → физика, бэкфилл, view-слой |
 | `efmesh run <env>` | тик планировщика: только новые интервалы, под локом; для cron |
+| `efmesh status <env>` | что происходит: последний план, отставание интервалов, тики run |
 | `efmesh audit <env>` | аудиты view-слоя окружения — ловит деградацию задним числом |
 | `efmesh diff <envA> <envB>` | чем окружения отличаются |
 | `efmesh render <model> [--env]` | итоговый SQL модели |

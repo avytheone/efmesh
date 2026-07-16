@@ -42,6 +42,12 @@ export {
   type AuditRunResult,
 } from "./plan/audit-run.ts"
 export { diffEnvironments, type EnvDiff } from "./plan/diff.ts"
+export {
+  environmentStatus,
+  type ModelLag,
+  type StatusOptions,
+  type StatusReport,
+} from "./plan/status.ts"
 export { formatLineage, lineage, LineageError, type LineageNode } from "./plan/lineage.ts"
 
 // — план и применение: типы результата и опций —

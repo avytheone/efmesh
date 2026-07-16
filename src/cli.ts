@@ -15,6 +15,7 @@ import { auditEnvironment, EnvironmentAuditError } from "./plan/audit-run.ts"
 import { diffEnvironments } from "./plan/diff.ts"
 import { renderGraphHtml } from "./plan/graph-html.ts"
 import { formatLineage, lineage, LineageError } from "./plan/lineage.ts"
+import { environmentStatus } from "./plan/status.ts"
 import { janitor } from "./plan/janitor.ts"
 import { fp8 } from "./plan/naming.ts"
 import { envLockName, withStateLock } from "./plan/lock.ts"
@@ -383,6 +384,52 @@ const janitorCommand = Command.make(
     }),
 ).pipe(Command.withDescription("Убрать физику, на которую не ссылается ни одно окружение"))
 
+const statusCommand = Command.make(
+  "status",
+  { env: Argument.string("env"), config: configFlag },
+  ({ config, env }) =>
+    Effect.gen(function* () {
+      const loaded = yield* loadConfig(config)
+      const report = yield* environmentStatus(env, loaded.models).pipe(
+        Effect.provide(configLayers(loaded)),
+      )
+      if (report.models === 0) {
+        yield* Console.log(`окружение «${env}» не существует — его создаст первый apply`)
+        return
+      }
+      yield* Console.log(
+        `окружение «${env}»: моделей ${report.models}, промоушен ${report.promotedAt}, схема стора v${report.storeVersion}`,
+      )
+      if (report.lastPlan !== null) {
+        yield* Console.log(
+          `последний план: ${report.lastPlan.appliedAt} (${report.lastPlan.appliedBy || "неизвестно"})`,
+        )
+      }
+      for (const lag of report.lag) {
+        const state =
+          lag.missing === 0
+            ? `догнано до ${lag.doneUpTo}`
+            : `отстаёт на ${lag.missing} интервал(ов), догнано до ${lag.doneUpTo ?? "—"}`
+        const failed = lag.failed > 0 ? `  ⚠ failed-интервалов: ${lag.failed}` : ""
+        yield* Console.log(`  ${lag.missing === 0 ? "✓" : "…"} ${lag.model}  ${state}${failed}`)
+      }
+      if (report.ticks.length === 0) {
+        yield* Console.log("тиков run ещё не было")
+      } else {
+        yield* Console.log("последние тики run:")
+        for (const tick of report.ticks) {
+          const mark = tick.outcome === "ok" ? "✓" : tick.outcome === "error" ? "✗" : "…"
+          const ms = Date.parse(tick.finishedAt) - Date.parse(tick.startedAt)
+          yield* Console.log(
+            `  ${mark} ${tick.startedAt}  ${tick.outcome} (${ms} мс)${tick.detail !== "" ? `  ${tick.detail}` : ""}`,
+          )
+        }
+      }
+    }),
+).pipe(
+  Command.withDescription("Что происходит в окружении: промоушен, отставание, тики run"),
+)
+
 const auditCommand = Command.make(
   "audit",
   {
@@ -507,6 +554,7 @@ export const rootCommand = Command.make("efmesh").pipe(
     planCommand,
     applyCommand,
     runCommand,
+    statusCommand,
     auditCommand,
     renderCommand,
     graphCommand,

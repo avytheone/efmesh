@@ -165,6 +165,7 @@ export default defineConfig({
 | `efmesh plan <env>` | diff the project against an environment + missing intervals; changes nothing |
 | `efmesh apply <env>` | plan → confirmation (TTY) → physical tables, backfill, view layer |
 | `efmesh run <env>` | scheduler tick: new intervals only, under the lock; for cron |
+| `efmesh status <env>` | what is going on: last plan, interval lag, recent run ticks |
 | `efmesh audit <env>` | audit the environment's view layer — catches after-the-fact degradation |
 | `efmesh diff <envA> <envB>` | how two environments differ |
 | `efmesh render <model> [--env]` | the final SQL of a model |

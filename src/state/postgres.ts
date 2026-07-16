@@ -5,6 +5,7 @@ import type {
   IntervalRecord,
   MigrationReport,
   PlanRecord,
+  RunRecord,
   SnapshotRecord,
   StateStoreShape,
 } from "./store.ts"
@@ -53,6 +54,14 @@ CREATE TABLE IF NOT EXISTS efmesh_state.intervals (
   status      TEXT NOT NULL,
   updated_at  TEXT NOT NULL,
   PRIMARY KEY (snapshot_fp, start_ts)
+);
+CREATE TABLE IF NOT EXISTS efmesh_state.runs (
+  id          INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  env         TEXT NOT NULL,
+  started_at  TEXT NOT NULL,
+  finished_at TEXT NOT NULL,
+  outcome     TEXT NOT NULL,
+  detail      TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS efmesh_state.locks (
   name        TEXT PRIMARY KEY,
@@ -329,6 +338,24 @@ export const PostgresStateLive = (
                FROM efmesh_state.plans WHERE env = $1 ORDER BY id`,
               [env],
             )) as ReadonlyArray<PlanRecord>
+          }),
+
+        recordRun: (record) =>
+          attempt("recordRun", async () => {
+            await sql.unsafe(
+              `INSERT INTO efmesh_state.runs (env, started_at, finished_at, outcome, detail)
+               VALUES ($1, $2, $3, $4, $5)`,
+              [record.env, record.startedAt, record.finishedAt, record.outcome, record.detail],
+            )
+          }),
+
+        listRuns: (env, limit) =>
+          attempt("listRuns", async () => {
+            return (await sql.unsafe(
+              `SELECT id, env, started_at AS "startedAt", finished_at AS "finishedAt", outcome, detail
+               FROM efmesh_state.runs WHERE env = $1 ORDER BY id DESC LIMIT $2`,
+              [env, limit],
+            )) as ReadonlyArray<RunRecord>
           }),
 
         acquireLock: (name, ttlMs) =>

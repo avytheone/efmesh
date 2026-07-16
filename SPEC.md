@@ -293,6 +293,7 @@ snapshots     (name, fingerprint, definition_json, created_at)
 intervals     (snapshot_fp, start_ts, end_ts, status: done|failed, updated_at)
 environments  (env, name, snapshot_fp, promoted_at)
 plans         (id, env, summary_json, applied_at, applied_by)   -- audit journal
+runs          (id, env, started_at, finished_at, outcome, detail) -- run tick journal (0.2.0)
 meta          (version)                                          -- schema version (F4)
 ```
 
@@ -333,6 +334,15 @@ of a crashed process is reclaimed), the same in SQLite and Postgres.
 *Clarification in F5 (§14.6 closed): the lock is one per environment (`env:<name>`) and shared
 between `run` and `apply` — mutations of an environment from different processes mutually
 exclude each other; the `janitor` has its own global lock.*
+
+*Implemented in 0.2.0 (#1, #2):* every run tick writes its outcome to the
+`runs` journal in the state store — `ok` (with the list of built models),
+`awaiting-human` (unapplied changes), `lock-held`, `error` (the error tag) —
+including unsuccessful ones: a 3 a.m. cron failure is debuggable after the
+fact. `efmesh status <env>` reads it back: the last applied plan, interval
+lag per incremental model (computed against the environment's pointers —
+what consumers actually see), failed intervals, recent ticks. A journal
+write failure never masks the tick's real outcome (logged and ignored).
 A long-lived daemon is not needed,
 but for embedding into an Effect application there is `Runner.daemon` — an `Effect` that spins
 ticks by `Schedule.cron` inside your runtime.

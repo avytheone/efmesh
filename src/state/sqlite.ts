@@ -6,6 +6,7 @@ import type {
   IntervalRecord,
   MigrationReport,
   PlanRecord,
+  RunRecord,
   SnapshotRecord,
   StateStoreShape,
 } from "./store.ts"
@@ -45,6 +46,14 @@ CREATE TABLE IF NOT EXISTS intervals (
   status      TEXT NOT NULL,
   updated_at  TEXT NOT NULL,
   PRIMARY KEY (snapshot_fp, start_ts)
+);
+CREATE TABLE IF NOT EXISTS runs (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  env         TEXT NOT NULL,
+  started_at  TEXT NOT NULL,
+  finished_at TEXT NOT NULL,
+  outcome     TEXT NOT NULL,
+  detail      TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS locks (
   name        TEXT PRIMARY KEY,
@@ -340,6 +349,24 @@ export const SqliteStateLive = (
                  FROM plans WHERE env = ?1 ORDER BY id`,
               )
               .all(env) as ReadonlyArray<PlanRecord>
+          }),
+
+        recordRun: (record) =>
+          attempt("recordRun", () => {
+            db.query(
+              `INSERT INTO runs (env, started_at, finished_at, outcome, detail)
+               VALUES (?1, ?2, ?3, ?4, ?5)`,
+            ).run(record.env, record.startedAt, record.finishedAt, record.outcome, record.detail)
+          }),
+
+        listRuns: (env, limit) =>
+          attempt("listRuns", () => {
+            return db
+              .query(
+                `SELECT id, env, started_at AS startedAt, finished_at AS finishedAt, outcome, detail
+                 FROM runs WHERE env = ?1 ORDER BY id DESC LIMIT ?2`,
+              )
+              .all(env, limit) as ReadonlyArray<RunRecord>
           }),
 
         acquireLock: (name, ttlMs) =>

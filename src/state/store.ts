@@ -10,9 +10,9 @@ export class StateError extends Data.TaggedError("StateError")<{
  * на неё; стор со схемой старше (в т.ч. созданный до появления версии)
  * открытие не проходит — данные догоняет явный `efmesh migrate`.
  * 1 — базовая раскладка (F4), 2 — applied_by в журнале планов (F5),
- * 3 — fingerprint_version в снапшотах (F6).
+ * 3 — fingerprint_version в снапшотах (F6), 4 — журнал тиков run (0.2.0).
  */
-export const STATE_VERSION = 3
+export const STATE_VERSION = 4
 
 /** Схема стора не совпадает с ожидаемой бинарём — нужен `efmesh migrate`. */
 export class StateSchemaError extends Data.TaggedError("StateSchemaError")<{
@@ -73,6 +73,22 @@ export interface PlanRecord {
   readonly appliedAt: string
   /** Кто применил план (ОС-пользователь или ApplyOptions.appliedBy); '' у записей до v2. */
   readonly appliedBy: string
+}
+
+/**
+ * Запись журнала тиков run (SPEC §7, issue #2): упавший в три часа ночи
+ * cron-тик должен быть дебажим задним числом. outcome:
+ * ok — тик прошёл; awaiting-human — есть неприменённые изменения (exit 2);
+ * lock-held — окружение занято другим процессом; error — настоящий сбой.
+ */
+export interface RunRecord {
+  readonly id: number
+  readonly env: string
+  readonly startedAt: string
+  readonly finishedAt: string
+  readonly outcome: "ok" | "awaiting-human" | "lock-held" | "error"
+  /** ok: JSON-массив собранных моделей; awaiting-human: список изменений; error: тег ошибки. */
+  readonly detail: string
 }
 
 /**
@@ -137,6 +153,13 @@ export interface StateStoreShape {
     summary: string,
     appliedBy: string,
   ) => Effect.Effect<void, StateError>
+  /** Журнал тиков run (SPEC §7): исход каждого тика, включая неуспешные. */
+  readonly recordRun: (record: Omit<RunRecord, "id">) => Effect.Effect<void, StateError>
+  /** Последние тики окружения, свежие первыми. */
+  readonly listRuns: (
+    env: string,
+    limit: number,
+  ) => Effect.Effect<ReadonlyArray<RunRecord>, StateError>
   readonly listPlans: (env: string) => Effect.Effect<ReadonlyArray<PlanRecord>, StateError>
   /**
    * Межпроцессная блокировка (SPEC §7): true — получена, false — держит
