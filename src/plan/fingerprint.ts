@@ -18,6 +18,18 @@ import { EngineAdapter } from "../engine/adapter.ts"
  * интервалы учёт увидит сам.
  */
 
+/**
+ * Версия алгоритма fingerprint — КОНТРАКТ (SPEC §4). Fingerprint зависит от
+ * канонизации движка (json_serialize_sql DuckDB / libpg_query) и состава
+ * payload ниже: любое их изменение молча пере-фингерпринтит все модели
+ * пользователя и вынуждает полный ребилд склада. Поэтому: (1) канонизация
+ * заморожена golden-тестами (test/fingerprint-golden.test.ts) — красный
+ * тест при апгрейде DuckDB/libpg_query означает дрейф канона; (2) осознанная
+ * смена алгоритма = инкремент этой константы + история миграции, снапшоты
+ * другой версии план не сравнивает, а честно останавливается.
+ */
+export const FINGERPRINT_VERSION = 1
+
 const sha256 = (input: string): string => {
   const hasher = new Bun.CryptoHasher("sha256")
   hasher.update(input)

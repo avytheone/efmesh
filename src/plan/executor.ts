@@ -14,6 +14,7 @@ import { StateStore } from "../state/store.ts"
 import type { StateError, StateStoreShape } from "../state/store.ts"
 import { Metric } from "effect"
 import { checkContract, SchemaMismatchError } from "./contract.ts"
+import { FINGERPRINT_VERSION } from "./fingerprint.ts"
 import { auditFailuresTotal, intervalsDone, snapshotsBuilt } from "./metrics.ts"
 import {
   ducklakeAttachSql,
@@ -28,7 +29,13 @@ import {
   physicalTable,
   viewRef,
 } from "./naming.ts"
-import type { ForwardOnlyError, InvalidEnvironmentError, Plan, PlanAction } from "./planner.ts"
+import type {
+  FingerprintVersionError,
+  ForwardOnlyError,
+  InvalidEnvironmentError,
+  Plan,
+  PlanAction,
+} from "./planner.ts"
 
 export interface AppliedPlan {
   readonly plan: Plan
@@ -59,6 +66,7 @@ export type ApplyError =
   | AuditFailure
   | InvalidEnvironmentError
   | ForwardOnlyError
+  | FingerprintVersionError
   | EngineFeatureError
 
 export interface ApplyOptions {
@@ -426,6 +434,7 @@ export const applyPlan = (
             canonicalAst: action.canonicalAst ?? "",
             renderedSql: render(model.fragment, { resolveRef: (ref) => ref }),
             kind: model.kind._tag,
+            fingerprintVersion: FINGERPRINT_VERSION,
           })
           break
         }
@@ -443,6 +452,7 @@ export const applyPlan = (
             canonicalAst: "",
             renderedSql: body,
             kind: model.kind._tag,
+            fingerprintVersion: FINGERPRINT_VERSION,
           })
           break
         }
@@ -467,6 +477,7 @@ export const applyPlan = (
             canonicalAst: action.canonicalAst ?? "",
             renderedSql: render(model.fragment, { resolveRef: (ref) => ref }),
             kind: model.kind._tag,
+            fingerprintVersion: FINGERPRINT_VERSION,
           })
           break
         }
@@ -517,6 +528,7 @@ export const applyPlan = (
             canonicalAst: action.canonicalAst ?? "",
             renderedSql: render(model.fragment, { resolveRef: (ref) => ref }),
             kind: model.kind._tag,
+            fingerprintVersion: FINGERPRINT_VERSION,
           })
           break
         }
@@ -554,6 +566,7 @@ export const applyPlan = (
             canonicalAst: action.canonicalAst ?? "",
             renderedSql: body,
             kind: model.kind._tag,
+            fingerprintVersion: FINGERPRINT_VERSION,
           })
           break
         }
@@ -581,6 +594,7 @@ export const applyPlan = (
               canonicalAst: action.canonicalAst ?? "",
               renderedSql: render(model.fragment, { resolveRef: (ref) => ref }),
               kind: model.kind._tag,
+              fingerprintVersion: FINGERPRINT_VERSION,
             })
             yield* backfillIntoParquet(
               engine,
@@ -610,6 +624,7 @@ export const applyPlan = (
               canonicalAst: action.canonicalAst ?? "",
               renderedSql: render(model.fragment, { resolveRef: (ref) => ref }),
               kind: model.kind._tag,
+              fingerprintVersion: FINGERPRINT_VERSION,
             })
             yield* backfillIntoTable(
               engine,

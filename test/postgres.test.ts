@@ -42,6 +42,7 @@ describe.skipIf(!hasPostgres)("Postgres-адаптер (SPEC §9.1, F3)", () => 
           renderedSql: "SELECT 1",
           canonicalAst: "{}",
           kind: "full",
+          fingerprintVersion: 1,
         }
         yield* store.upsertSnapshot({ ...base, fingerprint: "f1", physicalFp: "f1" })
         yield* store.upsertSnapshot({ ...base, fingerprint: "f1", physicalFp: "f1" }) // идемпотентно

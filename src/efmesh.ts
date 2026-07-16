@@ -14,6 +14,7 @@ import {
 import { envLockName, withStateLock, type LockHeldError, type LockOptions } from "./plan/lock.ts"
 import {
   planChanges,
+  type FingerprintVersionError,
   type ForwardOnlyError,
   type InvalidEnvironmentError,
   type Plan,
@@ -41,6 +42,7 @@ export const Efmesh = {
     | StateError
     | InvalidEnvironmentError
     | ForwardOnlyError
+    | FingerprintVersionError
     | EngineError
     | SqlParseError
     | SeedReadError,

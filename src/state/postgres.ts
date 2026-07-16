@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS efmesh_state.snapshots (
   canonical_ast TEXT NOT NULL DEFAULT '',
   physical_fp   TEXT NOT NULL DEFAULT '',
   kind          TEXT NOT NULL,
+  fingerprint_version INTEGER NOT NULL DEFAULT 1,
   created_at    TEXT NOT NULL,
   orphaned_at   TEXT,
   PRIMARY KEY (name, fingerprint)
@@ -91,6 +92,7 @@ const applyMigrations = async (pool: SQL): Promise<void> => {
     ALTER TABLE efmesh_state.snapshots ADD COLUMN IF NOT EXISTS orphaned_at TEXT;
     ALTER TABLE efmesh_state.snapshots ADD COLUMN IF NOT EXISTS physical_fp TEXT NOT NULL DEFAULT '';
     ALTER TABLE efmesh_state.plans ADD COLUMN IF NOT EXISTS applied_by TEXT NOT NULL DEFAULT '';
+    ALTER TABLE efmesh_state.snapshots ADD COLUMN IF NOT EXISTS fingerprint_version INTEGER NOT NULL DEFAULT 1;
     CREATE TABLE IF NOT EXISTS efmesh_state.meta (version INTEGER NOT NULL);
   `)
   await pool.begin(async (tx) => {
@@ -121,6 +123,7 @@ const SNAPSHOT_COLUMNS = `
   name, fingerprint, rendered_sql AS "renderedSql",
   canonical_ast AS "canonicalAst", kind, created_at AS "createdAt",
   orphaned_at AS "orphanedAt",
+  fingerprint_version AS "fingerprintVersion",
   CASE WHEN physical_fp = '' THEN fingerprint ELSE physical_fp END AS "physicalFp"
 `
 
@@ -175,8 +178,8 @@ export const PostgresStateLive = (
               attempt("upsertSnapshot", async () => {
                 await sql.unsafe(
                   `INSERT INTO efmesh_state.snapshots
-                     (name, fingerprint, rendered_sql, canonical_ast, physical_fp, kind, created_at)
-                   VALUES ($1, $2, $3, $4, $5, $6, $7)
+                     (name, fingerprint, rendered_sql, canonical_ast, physical_fp, kind, fingerprint_version, created_at)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                    ON CONFLICT (name, fingerprint) DO NOTHING`,
                   [
                     snapshot.name,
@@ -185,6 +188,7 @@ export const PostgresStateLive = (
                     snapshot.canonicalAst,
                     snapshot.physicalFp,
                     snapshot.kind,
+                    snapshot.fingerprintVersion,
                     now,
                   ],
                 )

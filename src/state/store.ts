@@ -9,9 +9,10 @@ export class StateError extends Data.TaggedError("StateError")<{
  * Текущая версия схемы state store. Свежий стор бутстрапится сразу
  * на неё; стор со схемой старше (в т.ч. созданный до появления версии)
  * открытие не проходит — данные догоняет явный `efmesh migrate`.
- * 1 — базовая раскладка (F4), 2 — applied_by в журнале планов (F5).
+ * 1 — базовая раскладка (F4), 2 — applied_by в журнале планов (F5),
+ * 3 — fingerprint_version в снапшотах (F6).
  */
-export const STATE_VERSION = 2
+export const STATE_VERSION = 3
 
 /** Схема стора не совпадает с ожидаемой бинарём — нужен `efmesh migrate`. */
 export class StateSchemaError extends Data.TaggedError("StateSchemaError")<{
@@ -40,6 +41,12 @@ export interface SnapshotRecord {
    */
   readonly physicalFp: string
   readonly kind: string
+  /**
+   * Версия алгоритма fingerprint, которым посчитан снапшот (SPEC §4).
+   * План сравнивает только одноверсионные отпечатки; иная версия —
+   * громкая остановка, не тихий «всё breaking».
+   */
+  readonly fingerprintVersion: number
   readonly createdAt: string
   /**
    * Когда снапшот перестал быть указан хоть одним окружением (ISO UTC);

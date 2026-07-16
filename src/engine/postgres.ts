@@ -29,6 +29,27 @@ const stripLocations = (value: unknown): unknown => {
   return value
 }
 
+/**
+ * Канонизация Postgres-SQL — чистая (libpg_query, сервер не нужен);
+ * вынесена из Layer, чтобы golden-тесты могли заморозить канон
+ * независимо от пула (SPEC §4: канонизация = контракт fingerprint).
+ */
+export const canonicalizePostgresSql = (
+  sqlText: string,
+): Effect.Effect<string, SqlParseError> => {
+  // $start/$end канонического рендера — не синтаксис Postgres;
+  // детерминированная замена на $1/$2 сохраняет стабильность fingerprint
+  const parameterized = sqlText.replace(/\$start\b/g, "$1").replace(/\$end\b/g, "$2")
+  return Effect.tryPromise({
+    try: () => parse(parameterized),
+    catch: (cause) =>
+      new SqlParseError({
+        sql: sqlText,
+        message: cause instanceof Error ? cause.message : String(cause),
+      }),
+  }).pipe(Effect.map((tree) => JSON.stringify(stripLocations(tree))))
+}
+
 export interface PostgresEngineOptions {
   /** postgres://… или unix-сокет через ?host=/путь. */
   readonly url: string
@@ -91,19 +112,7 @@ export const PostgresEngineLive = (
               rows.map((row) => ({ name: row.name, type: row.type })),
             ),
           ),
-        canonicalize: (sqlText) => {
-          // $start/$end канонического рендера — не синтаксис Postgres;
-          // детерминированная замена на $1/$2 сохраняет стабильность fingerprint
-          const parameterized = sqlText.replace(/\$start\b/g, "$1").replace(/\$end\b/g, "$2")
-          return Effect.tryPromise({
-            try: () => parse(parameterized),
-            catch: (cause) =>
-              new SqlParseError({
-                sql: sqlText,
-                message: cause instanceof Error ? cause.message : String(cause),
-              }),
-          }).pipe(Effect.map((tree) => JSON.stringify(stripLocations(tree))))
-        },
+        canonicalize: canonicalizePostgresSql,
       }
       return service
     }),

@@ -22,6 +22,7 @@ describe("SqliteState", () => {
           canonicalAst: `{"statements":[]}`,
           physicalFp: "abc123",
           kind: "full",
+          fingerprintVersion: 1,
         }
         yield* store.upsertSnapshot(record)
         yield* store.upsertSnapshot(record) // повтор — no-op
@@ -85,7 +86,7 @@ describe("SqliteState", () => {
   test("orphaned_at: промоушен ставит отметку сироте и снимает при возврате", async () => {
     const phases = await withStore((store) =>
       Effect.gen(function* () {
-        const base = { name: "med.a", renderedSql: "SELECT 1", canonicalAst: "{}", kind: "full" }
+        const base = { name: "med.a", renderedSql: "SELECT 1", canonicalAst: "{}", kind: "full", fingerprintVersion: 1 }
         yield* store.upsertSnapshot({ ...base, fingerprint: "f1", physicalFp: "f1" })
         yield* store.promote("dev", [{ name: "med.a", fingerprint: "f1" }])
         const referenced = yield* store.getSnapshot("med.a", "f1")

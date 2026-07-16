@@ -8,7 +8,7 @@ import { EngineAdapter } from "../engine/adapter.ts"
 import { StateStore } from "../state/store.ts"
 import type { StateError } from "../state/store.ts"
 import { categorizeAstChange } from "./categorize.ts"
-import { fingerprintGraph } from "./fingerprint.ts"
+import { FINGERPRINT_VERSION, fingerprintGraph } from "./fingerprint.ts"
 import { validateEnvName } from "./naming.ts"
 
 export class InvalidEnvironmentError extends Data.TaggedError("InvalidEnvironmentError")<{
@@ -19,6 +19,18 @@ export class InvalidEnvironmentError extends Data.TaggedError("InvalidEnvironmen
 export class ForwardOnlyError extends Data.TaggedError("ForwardOnlyError")<{
   readonly model: string
   readonly reason: string
+}> {}
+
+/**
+ * Снапшот посчитан другой версией алгоритма fingerprint (SPEC §4):
+ * отпечатки разных версий несравнимы — план честно останавливается,
+ * а не показывает «всё breaking». Лечится миграцией той версии efmesh,
+ * которая сменила алгоритм.
+ */
+export class FingerprintVersionError extends Data.TaggedError("FingerprintVersionError")<{
+  readonly model: string
+  readonly found: number
+  readonly wanted: number
 }> {}
 
 export type ChangeCategory =
@@ -94,7 +106,13 @@ export const planChanges = (
   options?: PlanOptions,
 ): Effect.Effect<
   Plan,
-  InvalidEnvironmentError | ForwardOnlyError | StateError | EngineError | SqlParseError | SeedReadError,
+  | InvalidEnvironmentError
+  | ForwardOnlyError
+  | FingerprintVersionError
+  | StateError
+  | EngineError
+  | SqlParseError
+  | SeedReadError,
   StateStore | EngineAdapter
 > =>
   Effect.gen(function* () {
@@ -134,6 +152,13 @@ export const planChanges = (
         // категоризация по AST против последнего известного снапшота (SPEC §5.2);
         // старых записей без AST и external — консервативно breaking
         const previous = yield* store.getSnapshot(name, known)
+        if (previous !== undefined && previous.fingerprintVersion !== FINGERPRINT_VERSION) {
+          return yield* new FingerprintVersionError({
+            model: name,
+            found: previous.fingerprintVersion,
+            wanted: FINGERPRINT_VERSION,
+          })
+        }
         const oldAst = previous?.canonicalAst ?? ""
         if (oldAst === "" || ast === null) change = "breaking"
         else if (oldAst === ast) change = "indirect" // версия сдвинута родителем/метаданными
