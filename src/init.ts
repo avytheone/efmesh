@@ -14,7 +14,7 @@ export class InitError extends Data.TaggedError("InitError")<{
 }> {}
 
 const MODELS_TS = `import { Schema } from "effect"
-import { audit, defineModel, defineSeed, kind } from "efmesh"
+import { audit, defineModel, defineSeed, kind } from "@avytheone/efmesh"
 
 // seed: справочник из файла; содержимое входит в fingerprint —
 // правка CSV = новая версия и пересборка
@@ -40,7 +40,7 @@ export const floors = defineModel(
 )
 `
 
-const CONFIG_TS = `import { defineConfig } from "efmesh"
+const CONFIG_TS = `import { defineConfig } from "@avytheone/efmesh"
 import { departments, floors } from "./models.ts"
 
 export default defineConfig({

@@ -10,7 +10,7 @@ Models are plain TypeScript modules: SQL bodies, imports as dependencies, Effect
 
 ```ts
 import { Schema } from "effect"
-import { defineModel, kind } from "efmesh"
+import { defineModel, kind } from "@avytheone/efmesh"
 import { rawMoves } from "./sources.ts"
 
 export const moves = defineModel(
@@ -68,10 +68,8 @@ A typo in a `ref` is a compile error, not an empty run; renaming a parent's colu
 
 ## Quickstart
 
-Not yet published to a registry — install from git:
-
 ```sh
-bun add -d efmesh@git+https://github.com/avytheone/efmesh.git
+bun add -d @avytheone/efmesh@beta
 bunx efmesh init my-warehouse && cd my-warehouse
 bunx efmesh plan dev    # what would be done
 bunx efmesh apply dev   # physical tables, backfill, view layer
@@ -119,7 +117,7 @@ audits: [
 
 ```ts
 // a model unit test: fixtures → CTEs → in-memory DuckDB → comparison (bun test)
-import { testModel } from "efmesh/testing"
+import { testModel } from "@avytheone/efmesh/testing"
 
 test("stays", () =>
   testModel(stays, {
@@ -135,7 +133,7 @@ The declared `schema` is a contract, not documentation: before every build efmes
 `efmesh.config.ts` is a typed TS module — no YAML:
 
 ```ts
-import { defineConfig } from "efmesh"
+import { defineConfig } from "@avytheone/efmesh"
 
 export default defineConfig({
   discovery: "models/**/*.ts",      // every model export by glob; duplicate names = load error

@@ -10,7 +10,7 @@
 
 ```ts
 import { Schema } from "effect"
-import { defineModel, kind } from "efmesh"
+import { defineModel, kind } from "@avytheone/efmesh"
 import { rawMoves } from "./sources.ts"
 
 export const moves = defineModel(
@@ -72,10 +72,8 @@ dbt/sqlmesh-подход поверх DuckDB или Postgres и готовы ж�
 
 ## Быстрый старт
 
-Пакет пока не опубликован в registry — ставится из git:
-
 ```sh
-bun add -d efmesh@git+https://github.com/avytheone/efmesh.git
+bun add -d @avytheone/efmesh@beta
 bunx efmesh init my-warehouse && cd my-warehouse
 bunx efmesh plan dev    # что будет сделано
 bunx efmesh apply dev   # физика, бэкфилл, view-слой
@@ -123,7 +121,7 @@ audits: [
 
 ```ts
 // юнит-тест модели: фикстуры → CTE → in-memory DuckDB → сверка (bun test)
-import { testModel } from "efmesh/testing"
+import { testModel } from "@avytheone/efmesh/testing"
 
 test("stays", () =>
   testModel(stays, {
@@ -139,7 +137,7 @@ test("stays", () =>
 `efmesh.config.ts` — типизированный TS-модуль, никакого YAML:
 
 ```ts
-import { defineConfig } from "efmesh"
+import { defineConfig } from "@avytheone/efmesh"
 
 export default defineConfig({
   discovery: "models/**/*.ts",      // все экспорты-модели по glob; дубликат имени = ошибка

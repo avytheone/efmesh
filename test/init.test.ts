@@ -28,7 +28,7 @@ describe("efmesh init (SPEC §12, F4)", () => {
       // в скаффолде импорт из пакета «efmesh» и относительный путь seed —
       // для прогона из теста подменяем на локальный src и абсолютный путь
       const models = readFileSync(join(dir, "models.ts"), "utf8")
-        .replaceAll(`"efmesh"`, `"${join(import.meta.dir, "../src/index.ts")}"`)
+        .replaceAll(`"@avytheone/efmesh"`, `"${join(import.meta.dir, "../src/index.ts")}"`)
         .replaceAll(`"seeds/departments.csv"`, `"${join(dir, "seeds/departments.csv")}"`)
       writeFileSync(join(dir, "models.ts"), models)
       const loaded = (await import(join(dir, "models.ts"))) as Record<string, AnyModel>
