@@ -48,6 +48,12 @@ export const moves = defineModel(
 
 A typo in a `ref` is a compile error, not an empty run; renaming a parent's column breaks the child's build before any SQL reaches the database.
 
+## Why this exists: small data lakes
+
+Most analytics in the world is not a cloud warehouse — it is DuckDB-class data: gigabytes to a terabyte on one machine. Product analytics of a startup, the marts of one department, on-prem and edge deployments, a pipeline living inside a SaaS app. dbt and sqlmesh were born in the cloud-DWH world and carry that weight with them (Python, adapters, infrastructure). efmesh is the sqlmesh approach that is `bun add` and go — and the lake is a folder of parquet files.
+
+Honestly placed: the **core** is the same class of system as sqlmesh — snapshots, AST fingerprints, plans as diffs, virtual environments. The **breadth** is not: no cloud engines, no multi-dialect, no web UI, no ecosystem of packages — and no ambition to catch up on all of it. Compared to dbt-core the trade is reversed: dbt has an industry around it, but no state-based plans, no virtual environments, no fingerprint versioning — every team reinvents "how not to rebuild everything". Our four honest advantages: **types as the DAG contract** (a typo breaks the build, not the nightly run), **library before CLI** (embed `Efmesh.apply(...)` in your app), **one language for the whole stack** (models, app, tests), and a **codebase you can read in an evening** (~5.5k lines).
+
 ## Who this is for (and who it isn't)
 
 **For you**, if you are a TypeScript team on Bun, want a typed dbt/sqlmesh-style workflow on top of DuckDB or Postgres, and are fine living on a beta (efmesh is 0.1.x; Effect v4 is beta, pinned exactly as a peer dependency).
@@ -170,6 +176,16 @@ export default defineConfig({
 `apply`/`run` flags: `--jobs N` — DAG concurrency (always 1 on DuckDB — single connection), `--retries N` — retries for transient batch failures (exponential backoff), `--yes`/`-y` — skip confirmation, `--forward-only <model>,…` — reuse physical storage and history.
 
 Exit codes: `0` — success, `1` — error, `2` — "awaiting a human": the plan needs confirmation in a non-TTY (add `--yes`), or `run` hit unapplied changes. In a non-TTY, `apply` with changes and no `--yes` refuses — efmesh will not silently roll out a plan nobody has seen.
+
+## Performance
+
+The framework overhead is negligible for any realistic project (in-memory DuckDB, `bun bench/plan-bench.ts N`):
+
+| models | cold plan | apply (all physical) | no-op plan | promote to prod |
+|---|---|---|---|---|
+| 100 | 51 ms | 155 ms | 35 ms | 67 ms |
+| 500 | 177 ms | 729 ms | 160 ms | 332 ms |
+| 2000 | 0.7 s | 2.9 s | 0.6 s | 1.3 s |
 
 ## Postgres
 
