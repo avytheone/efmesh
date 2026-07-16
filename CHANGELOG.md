@@ -36,6 +36,12 @@ the first version gathers them in full.
   dialog — works in CI), journaled with `applied_by`
   (`PlanAction.reclassifiedFrom`); governs descendants' physics reuse.
   Guard rail: dropped columns declared non-breaking are refused (#5).
+- `diff --data` — compare the DATA of two environments: full row counts,
+  key overlap (grain or the kind's key), per-column mismatch rates among
+  matched keys, schema drift between sides. `--sample P` compares a
+  deterministic share of keys (md5 buckets aligned across both sides — no
+  false only-in rows); `--json` for CI (`dataDiffEnvironments` in the
+  library API) (#6).
 
 ## [0.1.0-beta.2] — 2026-07-16
 

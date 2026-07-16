@@ -167,7 +167,7 @@ export default defineConfig({
 | `efmesh run <env>` | scheduler tick: new intervals only, under the lock; for cron |
 | `efmesh status <env>` | what is going on: last plan, interval lag, recent run ticks |
 | `efmesh audit <env>` | audit the environment's view layer — catches after-the-fact degradation |
-| `efmesh diff <envA> <envB>` | how two environments differ |
+| `efmesh diff <envA> <envB>` | how two environments differ; `--data` compares the actual data |
 | `efmesh render <model> [--env]` | the final SQL of a model |
 | `efmesh lineage <model[.col]>` | column lineage down to the raw sources |
 | `efmesh graph [--html]` | the model DAG as text or a page |
@@ -191,6 +191,13 @@ nodes diverged (`where_clause`, `select_list[2] (added)`, …) and why the
 category followed — including cascade sources for `indirect`. The same
 data ships in `--json` as `explain`; the AST paths are a debugging hint,
 not part of the contract.
+
+`diff <envA> <envB> --data` compares the actual data of two environments:
+row counts, key overlap (grain or the kind's key), per-column mismatch
+rates among matched keys, schema drift between sides. `--sample P` (1–99)
+compares a deterministic share of keys — md5 buckets aligned across both
+sides, so sampling never fabricates only-in rows. `--model a,b` narrows,
+`--json` for CI.
 
 Exit codes: `0` — success, `1` — error, `2` — "awaiting a human": the plan needs confirmation in a non-TTY (add `--yes`), or `run` hit unapplied changes. In a non-TTY, `apply` with changes and no `--yes` refuses — efmesh will not silently roll out a plan nobody has seen.
 

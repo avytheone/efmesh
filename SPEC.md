@@ -551,12 +551,13 @@ Schedule/Metric/Scope), with point adaptations — at the finalization of v4.
 
 ```
 efmesh init [dir]               — scaffold a project (config, example models, seed)
-efmesh plan <env> [--forward-only <model>,…]
-efmesh apply <env> [--yes] [--jobs N] [--retries N] [--forward-only …]  — plan + confirmation + application
+efmesh plan <env> [--forward-only <model>,…] [--reclassify m=cat,…] [--explain] [--json]
+efmesh apply <env> [--yes] [--jobs N] [--retries N] [--forward-only …] [--reclassify …]  — plan + confirmation + application
 efmesh run  <env> [--jobs N] [--retries N]  — a scheduler tick
-efmesh audit <env> [--model a,b] — audits of the environment's view layer, changing nothing
+efmesh audit <env> [--model a,b] [--json] — audits of the environment's view layer, changing nothing
 efmesh render <model> [--env]   — show the final SQL (for debugging)
-efmesh diff <envA> <envB>       — how the environments differ
+efmesh diff <envA> <envB> [--data [--model a,b] [--sample P] [--json]] — how the environments differ
+efmesh status <env> [--json]    — last plan, interval lag, recent run ticks
 efmesh lineage <model[.column]>
 efmesh graph [--html]           — the model DAG
 efmesh janitor [--ttl 7]        — cleanup of orphaned physical tables
@@ -565,6 +566,17 @@ efmesh migrate                  — catch the state store schema up to the curre
 
 The config is `efmesh.config.ts` (not YAML): typed, it assembles the `Layer` of the engine
 and the state store, defines environments, the project's `start`, the ttl, concurrency.
+
+`diff --data` (0.2.0, #6 — the sqlmesh table_diff class) compares the DATA of
+two environments' view layers: full row counts, key overlap (grain, or the
+kind's key for uniqueKey/scdType2) via a FULL OUTER JOIN with presence
+markers, and per-column mismatch counts among matched keys. Models without a
+key get honest row counts only; columns existing on one side only are
+reported as schema drift. `--sample P` (1–99) compares a deterministic share
+of keys — both sides are filtered by the same md5 buckets of the key, so the
+sample stays aligned and produces no false only-in rows (row counts remain
+full). Works on DuckDB and Postgres; ducklake marts are visible via the same
+ATTACH `apply` uses.
 
 ---
 

@@ -41,7 +41,16 @@ export {
   type AuditRunReport,
   type AuditRunResult,
 } from "./plan/audit-run.ts"
-export { diffEnvironments, type EnvDiff } from "./plan/diff.ts"
+export {
+  dataDiffEnvironments,
+  DataDiffError,
+  diffEnvironments,
+  type ColumnDrift,
+  type DataDiffOptions,
+  type DataDiffReport,
+  type EnvDiff,
+  type ModelDataDiff,
+} from "./plan/diff.ts"
 export {
   environmentStatus,
   type ModelLag,

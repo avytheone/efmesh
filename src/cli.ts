@@ -12,7 +12,13 @@ import { DuckDBEngineLive } from "./engine/duckdb.ts"
 import { PostgresEngineLive } from "./engine/postgres.ts"
 import { PostgresStateLive } from "./state/postgres.ts"
 import { auditEnvironment, EnvironmentAuditError } from "./plan/audit-run.ts"
-import { diffEnvironments } from "./plan/diff.ts"
+import {
+  dataDiffEnvironments,
+  diffEnvironments,
+  type DataDiffReport,
+} from "./plan/diff.ts"
+import { EngineAdapter } from "./engine/adapter.ts"
+import { ducklakeAttachSql } from "./plan/naming.ts"
 import { renderGraphHtml } from "./plan/graph-html.ts"
 import { formatLineage, lineage, LineageError } from "./plan/lineage.ts"
 import { environmentStatus } from "./plan/status.ts"
@@ -436,15 +442,100 @@ const runCommand = Command.make(
   ),
 )
 
+const printDataDiff = (report: DataDiffReport) =>
+  Effect.gen(function* () {
+    yield* Console.log(`данные ${report.envA} ↔ ${report.envB}:`)
+    if (report.models.length === 0) {
+      yield* Console.log("  общих материализуемых моделей нет")
+      return
+    }
+    for (const entry of report.models) {
+      if (entry.key === undefined) {
+        yield* Console.log(
+          `  · ${entry.model}  A=${entry.rowsA} B=${entry.rowsB}  без ключа (задайте grain) — только счётчики`,
+        )
+      } else {
+        const clean =
+          entry.onlyInA === 0 &&
+          entry.onlyInB === 0 &&
+          (entry.columns?.length ?? 0) === 0 &&
+          entry.rowsA === entry.rowsB
+        const sampled =
+          entry.sampledPercent !== undefined ? `  (выборка ${entry.sampledPercent}%)` : ""
+        yield* Console.log(
+          `  ${clean ? "✓" : "≠"} ${entry.model}  A=${entry.rowsA} B=${entry.rowsB}  ключ (${entry.key.join(", ")}): только в A ${entry.onlyInA}, только в B ${entry.onlyInB}, совпало ${entry.matched}${sampled}`,
+        )
+        for (const drift of entry.columns ?? []) {
+          yield* Console.log(
+            `      ${drift.column}: ${drift.mismatches} из ${entry.matched} (${(drift.rate * 100).toFixed(2)}%)`,
+          )
+        }
+      }
+      if (entry.columnsOnlyInA !== undefined) {
+        yield* Console.log(`      колонки только в A: ${entry.columnsOnlyInA.join(", ")}`)
+      }
+      if (entry.columnsOnlyInB !== undefined) {
+        yield* Console.log(`      колонки только в B: ${entry.columnsOnlyInB.join(", ")}`)
+      }
+    }
+  })
+
 const diffCommand = Command.make(
   "diff",
-  { envA: Argument.string("envA"), envB: Argument.string("envB"), config: configFlag },
-  ({ config, envA, envB }) =>
+  {
+    envA: Argument.string("envA"),
+    envB: Argument.string("envB"),
+    config: configFlag,
+    data: Flag.boolean("data").pipe(
+      Flag.withDescription(
+        "Сравнить ДАННЫЕ view-слоёв: счётчики строк, пересечение по ключу, расхождения по колонкам",
+      ),
+    ),
+    model: Flag.string("model").pipe(
+      Flag.withDefault(""),
+      Flag.withDescription("Только эти модели, через запятую (для --data)"),
+    ),
+    sample: Flag.string("sample").pipe(
+      Flag.withDefault(""),
+      Flag.withDescription(
+        "Процент 1–99: сравнивать детерминированную долю ключей (md5-бакеты; для --data)",
+      ),
+    ),
+    json: jsonFlag,
+  },
+  ({ config, data, envA, envB, json, model, sample }) =>
     Effect.gen(function* () {
       const loaded = yield* loadConfig(config)
+      if (data) {
+        const only = parseForwardOnly(model)
+        const percent = sample === "" ? undefined : Number(sample)
+        if (percent !== undefined && !(Number.isFinite(percent) && percent >= 1 && percent <= 99)) {
+          yield* Console.error("--sample ожидает процент от 1 до 99")
+          return yield* Effect.sync(() => {
+            process.exitCode = 1
+          })
+        }
+        const report = yield* Effect.gen(function* () {
+          // ducklake-витрины видны через ATTACH — как делает apply
+          if (loaded.ducklake !== undefined) {
+            const engine = yield* EngineAdapter
+            yield* engine.execute(ducklakeAttachSql(loaded.ducklake))
+          }
+          return yield* dataDiffEnvironments(envA, envB, loaded.models, {
+            ...(only !== undefined ? { models: only } : {}),
+            ...(percent !== undefined ? { samplePercent: percent } : {}),
+          })
+        }).pipe(Effect.provide(configLayers(loaded)))
+        yield* json ? printJson(report) : printDataDiff(report)
+        return
+      }
       const diff = yield* diffEnvironments(envA, envB).pipe(
         Effect.provide(configLayers(loaded)),
       )
+      if (json) {
+        yield* printJson(diff)
+        return
+      }
       for (const name of diff.onlyInA) yield* Console.log(`< ${name}  только в ${envA}`)
       for (const name of diff.onlyInB) yield* Console.log(`> ${name}  только в ${envB}`)
       for (const entry of diff.different) {
@@ -454,7 +545,9 @@ const diffCommand = Command.make(
         yield* Console.log("окружения идентичны")
       }
     }),
-).pipe(Command.withDescription("Чем окружения отличаются (по state store)"))
+).pipe(
+  Command.withDescription("Чем окружения отличаются: версии (state store) или --data (данные)"),
+)
 
 const janitorCommand = Command.make(
   "janitor",
