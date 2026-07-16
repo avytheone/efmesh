@@ -131,10 +131,12 @@ export const parseModelName = (raw: string): ModelName => {
 }
 
 /**
- * Куда складывать физический слой (SPEC §3.3): нативная таблица движка
- * или parquet-файлы озера (интервал = партиция, view поверх read_parquet).
+ * Куда складывать физический слой (SPEC §3.3): нативная таблица движка,
+ * parquet-файлы озера (интервал = партиция, view поверх read_parquet) или
+ * DuckLake-каталог (SPEC §14.5: таблица-на-fingerprint в ATTACH-каталоге —
+ * снапшоты и time travel самого DuckLake в довесок, версионность наша).
  */
-export type MaterializationTarget = "table" | "parquet"
+export type MaterializationTarget = "table" | "parquet" | "ducklake"
 
 export interface ModelConfig<Fields extends Schema.Struct.Fields> {
   readonly name: string
@@ -256,11 +258,12 @@ const validateKindConfig = <Fields extends Schema.Struct.Fields>(
   }
   if (
     (config.kind._tag === "view" || config.kind._tag === "embedded") &&
-    config.target === "parquet"
+    config.target !== undefined &&
+    config.target !== "table"
   ) {
     throw new ModelDefinitionError({
       model: name.full,
-      reason: `${config.kind._tag} не материализуется — parquet-цель к нему неприменима`,
+      reason: `${config.kind._tag} не материализуется — цель «${config.target}» к нему неприменима`,
     })
   }
   if (config.kind._tag === "incrementalByUniqueKey" && config.target === "parquet") {

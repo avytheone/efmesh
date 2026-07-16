@@ -24,6 +24,13 @@ export interface EfmeshConfig {
     /** Корень parquet-озера (SPEC §3.3) — локальная директория или s3://…. */
     readonly path: string
   }
+  /** DuckLake-каталог для target: "ducklake" (SPEC §14.5). DuckDB-only. */
+  readonly ducklake?: {
+    /** Путь к SQLite-файлу каталога DuckLake. */
+    readonly catalog: string
+    /** Куда DuckLake кладёт parquet-данные; по умолчанию — рядом с каталогом. */
+    readonly dataPath?: string
+  }
   /** ATTACH-базы по алиасам (SPEC §9.3): url + опции (`TYPE postgres` и т.п.). */
   readonly attach?: Readonly<Record<string, { readonly url: string; readonly options?: string }>>
 }

@@ -140,6 +140,7 @@ const applyCommand = Command.make(
       const modelConcurrency = parseJobs(jobs)
       const applied = yield* Efmesh.apply(env, loaded.models, {
         ...(loaded.lake !== undefined ? { lakePath: loaded.lake.path } : {}),
+        ...(loaded.ducklake !== undefined ? { ducklake: loaded.ducklake } : {}),
         ...(loaded.attach !== undefined ? { attach: loaded.attach } : {}),
         ...(names !== undefined ? { forwardOnly: names } : {}),
         ...(modelConcurrency !== undefined ? { modelConcurrency } : {}),
@@ -183,6 +184,7 @@ const runCommand = Command.make(
       const modelConcurrency = parseJobs(jobs)
       const applied = yield* run(env, loaded.models, {
         ...(loaded.lake !== undefined ? { lakePath: loaded.lake.path } : {}),
+        ...(loaded.ducklake !== undefined ? { ducklake: loaded.ducklake } : {}),
         ...(loaded.attach !== undefined ? { attach: loaded.attach } : {}),
         ...(modelConcurrency !== undefined ? { modelConcurrency } : {}),
       }).pipe(Effect.provide(configLayers(loaded)))
@@ -233,6 +235,7 @@ const janitorCommand = Command.make(
       const report = yield* janitor({
         ttlDays: Number(ttl),
         ...(loaded.lake !== undefined ? { lakePath: loaded.lake.path } : {}),
+        ...(loaded.ducklake !== undefined ? { ducklake: loaded.ducklake } : {}),
       }).pipe(Effect.provide(configLayers(loaded)))
       yield* Console.log(
         report.removed.length > 0

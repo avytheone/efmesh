@@ -15,6 +15,8 @@ import { Metric } from "effect"
 import { checkContract, SchemaMismatchError } from "./contract.ts"
 import { auditFailuresTotal, intervalsDone, snapshotsBuilt } from "./metrics.ts"
 import {
+  ducklakeAttachSql,
+  ducklakeRef,
   envSchema,
   externalSourceRef,
   intervalKey,
@@ -38,6 +40,11 @@ export class LakeNotConfiguredError extends Data.TaggedError("LakeNotConfiguredE
   readonly model: string
 }> {}
 
+/** В проекте есть ducklake-модели, но каталог не задан в конфиге. */
+export class DucklakeNotConfiguredError extends Data.TaggedError("DucklakeNotConfiguredError")<{
+  readonly model: string
+}> {}
+
 export type ApplyError =
   | GraphError
   | StateError
@@ -46,6 +53,7 @@ export type ApplyError =
   | SeedReadError
   | SchemaMismatchError
   | LakeNotConfiguredError
+  | DucklakeNotConfiguredError
   | AttachNotConfiguredError
   | AuditFailure
   | InvalidEnvironmentError
@@ -59,6 +67,8 @@ export interface ApplyOptions {
   readonly lakePath?: string
   /** ATTACH-базы по алиасам (SPEC §9.3) — для export-моделей. */
   readonly attach?: Readonly<Record<string, { readonly url: string; readonly options?: string }>>
+  /** DuckLake-каталог для target: "ducklake" (SPEC §14.5). DuckDB-only. */
+  readonly ducklake?: { readonly catalog: string; readonly dataPath?: string }
   /**
    * Сколько батчей бэкфилла одной модели считать одновременно (SPEC §5.3).
    * Осмыслен только на движке с пулом соединений (Postgres); DuckDB держит
@@ -295,8 +305,13 @@ export const applyPlan = (
         if (lakePath === undefined) throw new LakeNotConfiguredError({ model: model.name.full })
         return parquetRef(lakePath, model.name, fingerprint)
       }
-      return physicalRef(model.name, fingerprint)
+      return tableRef(model, fingerprint)
     }
+    // нативная физика или таблица DuckLake-каталога — по цели модели
+    const tableRef = (model: AnyModel, fingerprint: string): string =>
+      model.target === "ducklake"
+        ? ducklakeRef(model.name, fingerprint)
+        : physicalRef(model.name, fingerprint)
     const resolveRef = (ref: string): string => {
       const model = graph.models.get(ref)
       const fingerprint = physicalFpOf.get(ref)
@@ -313,12 +328,17 @@ export const applyPlan = (
       if (model.target === "parquet" && lakePath === undefined) {
         return yield* new LakeNotConfiguredError({ model: model.name.full })
       }
+      if (model.target === "ducklake" && options?.ducklake === undefined) {
+        return yield* new DucklakeNotConfiguredError({ model: model.name.full })
+      }
       // DuckDB-федерация (SPEC §9.3) на других движках не выражается —
       // честная ошибка до любых действий
       if (engine.dialect !== "duckdb") {
         const feature =
           model.target === "parquet"
             ? "target: parquet"
+            : model.target === "ducklake"
+              ? "target: ducklake"
             : model.kind._tag === "seed"
               ? "seed (read_csv/read_json)"
               : model.kind._tag === "external" && model.kind.source._tag === "files"
@@ -341,6 +361,11 @@ export const applyPlan = (
     // волновых барьеров); независимые ветки идут параллельно на движке
     // с пулом; упавший родитель не открывает гейт — потомки не строятся
     yield* engine.execute(`CREATE SCHEMA IF NOT EXISTS "${physicalSchema}"`)
+    // ducklake-каталог нужен и для сборки, и для чистого view-swap —
+    // view окружений ссылаются на таблицы каталога по алиасу
+    if (options?.ducklake !== undefined && engine.dialect === "duckdb") {
+      yield* engine.execute(ducklakeAttachSql(options.ducklake))
+    }
     const working = plan.actions.filter(
       (action) =>
         (action.build || action.backfill.length > 0 || action.refresh) &&
@@ -375,7 +400,7 @@ export const applyPlan = (
           const reader = model.kind.format === "csv" ? "read_csv" : "read_json"
           const body = `SELECT * FROM ${reader}('${model.kind.file.replaceAll(`'`, `''`)}')`
           yield* checkContract(engine, model, body)
-          const target = physicalRef(model.name, action.physicalFingerprint)
+          const target = tableRef(model, action.physicalFingerprint)
           yield* engine.execute(`CREATE OR REPLACE TABLE ${target} AS ${body}`)
           yield* runAudits(engine, model, target)
           yield* store.upsertSnapshot({
@@ -391,7 +416,7 @@ export const applyPlan = (
         case "incrementalByUniqueKey": {
           const body = render(model.fragment, { resolveRef })
           yield* checkContract(engine, model, body)
-          const target = physicalRef(model.name, action.physicalFingerprint)
+          const target = tableRef(model, action.physicalFingerprint)
           yield* engine.execute(
             `CREATE TABLE IF NOT EXISTS ${target} AS SELECT * FROM (${body}) q LIMIT 0`,
           )
@@ -417,7 +442,7 @@ export const applyPlan = (
           const body = render(model.fragment, { resolveRef })
           const managed = new Set([scd.validFrom, scd.validTo])
           yield* checkContract(engine, model, body, managed)
-          const target = physicalRef(model.name, action.physicalFingerprint)
+          const target = tableRef(model, action.physicalFingerprint)
           const from = quoteIdent(scd.validFrom)
           const to = quoteIdent(scd.validTo)
           yield* engine.execute(
@@ -474,7 +499,7 @@ export const applyPlan = (
               `COPY (${body}) TO '${prefix.replaceAll(`'`, `''`)}/data.parquet' (FORMAT PARQUET)`,
             )
           } else {
-            const target = physicalRef(model.name, action.physicalFingerprint)
+            const target = tableRef(model, action.physicalFingerprint)
             if (model.kind._tag === "view") {
               yield* engine.execute(`CREATE OR REPLACE VIEW ${target} AS ${body}`)
             } else if (engine.dialect === "duckdb") {
@@ -527,7 +552,7 @@ export const applyPlan = (
             yield* backfillIntoParquet(engine, store, model, action, prefix, resolveRef)
           } else {
             // пустой скелет с формой запроса; при resume уже существует
-            const target = physicalRef(model.name, action.physicalFingerprint)
+            const target = tableRef(model, action.physicalFingerprint)
             yield* engine.execute(
               `CREATE TABLE IF NOT EXISTS ${target} AS SELECT * FROM (${emptyBody}) q LIMIT 0`,
             )

@@ -291,6 +291,21 @@ describe.skipIf(!hasPostgres)("Postgres-адаптер (SPEC §9.1, F3)", () => 
         })
         const failure = yield* Effect.flip(Efmesh.apply("dev", [departments]))
         expect(failure._tag).toBe("EngineFeatureError")
+
+        // target: ducklake — тоже DuckDB-федерация, на PG не выражается
+        const lake = defineModel(
+          {
+            name: "med3.lake",
+            kind: kind.full(),
+            target: "ducklake",
+            schema: Schema.Struct({ n: Schema.Number }),
+          },
+          (ctx) => ctx.sql`SELECT 1::INT AS n`,
+        )
+        const lakeFailure = yield* Effect.flip(
+          Efmesh.apply("dev", [lake], { ducklake: { catalog: "unused.sqlite" } }),
+        )
+        expect(lakeFailure._tag).toBe("EngineFeatureError")
       }),
     )
   })

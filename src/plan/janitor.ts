@@ -5,7 +5,7 @@ import { EngineAdapter } from "../engine/adapter.ts"
 import type { EngineError } from "../engine/adapter.ts"
 import { StateStore } from "../state/store.ts"
 import type { StateError } from "../state/store.ts"
-import { parquetPrefix, physicalRef } from "./naming.ts"
+import { ducklakeAttachSql, ducklakeRef, parquetPrefix, physicalRef } from "./naming.ts"
 
 /**
  * Уборка осиротевшей физики (SPEC §5.4): снапшоты, на которые не ссылается
@@ -24,6 +24,8 @@ import { parquetPrefix, physicalRef } from "./naming.ts"
 export interface JanitorOptions {
   readonly ttlDays?: number
   readonly lakePath?: string
+  /** DuckLake-каталог (SPEC §14.5) — чтобы снести и таблицы-на-fingerprint в нём. */
+  readonly ducklake?: { readonly catalog: string; readonly dataPath?: string }
   /** «Сейчас» — инъекция для тестов. */
   readonly now?: number
 }
@@ -45,6 +47,13 @@ export const janitor = (
     const store = yield* StateStore
     const now = options?.now ?? (yield* Clock.currentTimeMillis)
     const ttlMs = (options?.ttlDays ?? 7) * DAY_MS
+
+    // снапшот не хранит цель материализации — при настроенном каталоге
+    // таблица сносится и там, и в _efmesh (DROP IF EXISTS терпим к пустоте)
+    const ducklake = options?.ducklake
+    if (ducklake !== undefined && engine.dialect === "duckdb") {
+      yield* engine.execute(ducklakeAttachSql(ducklake))
+    }
 
     const referenced = yield* store.listReferencedFingerprints()
     const removed: Array<string> = []
@@ -75,6 +84,11 @@ export const janitor = (
             ? `DROP VIEW IF EXISTS ${target}`
             : `DROP TABLE IF EXISTS ${target}`,
         )
+        if (ducklake !== undefined && engine.dialect === "duckdb" && snapshot.kind !== "view") {
+          yield* engine.execute(
+            `DROP TABLE IF EXISTS ${ducklakeRef(name, snapshot.physicalFp)}`,
+          )
+        }
         if (options?.lakePath !== undefined && !options.lakePath.startsWith("s3://")) {
           const prefix = parquetPrefix(options.lakePath, name, snapshot.physicalFp)
           yield* Effect.sync(() => rmSync(prefix, { recursive: true, force: true }))

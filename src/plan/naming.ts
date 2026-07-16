@@ -47,6 +47,28 @@ export const parquetPrefix = (lakePath: string, name: ModelName, fingerprint: st
 export const parquetRef = (lakePath: string, name: ModelName, fingerprint: string): string =>
   `read_parquet('${parquetPrefix(lakePath, name, fingerprint).replaceAll(`'`, `''`)}/**/*.parquet', union_by_name=true)`
 
+/**
+ * DuckLake-цель (SPEC §14.5): каталог подключается под фиксированным
+ * алиасом, физика — таблица-на-fingerprint в нём (то же имя, что у
+ * нативной физики, только каталог другой). Версионность остаётся нашей;
+ * снапшоты/time travel DuckLake — бонус. Потребители вне efmesh должны
+ * сами сделать ATTACH — view окружений ссылаются на каталог по алиасу.
+ */
+export const ducklakeAlias = "_efmesh_ducklake"
+
+export const ducklakeRef = (name: ModelName, fingerprint: string): string =>
+  `"${ducklakeAlias}"."${physicalTable(name, fingerprint)}"`
+
+export const ducklakeAttachSql = (config: {
+  readonly catalog: string
+  readonly dataPath?: string
+}): string =>
+  `ATTACH IF NOT EXISTS 'ducklake:sqlite:${config.catalog.replaceAll(`'`, `''`)}' AS "${ducklakeAlias}"${
+    config.dataPath !== undefined
+      ? ` (DATA_PATH '${config.dataPath.replaceAll(`'`, `''`)}')`
+      : ""
+  }`
+
 /** Ключ партиции интервала — безопасен для файловых систем (без двоеточий). */
 export const intervalKey = (unit: "day" | "hour", startMs: number): string => {
   const iso = new Date(startMs).toISOString()
