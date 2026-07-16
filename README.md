@@ -2,15 +2,17 @@
 
 sqlmesh на bun, typescript и Effect.
 
-Спецификация: [SPEC.md](./SPEC.md). Статус: **F3** — поверх F0/F1/F2
+Спецификация: [SPEC.md](./SPEC.md). Статус: **F4** — поверх F0–F3
 (модели/DAG, DuckDB-движок, план как diff, виртуальные окружения,
 инкрементальность с бэкфиллом и resume, AST-fingerprint, external, контракт
 схемы, parquet-озеро, аудиты, `testModel`, категоризация изменений, `run`
-с блокировкой, janitor, seed, upsert, экспорт в ATTACH, diff, метрики)
-добавились **Postgres** (движок на `Bun.SQL` + libpg_query, state store
-в PG, параллельные батчи бэкфилла на пуле), `--forward-only` (реюз физики
-без переигрывания истории), `scdType2`, `embedded`, сырые `.sql`-модели,
-колоночный `lineage` и `graph --html`.
+с блокировкой, janitor, seed, upsert, экспорт в ATTACH, diff, метрики,
+Postgres — движок на `Bun.SQL` + libpg_query и state store, `--forward-only`,
+`scdType2`, `embedded`, `.sql`-модели, `lineage`, `graph --html`) добавились
+**межмодельная DAG-конкурентность** apply (`--jobs`), **`target: "ducklake"`**
+(таблица-на-fingerprint в DuckLake-каталоге), автономный **`efmesh audit`**,
+**`efmesh init`**, версионирование схемы state store + **`efmesh migrate`**
+и интерактивное **подтверждение плана** в apply.
 
 ## Быстрый старт
 
@@ -94,9 +96,26 @@ engine: { url: "postgres://…" },  // canonicalize через libpg_query
 state:  { url: "postgres://…" },  // схема efmesh_state, переживает команду
 ```
 
-Бэкфилл на Postgres гонит батчи параллельно (пул соединений, `concurrency`).
-DuckDB-федерация (seed/parquet/external-файлы/export) на PG честно падает
-`EngineFeatureError`.
+Бэкфилл на Postgres гонит батчи параллельно (пул соединений, `concurrency`),
+а apply строит независимые ветки DAG одновременно (`--jobs`, модель стартует
+по готовности родителей). DuckDB-федерация (seed/parquet/external-файлы/
+export/ducklake) на PG честно падает `EngineFeatureError`.
+
+Из F4 — DuckLake как третья цель материализации и эксплуатационные команды:
+
+```ts
+// физика — таблица-на-fingerprint в DuckLake-каталоге; версии наши,
+// снапшоты и time travel каталога — бонус
+kind: kind.full(), target: "ducklake"
+// в конфиге: ducklake: { catalog: "ducklake.sqlite", dataPath: "lake/ducklake" }
+```
+
+`efmesh apply` в TTY показывает план и ждёт «y» (`--yes` в скриптах не
+нужен — не-TTY едет без вопроса). `efmesh audit dev` проверяет аудитами
+то, что окружение отдаёт потребителям сейчас, — ловит деградацию задним
+числом. `efmesh init` разворачивает скелет проекта, `efmesh migrate`
+догоняет схему state store: свежий стор бутстрапится сам, старый без
+миграции честно не открывается.
 
 `efmesh.config.ts` собирает проект:
 
@@ -113,16 +132,22 @@ export default defineConfig({
 CLI:
 
 ```
+bun efmesh init [dir]    # скаффолд: конфиг, модели-пример, seed
 bun efmesh plan dev      # diff + недостающие интервалы, ничего не меняет
-bun efmesh apply dev     # собрать физику, догнать интервалы, переключить view
-bun efmesh apply prod    # промоушен: view-swap без пересчёта
+bun efmesh apply dev     # план → подтверждение (TTY) → физика, интервалы, view
+bun efmesh apply prod -y # промоушен: view-swap без пересчёта, без вопроса
 bun efmesh run dev       # тик планировщика: только интервалы, с блокировкой
+bun efmesh audit dev     # аудиты view-слоя окружения, ничего не меняя
 bun efmesh diff dev prod # чем окружения отличаются
 bun efmesh janitor       # снести осиротевшую физику старше ttl
+bun efmesh migrate       # догнать схему state store до текущей версии
 bun efmesh render med.moves [--env dev]
 bun efmesh lineage mart.stays.dept   # колоночный lineage до сырья
 bun efmesh graph [--html dag.html]   # DAG текстом или страницей
 ```
+
+`apply`/`run` принимают `--jobs N` — сколько моделей строить одновременно
+(DAG-конкурентность; на DuckDB всегда 1 — одно соединение).
 
 Бэкфилл поинтервальный и возобновляемый: упавший батч помечается `failed`,
 повторный `apply` продолжает с места остановки, пересчёт интервала — без
