@@ -65,15 +65,16 @@ export const janitor = (
     const kept: Array<string> = []
 
     const snapshots = yield* store.listSnapshots()
+    const deadline = new Date(now - ttlMs).toISOString()
     const isDoomed = (snapshot: (typeof snapshots)[number]): boolean =>
       !referenced.has(snapshot.fingerprint) &&
-      now - Date.parse(snapshot.orphanedAt ?? snapshot.createdAt) >= ttlMs
-    // физика делится между версиями при forward-only — таблица/префикс
-    // сносятся, только когда их не использует ни один выживающий снапшот
-    const physicalInUse = new Set(
-      snapshots.filter((snapshot) => !isDoomed(snapshot)).map((snapshot) => snapshot.physicalFp),
-    )
+      (snapshot.orphanedAt ?? snapshot.createdAt) <= deadline
 
+    // фаза 1 — транзакционный claim записей: снос состоится, только если
+    // снапшот ВСЁ ЕЩЁ не referenced и сирота (проверки атомарны с удалением);
+    // параллельный apply, воскресивший версию (upsert снимает orphaned_at),
+    // claim проиграет — и её физика не тронется (гонка F6)
+    const claimed: Array<(typeof snapshots)[number]> = []
     for (const snapshot of snapshots) {
       if (referenced.has(snapshot.fingerprint)) continue
       const label = `${snapshot.name}@${snapshot.fingerprint.slice(0, 8)}`
@@ -81,26 +82,44 @@ export const janitor = (
         kept.push(label)
         continue
       }
-      const name = parseModelName(snapshot.name)
-      if (!physicalInUse.has(snapshot.physicalFp)) {
-        const target = physicalRef(name, snapshot.physicalFp)
-        yield* engine.execute(
-          snapshot.kind === "view"
-            ? `DROP VIEW IF EXISTS ${target}`
-            : `DROP TABLE IF EXISTS ${target}`,
-        )
-        if (ducklake !== undefined && engine.dialect === "duckdb" && snapshot.kind !== "view") {
-          yield* engine.execute(
-            `DROP TABLE IF EXISTS ${ducklakeRef(name, snapshot.physicalFp)}`,
-          )
-        }
-        if (options?.lakePath !== undefined && !options.lakePath.startsWith("s3://")) {
-          const prefix = parquetPrefix(options.lakePath, name, snapshot.physicalFp)
-          yield* Effect.sync(() => rmSync(prefix, { recursive: true, force: true }))
-        }
+      const won = yield* store.deleteSnapshotIfDoomed(
+        snapshot.name,
+        snapshot.fingerprint,
+        deadline,
+      )
+      if (!won) {
+        kept.push(label)
+        continue
       }
-      yield* store.deleteSnapshot(snapshot.name, snapshot.fingerprint)
+      claimed.push(snapshot)
       removed.push(label)
+    }
+
+    // фаза 2 — снос физики по СВЕЖЕМУ состоянию стора: физика делится между
+    // версиями (forward-only) и сносится, только если после claim'ов её не
+    // использует ни один выживший снапшот
+    const survivors = yield* store.listSnapshots()
+    const physicalInUse = new Set(survivors.map((snapshot) => snapshot.physicalFp))
+    const dropped = new Set<string>()
+    for (const snapshot of claimed) {
+      if (physicalInUse.has(snapshot.physicalFp) || dropped.has(snapshot.physicalFp)) continue
+      dropped.add(snapshot.physicalFp)
+      const name = parseModelName(snapshot.name)
+      const target = physicalRef(name, snapshot.physicalFp)
+      yield* engine.execute(
+        snapshot.kind === "view"
+          ? `DROP VIEW IF EXISTS ${target}`
+          : `DROP TABLE IF EXISTS ${target}`,
+      )
+      if (ducklake !== undefined && engine.dialect === "duckdb" && snapshot.kind !== "view") {
+        yield* engine.execute(
+          `DROP TABLE IF EXISTS ${ducklakeRef(name, snapshot.physicalFp)}`,
+        )
+      }
+      if (options?.lakePath !== undefined && !options.lakePath.startsWith("s3://")) {
+        const prefix = parquetPrefix(options.lakePath, name, snapshot.physicalFp)
+        yield* Effect.sync(() => rmSync(prefix, { recursive: true, force: true }))
+      }
     }
 
     return { removed, kept }

@@ -177,10 +177,12 @@ export const PostgresStateLive = (
             Effect.flatMap((now) =>
               attempt("upsertSnapshot", async () => {
                 await sql.unsafe(
+                  // воскрешение снимает сиротство и освежает created_at — как в sqlite (гонка F6)
                   `INSERT INTO efmesh_state.snapshots
                      (name, fingerprint, rendered_sql, canonical_ast, physical_fp, kind, fingerprint_version, created_at)
                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-                   ON CONFLICT (name, fingerprint) DO NOTHING`,
+                   ON CONFLICT (name, fingerprint)
+                   DO UPDATE SET orphaned_at = NULL, created_at = excluded.created_at`,
                   [
                     snapshot.name,
                     snapshot.fingerprint,
@@ -234,6 +236,27 @@ export const PostgresStateLive = (
             }),
           ).pipe(Effect.asVoid),
 
+        deleteSnapshotIfDoomed: (name, fingerprint, deadline) =>
+          attempt("deleteSnapshotIfDoomed", () =>
+            sql.begin(async (tx) => {
+              const deleted = (await tx.unsafe(
+                `DELETE FROM efmesh_state.snapshots
+                 WHERE name = $1 AND fingerprint = $2
+                   AND COALESCE(orphaned_at, created_at) <= $3
+                   AND NOT EXISTS (
+                     SELECT 1 FROM efmesh_state.environments e WHERE e.fingerprint = $2
+                   )
+                 RETURNING 1`,
+                [name, fingerprint, deadline],
+              )) as ReadonlyArray<unknown>
+              if (deleted.length === 0) return false
+              await tx.unsafe(`DELETE FROM efmesh_state.intervals WHERE snapshot_fp = $1`, [
+                fingerprint,
+              ])
+              return true
+            }) as Promise<boolean>,
+          ),
+
         getEnvironment: (env) =>
           attempt("getEnvironment", async () => {
             return (await sql.unsafe(
@@ -248,6 +271,20 @@ export const PostgresStateLive = (
             Effect.flatMap((now) =>
               attempt("promote", () =>
                 sql.begin(async (tx) => {
+                  // живость снапшотов — в той же транзакции (гонка F6):
+                  // janitor унёс версию → громкая ошибка, view не трогается
+                  for (const entry of entries) {
+                    if (entry.requireSnapshot !== true) continue
+                    const alive = (await tx.unsafe(
+                      `SELECT 1 FROM efmesh_state.snapshots WHERE name = $1 AND fingerprint = $2`,
+                      [entry.name, entry.fingerprint],
+                    )) as ReadonlyArray<unknown>
+                    if (alive.length === 0) {
+                      throw new Error(
+                        `промоушен ${env}: снапшот ${entry.name}@${entry.fingerprint.slice(0, 8)} исчез из стора (снесён janitor?) — повторите apply`,
+                      )
+                    }
+                  }
                   await tx.unsafe(`DELETE FROM efmesh_state.environments WHERE env = $1`, [env])
                   for (const entry of entries) {
                     await tx.unsafe(

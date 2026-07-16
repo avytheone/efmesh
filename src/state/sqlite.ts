@@ -1,4 +1,5 @@
 import { Database } from "bun:sqlite"
+import { copyFileSync, existsSync } from "node:fs"
 import { Clock, Effect, Layer } from "effect"
 import type {
   EnvironmentRecord,
@@ -98,17 +99,27 @@ const applyMigrations = (db: Database): void => {
   db.query(`INSERT INTO meta (version) VALUES (?1)`).run(STATE_VERSION)
 }
 
-/** `efmesh migrate`: явное обновление схемы существующего стора. */
+/**
+ * `efmesh migrate`: явное обновление схемы существующего стора.
+ * Перед апгрейдом файл копируется в `<path>.backup-v<from>` — откат
+ * на старую версию efmesh иначе односторонний (F6).
+ */
 export const migrateSqliteState = (
   options?: SqliteStateOptions,
 ): Effect.Effect<MigrationReport, StateError> =>
   Effect.try({
     try: () => {
-      const db = new Database(options?.path ?? ":memory:", { create: true })
+      const path = options?.path ?? ":memory:"
+      const db = new Database(path, { create: true })
       try {
         const from = readVersion(db)
+        let backup: string | undefined
+        if (path !== ":memory:" && from !== STATE_VERSION && existsSync(path)) {
+          backup = `${path}.backup-v${from}`
+          copyFileSync(path, backup)
+        }
         applyMigrations(db)
-        return { from, to: STATE_VERSION }
+        return { from, to: STATE_VERSION, ...(backup !== undefined ? { backup } : {}) }
       } finally {
         db.close()
       }
@@ -163,10 +174,15 @@ export const SqliteStateLive = (
           isoNow.pipe(
             Effect.flatMap((now) =>
               attempt("upsertSnapshot", () => {
+                // воскрешение версии (повторный apply старого fingerprint)
+                // снимает сиротство И освежает created_at СРАЗУ: между upsert
+                // и промоушеном janitor не сочтёт её обречённой ни по
+                // orphaned_at, ни по старому created_at (гонка F6)
                 db.query(
                   `INSERT INTO snapshots (name, fingerprint, rendered_sql, canonical_ast, physical_fp, kind, fingerprint_version, created_at)
                    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
-                   ON CONFLICT (name, fingerprint) DO NOTHING`,
+                   ON CONFLICT (name, fingerprint)
+                   DO UPDATE SET orphaned_at = NULL, created_at = excluded.created_at`,
                 ).run(
                   snapshot.name,
                   snapshot.fingerprint,
@@ -228,6 +244,28 @@ export const SqliteStateLive = (
             remove()
           }),
 
+        deleteSnapshotIfDoomed: (name, fingerprint, deadline) =>
+          attempt("deleteSnapshotIfDoomed", () => {
+            const claim = db.transaction((): boolean => {
+              const referenced =
+                db
+                  .query(`SELECT 1 FROM environments WHERE fingerprint = ?1 LIMIT 1`)
+                  .get(fingerprint) !== null
+              if (referenced) return false
+              const result = db
+                .query(
+                  `DELETE FROM snapshots
+                   WHERE name = ?1 AND fingerprint = ?2
+                     AND COALESCE(orphaned_at, created_at) <= ?3`,
+                )
+                .run(name, fingerprint, deadline)
+              if (result.changes === 0) return false
+              db.query(`DELETE FROM intervals WHERE snapshot_fp = ?1`).run(fingerprint)
+              return true
+            })
+            return claim() as boolean
+          }),
+
         getEnvironment: (env) =>
           attempt("getEnvironment", () => {
             return db
@@ -243,6 +281,19 @@ export const SqliteStateLive = (
             Effect.flatMap((now) =>
               attempt("promote", () => {
                 const replace = db.transaction(() => {
+                  // живость снапшотов — в той же транзакции: если janitor
+                  // успел унести версию, промоушен громко падает, а view
+                  // не переключается на снесённую физику (гонка F6)
+                  const alive = db.query(
+                    `SELECT 1 FROM snapshots WHERE name = ?1 AND fingerprint = ?2`,
+                  )
+                  for (const entry of entries) {
+                    if (entry.requireSnapshot === true && alive.get(entry.name, entry.fingerprint) === null) {
+                      throw new Error(
+                        `промоушен ${env}: снапшот ${entry.name}@${entry.fingerprint.slice(0, 8)} исчез из стора (снесён janitor?) — повторите apply`,
+                      )
+                    }
+                  }
                   db.query(`DELETE FROM environments WHERE env = ?1`).run(env)
                   const insert = db.query(
                     `INSERT INTO environments (env, name, fingerprint, promoted_at)

@@ -1,6 +1,6 @@
 import { Database } from "bun:sqlite"
 import { describe, expect, test } from "bun:test"
-import { mkdtempSync } from "node:fs"
+import { existsSync, mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Effect } from "effect"
@@ -49,7 +49,7 @@ describe("версия схемы state store + migrate (SPEC §6, F4)", () => {
     expect(failure).toMatchObject({ found: 0, wanted: STATE_VERSION })
 
     const report = await Effect.runPromise(migrateSqliteState({ path }))
-    expect(report).toEqual({ from: 0, to: STATE_VERSION })
+    expect(report).toMatchObject({ from: 0, to: STATE_VERSION })
 
     // старый снапшот читается: physical_fp пуст → fallback на fingerprint
     const snapshot = await Effect.runPromise(
@@ -94,7 +94,7 @@ describe("версия схемы state store + migrate (SPEC §6, F4)", () => {
     expect(failure).toMatchObject({ found: 1, wanted: STATE_VERSION })
 
     const report = await Effect.runPromise(migrateSqliteState({ path }))
-    expect(report).toEqual({ from: 1, to: STATE_VERSION })
+    expect(report).toMatchObject({ from: 1, to: STATE_VERSION })
 
     const plans = await Effect.runPromise(
       Effect.gen(function* () {
@@ -105,5 +105,24 @@ describe("версия схемы state store + migrate (SPEC §6, F4)", () => {
     )
     // старой записи журнал приписывает пустого автора, новой — настоящего
     expect(plans.map((plan) => plan.appliedBy)).toEqual(["", "avy"])
+  })
+
+  test("migrate снимает копию стора перед апгрейдом; на актуальном — нет", async () => {
+    const path = join(mkdtempSync(join(tmpdir(), "efmesh-migrate-")), "state.sqlite")
+    createLegacyStore(path)
+
+    const report = await Effect.runPromise(migrateSqliteState({ path }))
+    expect(report.backup).toBe(`${path}.backup-v0`)
+    expect(existsSync(`${path}.backup-v0`)).toBe(true)
+    // в копии — доверсионная раскладка: можно откатить версию efmesh
+    const backup = new Database(`${path}.backup-v0`)
+    expect(
+      backup.query(`SELECT 1 FROM sqlite_master WHERE name = 'meta'`).get(),
+    ).toBeNull()
+    backup.close()
+
+    // повторный migrate по актуальному стору копию не плодит
+    const idle = await Effect.runPromise(migrateSqliteState({ path }))
+    expect(idle.backup).toBeUndefined()
   })
 })

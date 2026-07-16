@@ -400,6 +400,9 @@ const migrateCommand = Command.make(
           ? `state store уже на версии ${report.to}`
           : `state store: версия ${report.from} → ${report.to}`,
       )
+      if (report.backup !== undefined) {
+        yield* Console.log(`копия старого стора: ${report.backup}`)
+      }
     }),
 ).pipe(Command.withDescription("Догнать схему state store до текущей версии"))
 

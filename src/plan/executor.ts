@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs"
+import { mkdirSync, renameSync } from "node:fs"
 import { userInfo } from "node:os"
 import { Clock, Data, Deferred, Effect, Schedule } from "effect"
 import { AuditFailure } from "../core/audit.ts"
@@ -302,10 +302,19 @@ const backfillIntoParquet = (
         const mark = [{ startTs: toIso(interval.start), endTs: toIso(interval.end) }]
         const markFailed = () =>
           store.markIntervals(action.fingerprint, mark, "failed").pipe(Effect.ignore)
-        const file = `${partition.replaceAll(`'`, `''`)}/data.parquet`
+        // локально COPY пишет во временный файл, rename атомарен (POSIX):
+        // kill посреди записи не оставит битую партицию, а lookback-пересчёт
+        // не подсунет читателю view недописанный файл; s3 — прямая запись
+        // (rename нет; недописанный ключ не помечен done и перезапишется)
+        const target = `${partition}/data.parquet`
+        const writePath = partition.startsWith("s3://") ? target : `${target}.tmp`
         yield* engine
-          .execute(`COPY (${body}) TO '${file}' (FORMAT PARQUET)`)
+          .execute(`COPY (${body}) TO '${writePath.replaceAll(`'`, `''`)}' (FORMAT PARQUET)`)
           .pipe(withBatchRetry(retry), Effect.tapError(markFailed))
+        if (writePath !== target) {
+          yield* Effect.sync(() => renameSync(writePath, target))
+        }
+        const file = target.replaceAll(`'`, `''`)
         // аудит записанной партиции — до отметки done; провал = не done → перезапись
         yield* runAudits(engine, model, `(SELECT * FROM read_parquet('${file}'))`).pipe(
           Effect.tapError(markFailed),
@@ -720,12 +729,18 @@ export const applyPlan = (
       )
     }
 
-    // 4. Состояние окружения + журнал
+    // 4. Состояние окружения + журнал; requireSnapshot — защита от гонки
+    // с janitor (F6): у материализуемых моделей снапшот обязан быть жив
+    // в момент промоушена, иначе view указал бы на снесённую физику
     yield* store.promote(
       plan.env,
       plan.actions
         .filter((a) => a.change !== "removed")
-        .map((a) => ({ name: a.name, fingerprint: a.fingerprint })),
+        .map((a) => ({
+          name: a.name,
+          fingerprint: a.fingerprint,
+          requireSnapshot: graph.models.get(a.name)?.kind._tag !== "external",
+        })),
     )
     yield* store.recordPlan(
       plan.env,

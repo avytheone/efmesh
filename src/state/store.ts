@@ -24,6 +24,8 @@ export class StateSchemaError extends Data.TaggedError("StateSchemaError")<{
 export interface MigrationReport {
   readonly from: number
   readonly to: number
+  /** Куда сложена копия стора перед апгрейдом схемы (SQLite; F6). */
+  readonly backup?: string
 }
 
 /** Версия модели, известная state store (SPEC §6). */
@@ -100,13 +102,34 @@ export interface StateStoreShape {
   readonly listSnapshots: () => Effect.Effect<ReadonlyArray<SnapshotRecord>, StateError>
   /** Удаляет запись снапшота и его учёт интервалов (физику убирает janitor). */
   readonly deleteSnapshot: (name: string, fingerprint: string) => Effect.Effect<void, StateError>
+  /**
+   * Транзакционный «claim» сироты janitor'ом (SPEC §5.4, F6): запись и учёт
+   * интервалов удаляются, только если снапшот ВСЁ ЕЩЁ не referenced ни одним
+   * окружением и осиротел не позже deadline (ISO UTC) — обе проверки в одной
+   * транзакции с удалением, поэтому параллельный apply, воскресивший версию,
+   * не даст её унести. true — снесено, false — состояние изменилось.
+   */
+  readonly deleteSnapshotIfDoomed: (
+    name: string,
+    fingerprint: string,
+    deadline: string,
+  ) => Effect.Effect<boolean, StateError>
   readonly getEnvironment: (
     env: string,
   ) => Effect.Effect<ReadonlyArray<EnvironmentRecord>, StateError>
-  /** Транзакционно заменяет весь набор окружения. */
+  /**
+   * Транзакционно заменяет весь набор окружения. Записи с
+   * `requireSnapshot: true` проверяются на живость снапшота в той же
+   * транзакции: если janitor успел его унести, промоушен громко падает —
+   * view никогда не переключается на снесённую физику.
+   */
   readonly promote: (
     env: string,
-    entries: ReadonlyArray<{ readonly name: string; readonly fingerprint: string }>,
+    entries: ReadonlyArray<{
+      readonly name: string
+      readonly fingerprint: string
+      readonly requireSnapshot?: boolean
+    }>,
   ) => Effect.Effect<void, StateError>
   /** Журнал применённых планов. */
   readonly recordPlan: (
