@@ -168,6 +168,31 @@ export const decideApply = (
   tty: boolean,
 ): "apply" | "ask" | "refuse" => (!hasChanges || yes ? "apply" : tty ? "ask" : "refuse")
 
+const jsonFlag = Flag.boolean("json").pipe(
+  Flag.withDescription("Машиночитаемый вывод (стабильная форма — контракт для CI)"),
+)
+
+/**
+ * JSON-форма плана (#3) — КОНТРАКТ для CI и ботов: изменения формы —
+ * semver-события пакета. Интервалы — ISO UTC, не epoch ms.
+ */
+export const planToJson = (plan: Plan): unknown => ({
+  env: plan.env,
+  hasChanges: plan.hasChanges,
+  actions: plan.actions.map((action) => ({
+    name: action.name,
+    change: action.change,
+    fingerprint: action.fingerprint,
+    build: action.build,
+    backfill: action.backfill.map((range) => ({
+      start: new Date(range.start).toISOString(),
+      end: new Date(range.end).toISOString(),
+    })),
+  })),
+})
+
+const printJson = (payload: unknown) => Console.log(JSON.stringify(payload, null, 2))
+
 const formatRange = (range: { readonly start: number; readonly end: number }): string =>
   `[${new Date(range.start).toISOString().slice(0, 10)} … ${new Date(range.end).toISOString().slice(0, 10)})`
 
@@ -201,15 +226,20 @@ const initCommand = Command.make(
 
 const planCommand = Command.make(
   "plan",
-  { env: Argument.string("env"), config: configFlag, forwardOnly: forwardOnlyFlag },
-  ({ config, env, forwardOnly }) =>
+  {
+    env: Argument.string("env"),
+    config: configFlag,
+    forwardOnly: forwardOnlyFlag,
+    json: jsonFlag,
+  },
+  ({ config, env, forwardOnly, json }) =>
     Effect.gen(function* () {
       const loaded = yield* loadConfig(config)
       const names = parseForwardOnly(forwardOnly)
       const plan = yield* Efmesh.plan(env, loaded.models, {
         ...(names !== undefined ? { forwardOnly: names } : {}),
       }).pipe(Effect.provide(configLayers(loaded)))
-      yield* printPlan(plan)
+      yield* json ? printJson(planToJson(plan)) : printPlan(plan)
     }),
 ).pipe(Command.withDescription("Показать diff проекта против окружения, ничего не меняя"))
 
@@ -386,13 +416,17 @@ const janitorCommand = Command.make(
 
 const statusCommand = Command.make(
   "status",
-  { env: Argument.string("env"), config: configFlag },
-  ({ config, env }) =>
+  { env: Argument.string("env"), config: configFlag, json: jsonFlag },
+  ({ config, env, json }) =>
     Effect.gen(function* () {
       const loaded = yield* loadConfig(config)
       const report = yield* environmentStatus(env, loaded.models).pipe(
         Effect.provide(configLayers(loaded)),
       )
+      if (json) {
+        yield* printJson(report)
+        return
+      }
       if (report.models === 0) {
         yield* Console.log(`окружение «${env}» не существует — его создаст первый apply`)
         return
@@ -439,14 +473,26 @@ const auditCommand = Command.make(
       Flag.withDefault(""),
       Flag.withDescription("Только эти модели, через запятую (по умолчанию — все с аудитами)"),
     ),
+    json: jsonFlag,
   },
-  ({ config, env, model }) =>
+  ({ config, env, model, json }) =>
     Effect.gen(function* () {
       const loaded = yield* loadConfig(config)
       const only = parseForwardOnly(model)
       const report = yield* auditEnvironment(env, loaded.models, only).pipe(
         Effect.provide(configLayers(loaded)),
       )
+      if (json) {
+        // отчёт целиком; exit-код по blocking сохраняется — stdout чистый JSON
+        yield* printJson(report)
+        if (report.blockingViolations > 0) {
+          return yield* new EnvironmentAuditError({
+            env,
+            blockingViolations: report.blockingViolations,
+          })
+        }
+        return
+      }
       if (report.results.length === 0) {
         yield* Console.log("аудитов нет — нечего проверять")
         return

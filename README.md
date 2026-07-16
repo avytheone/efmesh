@@ -176,6 +176,10 @@ export default defineConfig({
 
 `apply`/`run` flags: `--jobs N` — DAG concurrency (always 1 on DuckDB — single connection), `--retries N` — retries for transient batch failures (exponential backoff), `--yes`/`-y` — skip confirmation, `--forward-only <model>,…` — reuse physical storage and history.
 
+`plan`, `audit` and `status` take `--json` — a stable machine-readable shape
+(a contract under semver) for CI and bots; exit codes are unchanged, stdout
+stays pure JSON.
+
 Exit codes: `0` — success, `1` — error, `2` — "awaiting a human": the plan needs confirmation in a non-TTY (add `--yes`), or `run` hit unapplied changes. In a non-TTY, `apply` with changes and no `--yes` refuses — efmesh will not silently roll out a plan nobody has seen.
 
 ## Performance

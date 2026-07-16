@@ -13,6 +13,8 @@ the first version gathers them in full.
 - Run tick journal in the state store (`runs`, schema v4 — `efmesh migrate`
   with a store backup): every tick records its outcome, including
   unsuccessful ones (#2).
+- `--json` on `plan`, `audit` and `status`: a stable machine-readable shape
+  for CI and bots; exit codes unchanged (#3).
 
 ## [0.1.0-beta.2] — 2026-07-16
 
