@@ -149,14 +149,23 @@ export const isAffirmative = (answer: string | null): boolean =>
   ["y", "yes", "д", "да"].includes((answer ?? "").trim().toLowerCase())
 
 /**
- * Подтверждение плана (SPEC §5): в TTY показанный план применяется только
- * после явного «y»; скрипты и CI (не-TTY) едут без вопроса — совместимость
- * с F0-поведением, отказаться можно только глазами человека.
+ * Exit-код «работа ждёт человека» (F6): план требует подтверждения в не-TTY
+ * или run упёрся в структурные изменения. Алертинг обязан отличать это
+ * штатное состояние от настоящих ошибок (код 1).
  */
-const confirmApply = (hasChanges: boolean, yes: boolean): Effect.Effect<boolean> =>
-  !hasChanges || yes || process.stdin.isTTY !== true
-    ? Effect.succeed(true)
-    : Effect.sync(() => isAffirmative(globalThis.prompt("применить план? [y/N]")))
+export const EXIT_AWAITING_HUMAN = 2
+
+/**
+ * Судьба показанного плана (SPEC §5.1, ужесточено в F6): без изменений или
+ * с --yes — применять; изменения в TTY — спросить человека; изменения в
+ * не-TTY (CI, cron, пайп) — ОТКАЗ: молча применять план, который никто не
+ * видел, нельзя, нужен явный --yes.
+ */
+export const decideApply = (
+  hasChanges: boolean,
+  yes: boolean,
+  tty: boolean,
+): "apply" | "ask" | "refuse" => (!hasChanges || yes ? "apply" : tty ? "ask" : "refuse")
 
 const formatRange = (range: { readonly start: number; readonly end: number }): string =>
   `[${new Date(range.start).toISOString().slice(0, 10)} … ${new Date(range.end).toISOString().slice(0, 10)})`
@@ -229,7 +238,20 @@ const applyCommand = Command.make(
           ...(names !== undefined ? { forwardOnly: names } : {}),
         })
         yield* printPlan(plan)
-        if (!(yield* confirmApply(plan.hasChanges, yes))) {
+        const decision = decideApply(plan.hasChanges, yes, process.stdin.isTTY === true)
+        if (decision === "refuse") {
+          yield* Console.error(
+            "план меняет модели, а подтвердить некому (не-TTY): добавьте --yes",
+          )
+          yield* Effect.sync(() => {
+            process.exitCode = EXIT_AWAITING_HUMAN
+          })
+          return
+        }
+        if (
+          decision === "ask" &&
+          !isAffirmative(globalThis.prompt("применить план? [y/N]"))
+        ) {
           yield* Console.log("применение отменено")
           return
         }
@@ -284,7 +306,23 @@ const runCommand = Command.make(
         ...(loaded.attach !== undefined ? { attach: loaded.attach } : {}),
         ...(modelConcurrency !== undefined ? { modelConcurrency } : {}),
         ...(retry !== undefined ? { retry } : {}),
-      }).pipe(Effect.provide(configLayers(loaded)))
+      }).pipe(
+        Effect.provide(configLayers(loaded)),
+        // структурные изменения — штатное «ждёт человека с apply», не сбой:
+        // алертинг различает по exit-коду 2 (F6)
+        Effect.catchTag("RunBlockedByChangesError", (blocked) =>
+          Effect.gen(function* () {
+            yield* Console.error(
+              `run ${blocked.env}: есть неприменённые изменения — нужен apply:\n  ${blocked.changes.join("\n  ")}`,
+            )
+            yield* Effect.sync(() => {
+              process.exitCode = EXIT_AWAITING_HUMAN
+            })
+            return undefined
+          }),
+        ),
+      )
+      if (applied === undefined) return
       yield* Console.log(
         applied.built.length > 0
           ? `обработано: ${applied.built.join(", ")}`
