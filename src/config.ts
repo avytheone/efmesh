@@ -5,7 +5,13 @@ import type { AnyModel } from "./core/model.ts"
  * никакого YAML. CLI импортирует его и собирает слои движка и состояния.
  */
 export interface EfmeshConfig {
-  readonly models: ReadonlyArray<AnyModel>
+  /** Модели значениями; можно вместе с discovery — дубликат имени = ошибка. */
+  readonly models?: ReadonlyArray<AnyModel>
+  /**
+   * Glob-маски файлов моделей относительно конфига (SPEC §12):
+   * все экспорты-модели найденных файлов попадают в проект.
+   */
+  readonly discovery?: string | ReadonlyArray<string>
   readonly engine?: {
     /** Путь к файлу DuckDB; по умолчанию `efmesh.duckdb` рядом с конфигом. */
     readonly path?: string

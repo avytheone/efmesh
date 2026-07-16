@@ -4,6 +4,8 @@ import { Console, Data, Effect, Layer } from "effect"
 import { Argument, Command, Flag } from "effect/unstable/cli"
 import type { EfmeshConfig } from "./config.ts"
 import { buildGraph } from "./core/graph.ts"
+import type { AnyModel } from "./core/model.ts"
+import { discoverModels, DiscoveryError, DiscoveryConflictError } from "./discovery.ts"
 import { Efmesh } from "./efmesh.ts"
 import { scaffold } from "./init.ts"
 import { DuckDBEngineLive } from "./engine/duckdb.ts"
@@ -27,17 +29,44 @@ export class ConfigLoadError extends Data.TaggedError("ConfigLoadError")<{
   readonly reason: string
 }> {}
 
-const loadConfig = (configPath: string): Effect.Effect<EfmeshConfig, ConfigLoadError> =>
-  Effect.tryPromise({
-    try: async () => {
-      const absolute = NodePath.resolve(process.cwd(), configPath)
-      const module = (await import(absolute)) as { default?: EfmeshConfig }
-      if (module.default === undefined || !Array.isArray(module.default.models)) {
-        throw new Error("конфиг должен экспортировать default с полем models")
+/** Конфиг с уже собранным списком моделей: явные + найденные discovery. */
+type LoadedConfig = EfmeshConfig & { readonly models: ReadonlyArray<AnyModel> }
+
+const loadConfig = (
+  configPath: string,
+): Effect.Effect<LoadedConfig, ConfigLoadError | DiscoveryError | DiscoveryConflictError> =>
+  Effect.gen(function* () {
+    const absolute = NodePath.resolve(process.cwd(), configPath)
+    const config = yield* Effect.tryPromise({
+      try: async () => {
+        const module = (await import(absolute)) as { default?: EfmeshConfig }
+        if (
+          module.default === undefined ||
+          (!Array.isArray(module.default.models) && module.default.discovery === undefined)
+        ) {
+          throw new Error("конфиг должен экспортировать default с models и/или discovery")
+        }
+        return module.default
+      },
+      catch: (cause) => new ConfigLoadError({ path: configPath, reason: String(cause) }),
+    })
+    const explicit = config.models ?? []
+    if (config.discovery === undefined) return { ...config, models: explicit }
+    // маски — относительно конфига: проект переносим независимо от cwd
+    const discovered = yield* discoverModels(config.discovery, NodePath.dirname(absolute))
+    const seen = new Set(explicit)
+    const names = new Map(explicit.map((model) => [model.name.full, "models в конфиге"]))
+    const merged = [...explicit]
+    for (const model of discovered) {
+      if (seen.has(model)) continue
+      const already = names.get(model.name.full)
+      if (already !== undefined) {
+        return yield* new DiscoveryConflictError({ name: model.name.full, files: [already, "discovery"] })
       }
-      return module.default
-    },
-    catch: (cause) => new ConfigLoadError({ path: configPath, reason: String(cause) }),
+      names.set(model.name.full, "discovery")
+      merged.push(model)
+    }
+    return { ...config, models: merged }
   })
 
 /** Слои движка и состояния из конфига — общие для plan/apply. */

@@ -1,8 +1,8 @@
 import { defineConfig } from "../../src/index.ts"
-import { departments, deptDaily, deptLoad, moves, rawMoves, stays, staysMart } from "./models.ts"
 
 export default defineConfig({
-  models: [departments, rawMoves, moves, stays, deptLoad, staysMart, deptDaily],
+  // модели находятся discovery по glob (SPEC §12) — конфиг их не перечисляет
+  discovery: "models.ts",
   lake: { path: "lake" },
   ducklake: { catalog: "ducklake.sqlite", dataPath: "lake/ducklake" },
 })
