@@ -86,6 +86,26 @@ export const deptLoad = defineModel(
   `,
 )
 
+/** Витрина в DuckLake-каталог: таблица-на-fingerprint, снапшоты каталога — бонус. */
+export const deptDaily = defineModel(
+  {
+    name: "mart.dept_daily",
+    kind: kind.full(),
+    target: "ducklake",
+    schema: Schema.Struct({
+      dept: Schema.String,
+      day: Schema.DateTimeUtc,
+      arrivals: Schema.Number,
+    }),
+    description: "Заходы в отделения по дням — в DuckLake",
+  },
+  (ctx) => ctx.sql`
+    SELECT dept, date_trunc('day', moved_at) AS day, count(*)::INT AS arrivals
+    FROM ${ctx.ref(stays)}
+    GROUP BY dept, day
+  `,
+)
+
 /** Витрина в озеро: физика — parquet-файлы, view поверх read_parquet. */
 export const staysMart = defineModel(
   {
