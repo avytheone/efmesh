@@ -1,0 +1,36 @@
+name: Bug report
+description: Something broke — a failing apply/run, wrong plan, data corruption
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what you got instead.
+      placeholder: |
+        Ran `bunx efmesh apply dev` after adding a column to med.moves,
+        expected a non-breaking plan, got the whole subtree rebuilt…
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproduction
+      description: >
+        The smallest model/config that shows the problem. `efmesh init` output
+        plus your edit is a perfect starting point.
+      render: text
+  - type: textarea
+    id: output
+    attributes:
+      label: Output / error
+      description: Full CLI output, including the error tag (e.g. SchemaMismatchError).
+      render: shell
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: efmesh / bun / effect / OS; engine (DuckDB file or Postgres).
+      placeholder: efmesh 0.1.0-beta.2, bun 1.3.14, effect 4.0.0-beta.98, Linux, DuckDB
+    validations:
+      required: true

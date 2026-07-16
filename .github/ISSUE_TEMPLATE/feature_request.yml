@@ -1,0 +1,24 @@
+name: Feature request
+description: Something you need that efmesh doesn't do
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: >
+        What are you trying to accomplish, and where does efmesh stop you?
+        Real-world context beats abstract proposals — the roadmap is driven
+        by actual usage.
+    validations:
+      required: true
+  - type: textarea
+    id: workaround
+    attributes:
+      label: Current workaround
+      description: How you solve it today, if at all.
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed shape (optional)
+      description: API/CLI sketch if you have one in mind.
