@@ -2,7 +2,7 @@
 
 > Data transformation in the spirit of [sqlmesh](https://sqlmesh.com) — on TypeScript, [Bun](https://bun.sh) and [Effect](https://effect.website).
 
-[![ci](https://github.com/avytheone/efmesh/actions/workflows/ci.yml/badge.svg)](https://github.com/avytheone/efmesh/actions/workflows/ci.yml) ![status](https://img.shields.io/badge/status-beta-orange) ![version](https://img.shields.io/badge/version-0.1.0--beta.1-blue) ![license](https://img.shields.io/badge/license-MIT-green) ![runtime](https://img.shields.io/badge/runtime-bun-black) ![effect](https://img.shields.io/badge/effect-v4-5C4EE5)
+[![ci](https://github.com/avytheone/efmesh/actions/workflows/ci.yml/badge.svg)](https://github.com/avytheone/efmesh/actions/workflows/ci.yml) ![status](https://img.shields.io/badge/status-beta-orange) ![npm](https://img.shields.io/npm/v/%40avytheone%2Fefmesh) ![license](https://img.shields.io/badge/license-MIT-green) ![runtime](https://img.shields.io/badge/runtime-bun-black) ![effect](https://img.shields.io/badge/effect-v4-5C4EE5)
 
 *Русская версия: [README.ru.md](./README.ru.md).*
 
@@ -56,7 +56,7 @@ Honestly placed: the **core** is the same class of system as sqlmesh — snapsho
 
 ## Who this is for (and who it isn't)
 
-**For you**, if you are a TypeScript team on Bun, want a typed dbt/sqlmesh-style workflow on top of DuckDB or Postgres, and are fine living on a beta (efmesh is 0.1.x; Effect v4 is beta, pinned exactly as a peer dependency).
+**For you**, if you are a TypeScript team on Bun, want a typed dbt/sqlmesh-style workflow on top of DuckDB or Postgres, and are fine living on a beta (efmesh is 0.2.x; Effect v4 is beta, pinned exactly as a peer dependency).
 
 **Not for you**, if you need: a Node runtime (Bun-only for now), multi-dialect or cloud DWHs (Snowflake/BigQuery are out of scope), 1.0-grade stability, or the Python ecosystem — take sqlmesh instead, honestly.
 
@@ -77,7 +77,7 @@ Honestly placed: the **core** is the same class of system as sqlmesh — snapsho
 ## Quickstart
 
 ```sh
-bun add -d @avytheone/efmesh@beta
+bun add -d @avytheone/efmesh
 bunx efmesh init my-warehouse && cd my-warehouse
 bunx efmesh plan dev    # what would be done
 bunx efmesh apply dev   # physical tables, backfill, view layer

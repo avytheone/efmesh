@@ -5,7 +5,10 @@ versioning — [SemVer](https://semver.org/).
 Internal development history was tracked in phases F0–F6 (SPEC.md §13);
 the first version gathers them in full.
 
-## [Unreleased]
+## [0.2.0] — 2026-07-16
+
+Theme: "operator and team" — efmesh in the hands of a non-author: the
+operator of the nightly cron and a team with CI.
 
 - `efmesh status <env>` — what is going on in one command: the last applied
   plan, interval lag per incremental model, failed intervals, recent run
