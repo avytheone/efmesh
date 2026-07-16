@@ -15,8 +15,9 @@ import { renderGraphHtml } from "./plan/graph-html.ts"
 import { formatLineage, lineage, LineageError } from "./plan/lineage.ts"
 import { janitor } from "./plan/janitor.ts"
 import { fp8 } from "./plan/naming.ts"
+import { applyPlan } from "./plan/executor.ts"
 import { run } from "./plan/run.ts"
-import type { Plan } from "./plan/planner.ts"
+import { planChanges, type Plan } from "./plan/planner.ts"
 import { migratePostgresState } from "./state/postgres.ts"
 import { migrateSqliteState, SqliteStateLive } from "./state/sqlite.ts"
 
@@ -94,6 +95,25 @@ const parseForwardOnly = (value: string): ReadonlyArray<string> | undefined => {
   return names.length > 0 ? names : undefined
 }
 
+const yesFlag = Flag.boolean("yes").pipe(
+  Flag.withAlias("y"),
+  Flag.withDescription("Применить без подтверждения (не-TTY подтверждения не спрашивает)"),
+)
+
+/** y/yes/д/да — регистронезависимо; всё остальное (включая пусто) — отказ. */
+export const isAffirmative = (answer: string | null): boolean =>
+  ["y", "yes", "д", "да"].includes((answer ?? "").trim().toLowerCase())
+
+/**
+ * Подтверждение плана (SPEC §5): в TTY показанный план применяется только
+ * после явного «y»; скрипты и CI (не-TTY) едут без вопроса — совместимость
+ * с F0-поведением, отказаться можно только глазами человека.
+ */
+const confirmApply = (hasChanges: boolean, yes: boolean): Effect.Effect<boolean> =>
+  !hasChanges || yes || process.stdin.isTTY !== true
+    ? Effect.succeed(true)
+    : Effect.sync(() => isAffirmative(globalThis.prompt("применить план? [y/N]")))
+
 const formatRange = (range: { readonly start: number; readonly end: number }): string =>
   `[${new Date(range.start).toISOString().slice(0, 10)} … ${new Date(range.end).toISOString().slice(0, 10)})`
 
@@ -146,26 +166,38 @@ const applyCommand = Command.make(
     config: configFlag,
     forwardOnly: forwardOnlyFlag,
     jobs: jobsFlag,
+    yes: yesFlag,
   },
-  ({ config, env, forwardOnly, jobs }) =>
+  ({ config, env, forwardOnly, jobs, yes }) =>
     Effect.gen(function* () {
       const loaded = yield* loadConfig(config)
       const names = parseForwardOnly(forwardOnly)
       const modelConcurrency = parseJobs(jobs)
-      const applied = yield* Efmesh.apply(env, loaded.models, {
-        ...(loaded.lake !== undefined ? { lakePath: loaded.lake.path } : {}),
-        ...(loaded.ducklake !== undefined ? { ducklake: loaded.ducklake } : {}),
-        ...(loaded.attach !== undefined ? { attach: loaded.attach } : {}),
-        ...(names !== undefined ? { forwardOnly: names } : {}),
-        ...(modelConcurrency !== undefined ? { modelConcurrency } : {}),
+      // план и применение — под одним слоем: применяется ровно тот план,
+      // который показан и подтверждён, без пересчёта между ними
+      yield* Effect.gen(function* () {
+        const graph = yield* buildGraph(loaded.models)
+        const plan = yield* planChanges(env, graph, {
+          ...(names !== undefined ? { forwardOnly: names } : {}),
+        })
+        yield* printPlan(plan)
+        if (!(yield* confirmApply(plan.hasChanges, yes))) {
+          yield* Console.log("применение отменено")
+          return
+        }
+        const applied = yield* applyPlan(plan, graph, {
+          ...(loaded.lake !== undefined ? { lakePath: loaded.lake.path } : {}),
+          ...(loaded.ducklake !== undefined ? { ducklake: loaded.ducklake } : {}),
+          ...(loaded.attach !== undefined ? { attach: loaded.attach } : {}),
+          ...(modelConcurrency !== undefined ? { modelConcurrency } : {}),
+        })
+        yield* Console.log(
+          applied.built.length > 0
+            ? `собрано: ${applied.built.join(", ")}`
+            : "сборка не потребовалась (только view-swap)",
+        )
+        yield* Console.log(`окружение «${applied.plan.env}» промоутнуто`)
       }).pipe(Effect.provide(configLayers(loaded)))
-      yield* printPlan(applied.plan)
-      yield* Console.log(
-        applied.built.length > 0
-          ? `собрано: ${applied.built.join(", ")}`
-          : "сборка не потребовалась (только view-swap)",
-      )
-      yield* Console.log(`окружение «${applied.plan.env}» промоутнуто`)
     }),
 ).pipe(Command.withDescription("Применить план: собрать физику и переключить view"))
 
