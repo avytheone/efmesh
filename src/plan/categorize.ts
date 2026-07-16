@@ -8,7 +8,10 @@
 
 type AstNode = Record<string, unknown>
 
-const topSelect = (astJson: string): { list: ReadonlyArray<string>; rest: string } | null => {
+/** Верхний SELECT канона: список колонок + остальное дерево (для explain.ts). */
+export const topSelect = (
+  astJson: string,
+): { list: ReadonlyArray<string>; rest: string } | null => {
   try {
     const ast = JSON.parse(astJson) as {
       readonly statements?: ReadonlyArray<{ readonly node?: AstNode }>

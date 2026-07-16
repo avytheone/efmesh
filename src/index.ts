@@ -57,6 +57,7 @@ export type {
   PlanAction,
   PlanOptions,
 } from "./plan/planner.ts"
+export type { ChangeExplanation } from "./plan/explain.ts"
 export { FingerprintVersionError, ForwardOnlyError, InvalidEnvironmentError } from "./plan/planner.ts"
 export type { AppliedPlan, ApplyError, ApplyOptions } from "./plan/executor.ts"
 export {

@@ -172,6 +172,12 @@ const jsonFlag = Flag.boolean("json").pipe(
   Flag.withDescription("Машиночитаемый вывод (стабильная форма — контракт для CI)"),
 )
 
+const explainFlag = Flag.boolean("explain").pipe(
+  Flag.withDescription(
+    "К каждому изменению — какие узлы канонического AST разошлись и почему категория такая",
+  ),
+)
+
 /**
  * JSON-форма плана (#3) — КОНТРАКТ для CI и ботов: изменения формы —
  * semver-события пакета. Интервалы — ISO UTC, не epoch ms.
@@ -188,6 +194,8 @@ export const planToJson = (plan: Plan): unknown => ({
       start: new Date(range.start).toISOString(),
       end: new Date(range.end).toISOString(),
     })),
+    // причина категории (#4); diverged-пути — отладочная подсказка, не контракт
+    ...(action.explain !== undefined ? { explain: action.explain } : {}),
   })),
 })
 
@@ -196,7 +204,7 @@ const printJson = (payload: unknown) => Console.log(JSON.stringify(payload, null
 const formatRange = (range: { readonly start: number; readonly end: number }): string =>
   `[${new Date(range.start).toISOString().slice(0, 10)} … ${new Date(range.end).toISOString().slice(0, 10)})`
 
-const printPlan = (plan: Plan) =>
+const printPlan = (plan: Plan, explain = false) =>
   Effect.gen(function* () {
     yield* Console.log(`план для окружения «${plan.env}»:`)
     for (const action of plan.actions) {
@@ -209,6 +217,12 @@ const printPlan = (plan: Plan) =>
       yield* Console.log(
         `  ${mark} ${action.name}  ${action.change} @${fp8(action.fingerprint)}${build}${backfill}`,
       )
+      if (explain && action.explain !== undefined) {
+        yield* Console.log(`      почему: ${action.explain.reason}`)
+        if (action.explain.diverged.length > 0) {
+          yield* Console.log(`      разошлось: ${action.explain.diverged.join(", ")}`)
+        }
+      }
     }
     if (!plan.hasChanges) yield* Console.log("  изменений нет")
   })
@@ -231,15 +245,16 @@ const planCommand = Command.make(
     config: configFlag,
     forwardOnly: forwardOnlyFlag,
     json: jsonFlag,
+    explain: explainFlag,
   },
-  ({ config, env, forwardOnly, json }) =>
+  ({ config, env, explain, forwardOnly, json }) =>
     Effect.gen(function* () {
       const loaded = yield* loadConfig(config)
       const names = parseForwardOnly(forwardOnly)
       const plan = yield* Efmesh.plan(env, loaded.models, {
         ...(names !== undefined ? { forwardOnly: names } : {}),
       }).pipe(Effect.provide(configLayers(loaded)))
-      yield* json ? printJson(planToJson(plan)) : printPlan(plan)
+      yield* json ? printJson(planToJson(plan)) : printPlan(plan, explain)
     }),
 ).pipe(Command.withDescription("Показать diff проекта против окружения, ничего не меняя"))
 

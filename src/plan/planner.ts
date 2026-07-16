@@ -8,6 +8,8 @@ import { EngineAdapter } from "../engine/adapter.ts"
 import { StateStore } from "../state/store.ts"
 import type { StateError } from "../state/store.ts"
 import { categorizeAstChange } from "./categorize.ts"
+import type { ChangeExplanation } from "./explain.ts"
+import { explainCategorized } from "./explain.ts"
 import { FINGERPRINT_VERSION, fingerprintGraph } from "./fingerprint.ts"
 import { validateEnvName } from "./naming.ts"
 
@@ -65,6 +67,12 @@ export interface PlanAction {
   /** Канонический AST тела (null у external) — сохраняется в снапшот. */
   readonly canonicalAst: string | null
   readonly change: ChangeCategory
+  /**
+   * Почему категория такая (#4): разошедшиеся узлы канонического AST и
+   * причина словами. Есть у всех изменённых моделей, кроме added/removed —
+   * там сравнивать не с чем. Пути diverged — отладочная подсказка, не контракт.
+   */
+  readonly explain?: ChangeExplanation
   /**
    * Нужна ли сборка физики. false для unchanged/removed, external и для
    * снапшотов, уже собранных другим окружением, — тогда промоушен это
@@ -149,6 +157,7 @@ export const planChanges = (
       const { fingerprint, ast } = versions.get(name)!
       const known = current.get(name)
       let change: ChangeCategory
+      let explain: ChangeExplanation | undefined
       let reusedFrom: string | undefined
       let physicalFingerprint = fingerprint
       if (known === undefined) change = "added"
@@ -165,9 +174,37 @@ export const planChanges = (
           })
         }
         const oldAst = previous?.canonicalAst ?? ""
-        if (oldAst === "" || ast === null) change = "breaking"
-        else if (oldAst === ast) change = "indirect" // версия сдвинута родителем/метаданными
-        else change = categorizeAstChange(oldAst, ast)
+        const changedParents = [...model.deps].filter((dep) => {
+          const parent = changeOf.get(dep)
+          return parent !== undefined && parent !== "unchanged"
+        })
+        if (oldAst === "" || ast === null) {
+          change = "breaking"
+          explain = {
+            diverged: [],
+            reason:
+              ast === null
+                ? "у модели нет SQL-тела (external/seed) — версию сдвинули источник/файл, схема или родители; сравнивать AST не с чем"
+                : "у прошлого снапшота не сохранён канонический AST — сравнивать не с чем, консервативно breaking",
+          }
+        } else if (oldAst === ast) {
+          change = "indirect" // версия сдвинута родителем/метаданными
+          explain =
+            changedParents.length > 0
+              ? {
+                  diverged: [],
+                  reason: `собственный AST не менялся — версию сдвинул каскад от родителей: ${changedParents.join(", ")}`,
+                  cascadeFrom: changedParents,
+                }
+              : {
+                  diverged: [],
+                  reason:
+                    "собственный AST не менялся — разошлись метаданные (kind/grain/columns/target)",
+                }
+        } else {
+          change = categorizeAstChange(oldAst, ast)
+          explain = explainCategorized(oldAst, ast, change)
+        }
         // forward-only: явный флаг пользователя — либо каскад: собственный AST
         // не менялся, а все изменившиеся родители сами forward-only (реюз
         // физики родителя означает, что и потомку нечего переигрывать)
@@ -182,6 +219,17 @@ export const planChanges = (
           change = "forward-only"
           reusedFrom = known
           physicalFingerprint = previous.physicalFp
+          explain = forwardOnly.has(name)
+            ? {
+                diverged: explain?.diverged ?? [],
+                reason: `forward-only по флагу: физика и done-интервалы наследуются от @${known.slice(0, 8)}, история не переигрывается`,
+              }
+            : {
+                diverged: [],
+                reason:
+                  "собственный AST не менялся, все изменившиеся родители forward-only — физика реюзается каскадом",
+                cascadeFrom: changedParents,
+              }
         }
       }
       changeOf.set(name, change)
@@ -225,6 +273,7 @@ export const planChanges = (
         ...(reusedFrom !== undefined ? { reusedFrom } : {}),
         canonicalAst: ast,
         change,
+        ...(explain !== undefined ? { explain } : {}),
         build: !alreadyBuilt,
         backfill,
         // каждый apply сверяет запрос с физикой: upsert / SCD-версионирование

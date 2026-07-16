@@ -53,6 +53,17 @@ describe("plan --json — контракт формы (#3)", () => {
           refresh: false,
           backfill: [{ start: 1767225600000, end: 1767312000000 }],
         },
+        {
+          name: "med.daily",
+          change: "breaking",
+          fingerprint: "def",
+          physicalFingerprint: "def",
+          canonicalAst: "{}",
+          build: true,
+          refresh: false,
+          backfill: [],
+          explain: { diverged: ["where_clause"], reason: "дерево разошлось" },
+        },
       ],
     } as never)
     expect(json).toEqual({
@@ -65,6 +76,14 @@ describe("plan --json — контракт формы (#3)", () => {
           fingerprint: "abc",
           build: true,
           backfill: [{ start: "2026-01-01T00:00:00.000Z", end: "2026-01-02T00:00:00.000Z" }],
+        },
+        {
+          name: "med.daily",
+          change: "breaking",
+          fingerprint: "def",
+          build: true,
+          backfill: [],
+          explain: { diverged: ["where_clause"], reason: "дерево разошлось" },
         },
       ],
     })

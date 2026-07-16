@@ -19,6 +19,11 @@ the first version gathers them in full.
   2000 models drops from ~0.6 s to ~50 ms; the cache key includes the
   dialect and `FINGERPRINT_VERSION`, so canon drift can never be masked (#8).
 - Integration test: stale lock reclaim under a real `kill -9` (#7).
+- `plan --explain`: for every change — which canonical-AST nodes diverged
+  and why the category followed (cascade sources for `indirect`, inherited
+  physics for `forward-only`); also shipped in `--json` as `explain`
+  (`PlanAction.explain` in the library API). AST paths are a debugging
+  hint, not a contract (#4).
 
 ## [0.1.0-beta.2] — 2026-07-16
 

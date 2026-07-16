@@ -240,6 +240,12 @@ is recognized as a strictly suffix extension of the select_list with the rest of
 the tree untouched (the descendants' INSERT is positional); physical reuse is not
 automatic non-breaking, but an explicit forward-only.*
 
+The verdict is explainable (`plan --explain`, 0.2.0 #4): every changed model
+carries which canonical-AST nodes diverged (paths like `where_clause`,
+`select_list[2] (added)`) and why the category followed — cascade sources for
+indirect, inherited physics for forward-only. The AST paths follow the
+engine's canon and are a debugging hint, not a versioned contract.
+
 ### 5.3 Backfill
 
 - Intervals to recompute are grouped into batches (the model's `batchSize`).

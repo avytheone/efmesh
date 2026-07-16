@@ -180,6 +180,12 @@ export default defineConfig({
 (a contract under semver) for CI and bots; exit codes are unchanged, stdout
 stays pure JSON.
 
+`plan --explain` adds the reasoning to every change: which canonical-AST
+nodes diverged (`where_clause`, `select_list[2] (added)`, …) and why the
+category followed — including cascade sources for `indirect`. The same
+data ships in `--json` as `explain`; the AST paths are a debugging hint,
+not part of the contract.
+
 Exit codes: `0` — success, `1` — error, `2` — "awaiting a human": the plan needs confirmation in a non-TTY (add `--yes`), or `run` hit unapplied changes. In a non-TTY, `apply` with changes and no `--yes` refuses — efmesh will not silently roll out a plan nobody has seen.
 
 ## Performance
