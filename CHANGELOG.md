@@ -7,6 +7,16 @@ the first version gathers them in full.
 
 ## [Unreleased]
 
+- Detailed execution log (#14). `apply` and `run` now narrate their work
+  through Effect's logging system: per-model build start/finish with duration,
+  backfill batch progress (`batch n of m` with interval bounds), warn-audits
+  and promotion. Levels — **info** for lifecycle (visible by default), **warn**
+  for warn-audits/retries, **debug** for the rendered SQL and lock internals;
+  the existing `--log-level` flag sets the minimum. Every line carries
+  structured fields (`model`, `env`, `interval`) as annotations. Logs go to
+  **stderr** (stdout and `--json` stay byte-clean); a TTY gets pretty colored
+  output, a pipe/journal gets one-line logfmt with no ANSI. Embedders provide
+  their own `Logger` layer to redirect sinks and levels. Exit codes unchanged.
 - Human-readable, precise errors everywhere (#13). Every tagged error now
   derives its `message` from its typed fields, so the culprit (model, env,
   file, interval) and the underlying engine/system text are always present —

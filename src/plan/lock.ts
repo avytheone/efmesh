@@ -37,5 +37,18 @@ export const withStateLock =
       const store = yield* StateStore
       const acquired = yield* store.acquireLock(name, ttlMs ?? 3_600_000)
       if (!acquired) return yield* new LockHeldError({ name })
-      return yield* effect.pipe(Effect.ensuring(store.releaseLock(name).pipe(Effect.ignore)))
+      // lock lifecycle is an internal detail — DEBUG only, keyed by lock name (#14)
+      yield* Effect.logDebug("lock acquired").pipe(Effect.annotateLogs("lock", name))
+      return yield* effect.pipe(
+        Effect.ensuring(
+          store
+            .releaseLock(name)
+            .pipe(
+              Effect.andThen(
+                Effect.logDebug("lock released").pipe(Effect.annotateLogs("lock", name)),
+              ),
+              Effect.ignore,
+            ),
+        ),
+      )
     })

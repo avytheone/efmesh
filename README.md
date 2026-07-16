@@ -211,6 +211,28 @@ changes await a human.
 
 Exit codes: `0` — success, `1` — error, `2` — "awaiting a human": the plan needs confirmation in a non-TTY (add `--yes`), or `run` hit unapplied changes. In a non-TTY, `apply` with changes and no `--yes` refuses — efmesh will not silently roll out a plan nobody has seen.
 
+## Logging
+
+`apply` and `run` narrate what they do. Logs go to **stderr** — stdout stays
+reserved for the plan screen, summaries and `--json`, which stays byte-clean.
+Levels, set by the built-in `--log-level` flag (minimum level, default `info`):
+
+- **info** — lifecycle a human watches: per-model build start/finish with
+  duration, backfill batch progress (`batch 3 of 7` with the interval bounds),
+  promotion.
+- **warn** — warn-audits (violations that do not block) and retries.
+- **debug** — the rendered SQL about to run, lock acquire/release, and other
+  internals. `--log-level debug` also prints the full fiber trace on a failure.
+
+Each line carries structured fields as annotations (`model`, `env`, `interval`,
+…). At a TTY the output is pretty and colored; piped to a file or the systemd
+journal it is one-line [logfmt](https://brandur.org/logfmt) with no ANSI, so a
+log reader (or an AI agent post-morteming a 3am tick) can group by field.
+
+Embedding efmesh as a library? Logging is Effect's `Effect.log*` — provide your
+own `Logger` layer (sink, format, minimum level) and the CLI's choices do not
+apply. Row counts are not logged: efmesh never runs an extra query just to count.
+
 ## Performance
 
 The framework overhead is negligible for any realistic project (in-memory DuckDB, `bun bench/plan-bench.ts N`):

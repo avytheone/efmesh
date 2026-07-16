@@ -99,13 +99,16 @@ export const daemon = (
   run(env, models, options).pipe(
     Effect.tap((applied) =>
       applied.built.length > 0
-        ? Effect.logInfo(`run ${env}: built ${applied.built.join(", ")}`)
-        : Effect.void,
+        ? Effect.logInfo(`tick built ${applied.built.join(", ")}`)
+        : Effect.logInfo("tick: no new intervals"),
     ),
+    // a held lock is routine (another process ticks) — debug, not an alarm
     Effect.catchTag("LockHeldError", () =>
-      Effect.logDebug(`run ${env}: lock held by another process, skipping tick`),
+      Effect.logDebug("tick skipped: lock held by another process"),
     ),
-    Effect.catchCause((cause) => Effect.logError(`run ${env}: tick failed`, cause)),
+    Effect.catchCause((cause) => Effect.logError("tick failed", cause)),
+    // env is a structured field, not baked into every message (#14)
+    Effect.annotateLogs("env", env),
     Effect.schedule(schedule),
     Effect.andThen(Effect.never),
   )

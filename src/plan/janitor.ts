@@ -108,6 +108,9 @@ export const janitor = (
       dropped.add(snapshot.physicalFp)
       const name = parseModelName(snapshot.name)
       const target = physicalRef(name, snapshot.physicalFp)
+      yield* Effect.logDebug("dropping orphaned physics").pipe(
+        Effect.annotateLogs({ model: snapshot.name, physical: snapshot.physicalFp.slice(0, 8) }),
+      )
       yield* engine.execute(
         snapshot.kind === "view"
           ? `DROP VIEW IF EXISTS ${target}`

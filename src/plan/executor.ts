@@ -184,6 +184,15 @@ const ensureDir = (path: string): Effect.Effect<void> =>
     : Effect.sync(() => mkdirSync(path, { recursive: true }))
 
 /**
+ * The rendered statement about to run — DEBUG only (#14): SQL is a firehose and
+ * would drown the info lifecycle a human watches; an operator or agent asks for
+ * it with `--log-level debug`. The model/env are inherited from the enclosing
+ * per-model log scope, so only `sql` is annotated here.
+ */
+const logSql = (sql: string): Effect.Effect<void> =>
+  Effect.logDebug("rendered SQL").pipe(Effect.annotateLogs("sql", sql))
+
+/**
  * Runs a model's audits (SPEC §8): `self` is the snapshot's physics or a
  * subquery of the just-loaded interval. The audit query returns violations:
  * blocking → AuditFailure, warn → log and continue.
@@ -272,7 +281,14 @@ const backfillIntoTable = (
     // may differ from the query; the schema contract guarantees the names match
     const columns = columnNames(model).map(quoteIdent).join(", ")
 
-    const runBatch = (batch: Interval) =>
+    // connection pool (Postgres) → batches in parallel: intervals do not
+    // overlap, each is its own transaction; DuckDB (single connection) — sequentially
+    const batches = action.backfill.flatMap((range) =>
+      splitIntoBatches(range, kind.interval, kind.batchSize),
+    )
+    const total = batches.length
+
+    const runBatch = (batch: Interval, index: number) =>
       Effect.gen(function* () {
         const marks = intervalsWithin(batch, kind.interval).map((interval: Interval) => ({
           startTs: toIso(interval.start),
@@ -281,6 +297,12 @@ const backfillIntoTable = (
         const start = sqlTimestamp(batch.start)
         const end = sqlTimestamp(batch.end)
         const body = render(model.fragment, { resolveRef, interval: { start, end } })
+        // info lifecycle: a human watching a long backfill sees n-of-m progress;
+        // interval bounds are structured (annotation), not baked into the message
+        yield* Effect.logInfo(`backfill batch ${index + 1} of ${total}`).pipe(
+          Effect.annotateLogs("interval", `[${toIso(batch.start)}, ${toIso(batch.end)})`),
+        )
+        yield* logSql(body)
         const markFailed = () =>
           store.markIntervals(action.fingerprint, marks, "failed").pipe(Effect.ignore)
         yield* transactional(engine, [
@@ -297,11 +319,6 @@ const backfillIntoTable = (
         yield* Metric.update(intervalsDone, marks.length)
       })
 
-    // connection pool (Postgres) → batches in parallel: intervals do not
-    // overlap, each is its own transaction; DuckDB (single connection) — sequentially
-    const batches = action.backfill.flatMap((range) =>
-      splitIntoBatches(range, kind.interval, kind.batchSize),
-    )
     yield* Effect.forEach(batches, runBatch, {
       concurrency: engine.dialect === "duckdb" ? 1 : Math.max(1, concurrency),
       discard: true,
@@ -325,14 +342,25 @@ const backfillIntoParquet = (
   Effect.gen(function* () {
     if (model.kind._tag !== "incrementalByTimeRange") return
     const kind = model.kind
-    for (const range of action.backfill) {
-      for (const interval of intervalsWithin(range, kind.interval)) {
+    // interval = partition; flat list so progress reads "n of m" across all ranges
+    const intervals = action.backfill.flatMap((range) =>
+      intervalsWithin(range, kind.interval),
+    )
+    const total = intervals.length
+    yield* Effect.forEach(
+      intervals,
+      (interval, index) =>
+        Effect.gen(function* () {
         const partition = `${prefix}/interval=${intervalKey(kind.interval, interval.start)}`
         yield* ensureDir(partition)
         const body = render(model.fragment, {
           resolveRef,
           interval: { start: sqlTimestamp(interval.start), end: sqlTimestamp(interval.end) },
         })
+        yield* Effect.logInfo(`backfill partition ${index + 1} of ${total}`).pipe(
+          Effect.annotateLogs("interval", `[${toIso(interval.start)}, ${toIso(interval.end)})`),
+        )
+        yield* logSql(body)
         const mark = [{ startTs: toIso(interval.start), endTs: toIso(interval.end) }]
         const markFailed = () =>
           store.markIntervals(action.fingerprint, mark, "failed").pipe(Effect.ignore)
@@ -355,8 +383,9 @@ const backfillIntoParquet = (
         )
         yield* store.markIntervals(action.fingerprint, mark, "done")
         yield* Metric.update(intervalsDone, 1)
-      }
-    }
+        }),
+      { discard: true },
+    )
   })
 
 /**
@@ -470,6 +499,7 @@ export const applyPlan = (
           // there is no physics — but the contract and the version's audits are
           // checked here so consumers do not carry a broken subquery into themselves
           const body = render(model.fragment, { resolveRef })
+          yield* logSql(body)
           yield* checkContract(engine, model, body)
           yield* runAudits(engine, model, `(${body})`)
           yield* store.upsertSnapshot({
@@ -486,6 +516,7 @@ export const applyPlan = (
         case "seed": {
           const reader = model.kind.format === "csv" ? "read_csv" : "read_json"
           const body = `SELECT * FROM ${reader}('${model.kind.file.replaceAll(`'`, `''`)}')`
+          yield* logSql(body)
           yield* checkContract(engine, model, body)
           const target = tableRef(model, action.physicalFingerprint)
           yield* engine.execute(`CREATE OR REPLACE TABLE ${target} AS ${body}`)
@@ -503,6 +534,7 @@ export const applyPlan = (
         }
         case "incrementalByUniqueKey": {
           const body = render(model.fragment, { resolveRef })
+          yield* logSql(body)
           yield* checkContract(engine, model, body)
           const target = tableRef(model, action.physicalFingerprint)
           yield* engine.execute(
@@ -529,6 +561,7 @@ export const applyPlan = (
         case "scdType2": {
           const scd = model.kind
           const body = render(model.fragment, { resolveRef })
+          yield* logSql(body)
           const managed = new Set([scd.validFrom, scd.validTo])
           yield* checkContract(engine, model, body, managed)
           const target = tableRef(model, action.physicalFingerprint)
@@ -580,6 +613,7 @@ export const applyPlan = (
         case "view":
         case "full": {
           const body = render(model.fragment, { resolveRef })
+          yield* logSql(body)
           // schema contract (SPEC §3.2): type drift is caught before building
           yield* checkContract(engine, model, body)
           // indirect reuse (#5): the data is identical by construction (parents
@@ -715,10 +749,20 @@ export const applyPlan = (
           (gate) => Deferred.await(gate),
           { discard: true },
         )
+        const startedAt = yield* Clock.currentTimeMillis
+        yield* Effect.logInfo("build start")
         yield* buildOne(action).pipe(attachModel(action.name))
+        yield* Effect.logInfo(
+          `build done in ${(yield* Clock.currentTimeMillis) - startedAt} ms`,
+        )
         yield* Metric.update(snapshotsBuilt, 1)
         yield* Deferred.succeed(gates.get(action.name)!, undefined)
-      })
+      }).pipe(
+        // one structured log scope per model: model/env/change flow into every
+        // line the build emits (SQL at debug, backfill progress at info), so a
+        // machine reader can group them without parsing the message text (#14)
+        Effect.annotateLogs({ model: action.name, env: plan.env, change: action.change }),
+      )
 
     // working is in topological order, and forEach starts elements in order —
     // the earliest unfinished element always has its parents ready, so waiting
@@ -809,6 +853,10 @@ export const applyPlan = (
       }),
       options?.appliedBy ?? osUser(),
     )
+
+    yield* Effect.logInfo(
+      built.length > 0 ? `promoted, built ${built.join(", ")}` : "promoted (view-swap only)",
+    ).pipe(Effect.annotateLogs("env", plan.env))
 
     return { plan, built }
   }).pipe(Effect.withSpan("efmesh.apply", { attributes: { env: plan.env } }))
