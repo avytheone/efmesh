@@ -22,7 +22,7 @@ import type { SeedReadError } from "./core/errors.ts"
 import type { GraphError } from "./core/graph.ts"
 import type { StateError } from "./state/store.ts"
 import { StateStore } from "./state/store.ts"
-import { viewRef } from "./plan/naming.ts"
+import { externalSourceRef, viewRef } from "./plan/naming.ts"
 
 /**
  * Фасад efmesh (SPEC §10): обычные Effect'ы, встраиваемые в любое
@@ -72,9 +72,16 @@ export const Efmesh = {
       Effect.map((graph) => {
         const model = graph.models.get(name)
         if (model === undefined) throw new Error(`модели ${name} нет в проекте`)
-        return render(model.fragment, {
-          resolveRef: (ref) => viewRef(env, graph.models.get(ref)!.name),
-        })
+        // view-слоя у external и embedded нет: источник как есть / подзапрос
+        const resolve = (ref: string): string => {
+          const source = graph.models.get(ref)!
+          if (source.kind._tag === "external") return externalSourceRef(source.kind.source)
+          if (source.kind._tag === "embedded") {
+            return `(${render(source.fragment, { resolveRef: resolve })})`
+          }
+          return viewRef(env, source.name)
+        }
+        return render(model.fragment, { resolveRef: resolve })
       }),
     ),
 } as const

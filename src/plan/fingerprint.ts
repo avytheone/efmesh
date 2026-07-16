@@ -39,6 +39,7 @@ const kindPayload = (
   switch (kind._tag) {
     case "full":
     case "view":
+    case "embedded":
       return Effect.succeed({ _tag: kind._tag })
     case "incrementalByTimeRange":
       return Effect.succeed({

@@ -255,6 +255,9 @@ export const applyPlan = (
     const physicalFpOf = new Map(plan.actions.map((a) => [a.name, a.physicalFingerprint]))
     const physicalFor = (model: AnyModel, fingerprint: string): string => {
       if (model.kind._tag === "external") return externalSourceRef(model.kind.source)
+      // embedded не материализуется — подставляется потребителю подзапросом,
+      // его собственные ссылки резолвятся рекурсивно (DAG ацикличен)
+      if (model.kind._tag === "embedded") return `(${render(model.fragment, { resolveRef })})`
       if (model.target === "parquet") {
         if (lakePath === undefined) throw new LakeNotConfiguredError({ model: model.name.full })
         return parquetRef(lakePath, model.name, fingerprint)
@@ -287,6 +290,22 @@ export const applyPlan = (
       switch (model.kind._tag) {
         case "external":
           continue
+        case "embedded": {
+          // физики нет — но контракт и аудиты версии проверяются здесь,
+          // чтобы потребители не унесли в себя сломанный подзапрос
+          const body = render(model.fragment, { resolveRef })
+          yield* checkContract(engine, model, body)
+          yield* runAudits(engine, model, `(${body})`)
+          yield* store.upsertSnapshot({
+            name: action.name,
+            fingerprint: action.fingerprint,
+            physicalFp: action.physicalFingerprint,
+            canonicalAst: action.canonicalAst ?? "",
+            renderedSql: render(model.fragment, { resolveRef: (ref) => ref }),
+            kind: model.kind._tag,
+          })
+          break
+        }
         case "seed": {
           const reader = model.kind.format === "csv" ? "read_csv" : "read_json"
           const body = `SELECT * FROM ${reader}('${model.kind.file.replaceAll(`'`, `''`)}')`
@@ -426,7 +445,8 @@ export const applyPlan = (
         continue
       }
       const model = graph.models.get(action.name)!
-      if (model.kind._tag === "external") continue // view-слоя у external нет
+      // view-слоя у external и embedded нет — они не материализуются
+      if (model.kind._tag === "external" || model.kind._tag === "embedded") continue
       yield* engine.execute(
         `CREATE SCHEMA IF NOT EXISTS "${envSchema(plan.env, model.name.schema)}"`,
       )

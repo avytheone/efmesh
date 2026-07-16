@@ -10,6 +10,10 @@ export type ModelKind =
   | { readonly _tag: "full" }
   | { readonly _tag: "view" }
   | {
+      /** Подставляется в потребителей как подзапрос, без материализации (SPEC §3.1). */
+      readonly _tag: "embedded"
+    }
+  | {
       readonly _tag: "incrementalByTimeRange"
       /** Колонка времени, по которой режутся и перечитываются интервалы. */
       readonly timeColumn: string
@@ -59,6 +63,7 @@ export interface IncrementalByTimeRangeOptions {
 export const kind = {
   full: (): ModelKind => ({ _tag: "full" }),
   view: (): ModelKind => ({ _tag: "view" }),
+  embedded: (): ModelKind => ({ _tag: "embedded" }),
   incrementalByTimeRange: (options: IncrementalByTimeRangeOptions): ModelKind => ({
     _tag: "incrementalByTimeRange",
     timeColumn: options.timeColumn,
@@ -201,10 +206,13 @@ export const defineModel = <const Fields extends Schema.Struct.Fields>(
       throw new ModelDefinitionError({ model: name.full, reason: "key не может быть пустым" })
     }
   }
-  if (config.kind._tag === "view" && config.target === "parquet") {
+  if (
+    (config.kind._tag === "view" || config.kind._tag === "embedded") &&
+    config.target === "parquet"
+  ) {
     throw new ModelDefinitionError({
       model: name.full,
-      reason: "view не материализуется — parquet-цель к нему неприменима",
+      reason: `${config.kind._tag} не материализуется — parquet-цель к нему неприменима`,
     })
   }
   if (config.kind._tag === "incrementalByUniqueKey" && config.target === "parquet") {
