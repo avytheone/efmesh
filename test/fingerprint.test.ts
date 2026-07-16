@@ -20,7 +20,7 @@ const schema = Schema.Struct({ case_id: Schema.String, dept: Schema.String })
 
 const movesUgly = defineModel(
   { name: "med.moves", kind: kind.full(), schema },
-  (ctx) => ctx.sql`select   case_id,dept from src.raw_moves where dept='ОРИТ'`,
+  (ctx) => ctx.sql`select   case_id,dept from src.raw_moves where dept='ICU'`,
 )
 
 const movesPretty = defineModel(
@@ -28,13 +28,13 @@ const movesPretty = defineModel(
   (ctx) => ctx.sql`
     SELECT "case_id", "dept"
     FROM src.raw_moves
-    WHERE "dept" = 'ОРИТ'
+    WHERE "dept" = 'ICU'
   `,
 )
 
 const movesOther = defineModel(
   { name: "med.moves", kind: kind.full(), schema },
-  (ctx) => ctx.sql`SELECT case_id, dept FROM src.raw_moves WHERE dept = 'терапия'`,
+  (ctx) => ctx.sql`SELECT case_id, dept FROM src.raw_moves WHERE dept = 'therapy'`,
 )
 
 describe("fingerprint over the canonical AST (SPEC §4)", () => {

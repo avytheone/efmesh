@@ -24,7 +24,7 @@ describe("external models (SPEC §3.1, §9.3)", () => {
         const engine = yield* EngineAdapter
         yield* engine.execute(`CREATE SCHEMA src`)
         yield* engine.execute(
-          `CREATE TABLE src.raw_moves AS SELECT * FROM (VALUES ('c1','ОРИТ'), ('c2','терапия')) t(case_id, dept)`,
+          `CREATE TABLE src.raw_moves AS SELECT * FROM (VALUES ('c1','ICU'), ('c2','therapy')) t(case_id, dept)`,
         )
 
         const raw = defineExternal({ name: "src.moves", source: external.table("src.raw_moves"), schema })
@@ -56,10 +56,10 @@ describe("external models (SPEC §3.1, §9.3)", () => {
       Effect.gen(function* () {
         const engine = yield* EngineAdapter
         yield* engine.execute(
-          `COPY (SELECT 'c1' AS case_id, 'ОРИТ' AS dept) TO '${join(dir, "a.parquet")}' (FORMAT PARQUET)`,
+          `COPY (SELECT 'c1' AS case_id, 'ICU' AS dept) TO '${join(dir, "a.parquet")}' (FORMAT PARQUET)`,
         )
         yield* engine.execute(
-          `COPY (SELECT * FROM (VALUES ('c2','терапия'), ('c3','хирургия')) t(case_id, dept)) TO '${join(dir, "b.parquet")}' (FORMAT PARQUET)`,
+          `COPY (SELECT * FROM (VALUES ('c2','therapy'), ('c3','surgery')) t(case_id, dept)) TO '${join(dir, "b.parquet")}' (FORMAT PARQUET)`,
         )
 
         const lake = (path: string) =>

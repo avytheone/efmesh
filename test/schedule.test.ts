@@ -56,7 +56,7 @@ describe("efmesh schedule (#10)", () => {
   test("expression validation — via the Bun.cron parser", async () => {
     await Effect.runPromise(validateCron("@hourly"))
     await Effect.runPromise(validateCron("*/15 9-17 * * MON-FRI"))
-    const failure = await Effect.runPromise(Effect.flip(validateCron("каждый час")))
+    const failure = await Effect.runPromise(Effect.flip(validateCron("every hour")))
     expect(failure._tag).toBe("ScheduleError")
   })
 })

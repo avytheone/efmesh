@@ -57,7 +57,7 @@ const loadConfig = (
           module.default === undefined ||
           (!Array.isArray(module.default.models) && module.default.discovery === undefined)
         ) {
-          throw new Error("конфиг должен экспортировать default с models и/или discovery")
+          throw new Error("config must export a default with models and/or discovery")
         }
         return module.default
       },
@@ -68,7 +68,7 @@ const loadConfig = (
     // globs are relative to the config: the project is portable regardless of cwd
     const discovered = yield* discoverModels(config.discovery, NodePath.dirname(absolute))
     const seen = new Set(explicit)
-    const names = new Map(explicit.map((model) => [model.name.full, "models в конфиге"]))
+    const names = new Map(explicit.map((model) => [model.name.full, "config models"]))
     const merged = [...explicit]
     for (const model of discovered) {
       if (seen.has(model)) continue
@@ -98,7 +98,7 @@ const configLayers = (config: EfmeshConfig) =>
 
 const configFlag = Flag.string("config").pipe(
   Flag.withDefault("efmesh.config.ts"),
-  Flag.withDescription("Путь к efmesh.config.ts"),
+  Flag.withDescription("path to efmesh.config.ts"),
 )
 
 const CHANGE_MARK: Record<string, string> = {
@@ -114,21 +114,21 @@ const CHANGE_MARK: Record<string, string> = {
 const forwardOnlyFlag = Flag.string("forward-only").pipe(
   Flag.withDefault(""),
   Flag.withDescription(
-    "Модели через запятую: изменения применяются forward-only — физика и история переиспользуются",
+    "comma-separated models: changes apply forward-only — physics and history are reused",
   ),
 )
 
 const reclassifyFlag = Flag.string("reclassify").pipe(
   Flag.withDefault(""),
   Flag.withDescription(
-    "Override категоризации (#5): «модель=breaking|non-breaking[,…]» поверх --explain; журналируется с applied_by",
+    'override categorization (#5): "model=breaking|non-breaking[,…]" on top of --explain; journaled with applied_by',
   ),
 )
 
 const jobsFlag = Flag.string("jobs").pipe(
   Flag.withDefault(""),
   Flag.withDescription(
-    "Сколько моделей строить одновременно (DAG-конкурентность; на DuckDB всегда 1)",
+    "how many models to build at once (DAG concurrency; always 1 on DuckDB)",
   ),
 )
 
@@ -140,7 +140,7 @@ const parseJobs = (value: string): number | undefined => {
 const retriesFlag = Flag.string("retries").pipe(
   Flag.withDefault(""),
   Flag.withDescription(
-    "Сколько раз ретраить упавший батч бэкфилла (экспоненциальная пауза; по умолчанию 0)",
+    "how many times to retry a failed backfill batch (exponential backoff; default 0)",
   ),
 )
 
@@ -180,7 +180,7 @@ export const parseReclassify = (
       ) {
         return yield* new ReclassifyError({
           model: entry,
-          reason: "ожидается «модель=breaking» или «модель=non-breaking»",
+          reason: 'expected "model=breaking" or "model=non-breaking"',
         })
       }
       parsed[model] = category
@@ -190,12 +190,12 @@ export const parseReclassify = (
 
 const yesFlag = Flag.boolean("yes").pipe(
   Flag.withAlias("y"),
-  Flag.withDescription("Применить без подтверждения (не-TTY подтверждения не спрашивает)"),
+  Flag.withDescription("apply without confirmation (non-TTY never asks)"),
 )
 
-/** Accepts y/yes and their Russian equivalents, case-insensitive; anything else (including empty) is a refusal. */
+/** Accepts y/yes, case-insensitive; anything else (including empty) is a refusal. */
 export const isAffirmative = (answer: string | null): boolean =>
-  ["y", "yes", "д", "да"].includes((answer ?? "").trim().toLowerCase())
+  ["y", "yes"].includes((answer ?? "").trim().toLowerCase())
 
 /**
  * The "work awaits a human" exit code (F6): the plan needs confirmation in a
@@ -217,12 +217,12 @@ export const decideApply = (
 ): "apply" | "ask" | "refuse" => (!hasChanges || yes ? "apply" : tty ? "ask" : "refuse")
 
 const jsonFlag = Flag.boolean("json").pipe(
-  Flag.withDescription("Машиночитаемый вывод (стабильная форма — контракт для CI)"),
+  Flag.withDescription("machine-readable output (stable shape — a contract for CI)"),
 )
 
 const explainFlag = Flag.boolean("explain").pipe(
   Flag.withDescription(
-    "К каждому изменению — какие узлы канонического AST разошлись и почему категория такая",
+    "for each change — which canonical AST nodes diverged and why the category is what it is",
   ),
 )
 
@@ -255,37 +255,37 @@ export const planToJson = (plan: Plan): unknown => ({
 const printJson = (payload: unknown) => Console.log(JSON.stringify(payload, null, 2))
 
 const formatRange = (range: { readonly start: number; readonly end: number }): string =>
-  `[${new Date(range.start).toISOString().slice(0, 10)} … ${new Date(range.end).toISOString().slice(0, 10)})`
+  `[${new Date(range.start).toISOString().slice(0, 10)}, ${new Date(range.end).toISOString().slice(0, 10)})`
 
 const printPlan = (plan: Plan, explain = false) =>
   Effect.gen(function* () {
-    yield* Console.log(`план для окружения «${plan.env}»:`)
+    yield* Console.log(`plan for environment "${plan.env}":`)
     for (const action of plan.actions) {
       const mark = CHANGE_MARK[action.change] ?? "?"
       const overridden =
         action.reclassifiedFrom !== undefined
-          ? `  [override: было ${action.reclassifiedFrom}]`
+          ? `  [override: was ${action.reclassifiedFrom}]`
           : ""
       const reused =
         action.change === "indirect" && action.reusedFrom !== undefined
-          ? "  [физика реюзается]"
+          ? "  [physics reused]"
           : ""
-      const build = action.build ? "  [сборка]" : ""
+      const build = action.build ? "  [build]" : ""
       const backfill =
         action.backfill.length > 0
-          ? `  бэкфилл ${action.backfill.map(formatRange).join(", ")}`
+          ? `  backfill ${action.backfill.map(formatRange).join(", ")}`
           : ""
       yield* Console.log(
         `  ${mark} ${action.name}  ${action.change} @${fp8(action.fingerprint)}${overridden}${reused}${build}${backfill}`,
       )
       if (explain && action.explain !== undefined) {
-        yield* Console.log(`      почему: ${action.explain.reason}`)
+        yield* Console.log(`      why: ${action.explain.reason}`)
         if (action.explain.diverged.length > 0) {
-          yield* Console.log(`      разошлось: ${action.explain.diverged.join(", ")}`)
+          yield* Console.log(`      diverged: ${action.explain.diverged.join(", ")}`)
         }
       }
     }
-    if (!plan.hasChanges) yield* Console.log("  изменений нет")
+    if (!plan.hasChanges) yield* Console.log("  no changes")
   })
 
 const initCommand = Command.make(
@@ -294,10 +294,10 @@ const initCommand = Command.make(
   ({ dir }) =>
     Effect.gen(function* () {
       const created = yield* scaffold(dir)
-      for (const file of created) yield* Console.log(`создан ${file}`)
-      yield* Console.log("дальше: bunx efmesh plan dev && bunx efmesh apply dev")
+      for (const file of created) yield* Console.log(`created ${file}`)
+      yield* Console.log("next: bunx efmesh plan dev && bunx efmesh apply dev")
     }),
-).pipe(Command.withDescription("Скаффолд проекта: конфиг, модели-пример, seed"))
+).pipe(Command.withDescription("scaffold a project: config, example models, seed"))
 
 const planCommand = Command.make(
   "plan",
@@ -320,7 +320,7 @@ const planCommand = Command.make(
       }).pipe(Effect.provide(configLayers(loaded)))
       yield* json ? printJson(planToJson(plan)) : printPlan(plan, explain)
     }),
-).pipe(Command.withDescription("Показать diff проекта против окружения, ничего не меняя"))
+).pipe(Command.withDescription("show the project diff against an environment, changing nothing"))
 
 const applyCommand = Command.make(
   "apply",
@@ -354,7 +354,7 @@ const applyCommand = Command.make(
         const decision = decideApply(plan.hasChanges, yes, process.stdin.isTTY === true)
         if (decision === "refuse") {
           yield* Console.error(
-            "план меняет модели, а подтвердить некому (не-TTY): добавьте --yes",
+            "the plan changes models but there is no one to confirm (non-TTY): add --yes",
           )
           yield* Effect.sync(() => {
             process.exitCode = EXIT_AWAITING_HUMAN
@@ -363,9 +363,9 @@ const applyCommand = Command.make(
         }
         if (
           decision === "ask" &&
-          !isAffirmative(globalThis.prompt("применить план? [y/N]"))
+          !isAffirmative(globalThis.prompt("apply the plan? [y/N]"))
         ) {
-          yield* Console.log("применение отменено")
+          yield* Console.log("apply cancelled")
           return
         }
         const applied = yield* applyPlan(plan, graph, {
@@ -377,13 +377,13 @@ const applyCommand = Command.make(
         })
         yield* Console.log(
           applied.built.length > 0
-            ? `собрано: ${applied.built.join(", ")}`
-            : "сборка не потребовалась (только view-swap)",
+            ? `built: ${applied.built.join(", ")}`
+            : "no build needed (view-swap only)",
         )
-        yield* Console.log(`окружение «${applied.plan.env}» промоутнуто`)
+        yield* Console.log(`environment "${applied.plan.env}" promoted`)
       }).pipe(withStateLock(envLockName(env)), Effect.provide(configLayers(loaded)))
     }),
-).pipe(Command.withDescription("Применить план: собрать физику и переключить view"))
+).pipe(Command.withDescription("apply the plan: build physics and swap views"))
 
 const renderCommand = Command.make(
   "render",
@@ -392,7 +392,7 @@ const renderCommand = Command.make(
     config: configFlag,
     env: Flag.string("env").pipe(
       Flag.withDefault(""),
-      Flag.withDescription("Рендер против view-слоя окружения вместо логических имён"),
+      Flag.withDescription("render against an environment's view layer instead of logical names"),
     ),
   },
   ({ config, env, model }) =>
@@ -403,7 +403,7 @@ const renderCommand = Command.make(
         : yield* Efmesh.renderFor(loaded.models, model, env)
       yield* Console.log(sql.trim())
     }),
-).pipe(Command.withDescription("Показать итоговый SQL модели"))
+).pipe(Command.withDescription("show a model's final SQL"))
 
 const runCommand = Command.make(
   "run",
@@ -426,7 +426,7 @@ const runCommand = Command.make(
         Effect.catchTag("RunBlockedByChangesError", (blocked) =>
           Effect.gen(function* () {
             yield* Console.error(
-              `run ${blocked.env}: есть неприменённые изменения — нужен apply:\n  ${blocked.changes.join("\n  ")}`,
+              `run "${blocked.env}": unapplied changes present — apply needed:\n  ${blocked.changes.join("\n  ")}`,
             )
             yield* Effect.sync(() => {
               process.exitCode = EXIT_AWAITING_HUMAN
@@ -438,27 +438,27 @@ const runCommand = Command.make(
       if (applied === undefined) return
       yield* Console.log(
         applied.built.length > 0
-          ? `обработано: ${applied.built.join(", ")}`
-          : "новых интервалов нет",
+          ? `processed: ${applied.built.join(", ")}`
+          : "no new intervals",
       )
     }),
 ).pipe(
   Command.withDescription(
-    "Тик планировщика: догнать интервалы существующих версий (изменения — через apply)",
+    "scheduler tick: catch up intervals of existing versions (changes go through apply)",
   ),
 )
 
 const printDataDiff = (report: DataDiffReport) =>
   Effect.gen(function* () {
-    yield* Console.log(`данные ${report.envA} ↔ ${report.envB}:`)
+    yield* Console.log(`data "${report.envA}" ↔ "${report.envB}":`)
     if (report.models.length === 0) {
-      yield* Console.log("  общих материализуемых моделей нет")
+      yield* Console.log("  no shared materializable models")
       return
     }
     for (const entry of report.models) {
       if (entry.key === undefined) {
         yield* Console.log(
-          `  · ${entry.model}  A=${entry.rowsA} B=${entry.rowsB}  без ключа (задайте grain) — только счётчики`,
+          `  · ${entry.model}  A=${entry.rowsA} B=${entry.rowsB}  no key (set a grain) — counts only`,
         )
       } else {
         const clean =
@@ -467,21 +467,21 @@ const printDataDiff = (report: DataDiffReport) =>
           (entry.columns?.length ?? 0) === 0 &&
           entry.rowsA === entry.rowsB
         const sampled =
-          entry.sampledPercent !== undefined ? `  (выборка ${entry.sampledPercent}%)` : ""
+          entry.sampledPercent !== undefined ? `  (sample ${entry.sampledPercent}%)` : ""
         yield* Console.log(
-          `  ${clean ? "✓" : "≠"} ${entry.model}  A=${entry.rowsA} B=${entry.rowsB}  ключ (${entry.key.join(", ")}): только в A ${entry.onlyInA}, только в B ${entry.onlyInB}, совпало ${entry.matched}${sampled}`,
+          `  ${clean ? "✓" : "≠"} ${entry.model}  A=${entry.rowsA} B=${entry.rowsB}  key (${entry.key.join(", ")}): only in A ${entry.onlyInA}, only in B ${entry.onlyInB}, matched ${entry.matched}${sampled}`,
         )
         for (const drift of entry.columns ?? []) {
           yield* Console.log(
-            `      ${drift.column}: ${drift.mismatches} из ${entry.matched} (${(drift.rate * 100).toFixed(2)}%)`,
+            `      ${drift.column}: ${drift.mismatches} of ${entry.matched} (${(drift.rate * 100).toFixed(2)}%)`,
           )
         }
       }
       if (entry.columnsOnlyInA !== undefined) {
-        yield* Console.log(`      колонки только в A: ${entry.columnsOnlyInA.join(", ")}`)
+        yield* Console.log(`      columns only in A: ${entry.columnsOnlyInA.join(", ")}`)
       }
       if (entry.columnsOnlyInB !== undefined) {
-        yield* Console.log(`      колонки только в B: ${entry.columnsOnlyInB.join(", ")}`)
+        yield* Console.log(`      columns only in B: ${entry.columnsOnlyInB.join(", ")}`)
       }
     }
   })
@@ -494,17 +494,17 @@ const diffCommand = Command.make(
     config: configFlag,
     data: Flag.boolean("data").pipe(
       Flag.withDescription(
-        "Сравнить ДАННЫЕ view-слоёв: счётчики строк, пересечение по ключу, расхождения по колонкам",
+        "compare view-layer DATA: row counts, key intersection, per-column divergences",
       ),
     ),
     model: Flag.string("model").pipe(
       Flag.withDefault(""),
-      Flag.withDescription("Только эти модели, через запятую (для --data)"),
+      Flag.withDescription("only these models, comma-separated (for --data)"),
     ),
     sample: Flag.string("sample").pipe(
       Flag.withDefault(""),
       Flag.withDescription(
-        "Процент 1–99: сравнивать детерминированную долю ключей (md5-бакеты; для --data)",
+        "percent 1–99: compare a deterministic fraction of keys (md5 buckets; for --data)",
       ),
     ),
     json: jsonFlag,
@@ -516,7 +516,7 @@ const diffCommand = Command.make(
         const only = parseForwardOnly(model)
         const percent = sample === "" ? undefined : Number(sample)
         if (percent !== undefined && !(Number.isFinite(percent) && percent >= 1 && percent <= 99)) {
-          yield* Console.error("--sample ожидает процент от 1 до 99")
+          yield* Console.error("--sample expects a percent from 1 to 99")
           return yield* Effect.sync(() => {
             process.exitCode = 1
           })
@@ -542,17 +542,17 @@ const diffCommand = Command.make(
         yield* printJson(diff)
         return
       }
-      for (const name of diff.onlyInA) yield* Console.log(`< ${name}  только в ${envA}`)
-      for (const name of diff.onlyInB) yield* Console.log(`> ${name}  только в ${envB}`)
+      for (const name of diff.onlyInA) yield* Console.log(`< ${name}  only in ${envA}`)
+      for (const name of diff.onlyInB) yield* Console.log(`> ${name}  only in ${envB}`)
       for (const entry of diff.different) {
         yield* Console.log(`≠ ${entry.name}  ${envA}@${entry.a} vs ${envB}@${entry.b}`)
       }
       if (diff.onlyInA.length + diff.onlyInB.length + diff.different.length === 0) {
-        yield* Console.log("окружения идентичны")
+        yield* Console.log("environments are identical")
       }
     }),
 ).pipe(
-  Command.withDescription("Чем окружения отличаются: версии (state store) или --data (данные)"),
+  Command.withDescription("how environments differ: versions (state store) or --data (row data)"),
 )
 
 const scheduleCommand = Command.make(
@@ -562,17 +562,17 @@ const scheduleCommand = Command.make(
     config: configFlag,
     cron: Flag.string("cron").pipe(
       Flag.withDefault("@hourly"),
-      Flag.withDescription("Cron-выражение или никнейм (@hourly, @daily, …)"),
+      Flag.withDescription("cron expression or nickname (@hourly, @daily, …)"),
     ),
     remove: Flag.boolean("remove").pipe(
-      Flag.withDescription("Снять регистрацию окружения из OS-шедулера"),
+      Flag.withDescription("unregister the environment from the OS scheduler"),
     ),
     list: Flag.boolean("list").pipe(
-      Flag.withDescription("Показать efmesh-записи OS-шедулера"),
+      Flag.withDescription("list efmesh entries in the OS scheduler"),
     ),
     printSystemd: Flag.boolean("print-systemd").pipe(
       Flag.withDescription(
-        "Напечатать systemd user-юниты вместо cron (Persistent=true догоняет пропуски; спасение без cron-демона)",
+        "print systemd user units instead of cron (Persistent=true catches up misses; a lifeline without a cron daemon)",
       ),
     ),
   },
@@ -580,12 +580,12 @@ const scheduleCommand = Command.make(
     Effect.gen(function* () {
       if (list) {
         const entries = yield* listSchedules()
-        if (entries.length === 0) yield* Console.log("efmesh-записей в OS-шедулере нет")
+        if (entries.length === 0) yield* Console.log("no efmesh entries in the OS scheduler")
         for (const entry of entries) yield* Console.log(`  ${entry}`)
         return
       }
       if (env === "") {
-        yield* Console.error("нужно окружение: efmesh schedule <env> [--cron …]")
+        yield* Console.error("environment required: efmesh schedule <env> [--cron …]")
         return yield* Effect.sync(() => {
           process.exitCode = 1
         })
@@ -599,20 +599,20 @@ const scheduleCommand = Command.make(
         yield* Console.log(`# ~/.config/systemd/user/${units.name}.timer`)
         yield* Console.log(units.timer)
         yield* Console.log(
-          `# включить: systemctl --user daemon-reload && systemctl --user enable --now ${units.name}.timer`,
+          `# enable: systemctl --user daemon-reload && systemctl --user enable --now ${units.name}.timer`,
         )
         return
       }
       if (remove) {
         const removed = yield* removeSchedule(target)
-        yield* Console.log(`снято: ${removed.title}`)
+        yield* Console.log(`unregistered: ${removed.title}`)
         return
       }
       const registered = yield* registerSchedule(target, cron)
-      yield* Console.log(`зарегистрировано: ${registered.title} — «${cron}» (OS-шедулер)`)
-      yield* Console.log(`воркер: ${registered.worker}`)
+      yield* Console.log(`registered: ${registered.title} — "${cron}" (OS scheduler)`)
+      yield* Console.log(`worker: ${registered.worker}`)
       yield* Console.log(
-        "журнал тиков: efmesh status " + env + "; NB: cron не догоняет пропущенные запуски — строже systemd-таймер (--print-systemd)",
+        "tick journal: efmesh status " + env + "; NB: cron does not catch up missed runs — a systemd timer is stricter (--print-systemd)",
       )
     }).pipe(
       // reason is the most valuable part (a recipe for the operator): surface it in words, not a stacktrace
@@ -627,7 +627,7 @@ const scheduleCommand = Command.make(
     ),
 ).pipe(
   Command.withDescription(
-    "Зарегистрировать run <env> в OS-шедулере (Bun.cron: crontab/launchd/Task Scheduler)",
+    "register run <env> in the OS scheduler (Bun.cron: crontab/launchd/Task Scheduler)",
   ),
 )
 
@@ -637,7 +637,7 @@ const janitorCommand = Command.make(
     config: configFlag,
     ttl: Flag.string("ttl").pipe(
       Flag.withDefault("7"),
-      Flag.withDescription("Сколько дней осиротевшая физика живёт до сноса"),
+      Flag.withDescription("how many days orphaned physics lives before removal"),
     ),
   },
   ({ config, ttl }) =>
@@ -650,14 +650,14 @@ const janitorCommand = Command.make(
       }).pipe(Effect.provide(configLayers(loaded)))
       yield* Console.log(
         report.removed.length > 0
-          ? `снесено: ${report.removed.join(", ")}`
-          : "осиротевшей физики старше ttl нет",
+          ? `removed: ${report.removed.join(", ")}`
+          : "no orphaned physics older than ttl",
       )
       if (report.kept.length > 0) {
-        yield* Console.log(`осиротело, но моложе ttl: ${report.kept.join(", ")}`)
+        yield* Console.log(`orphaned but younger than ttl: ${report.kept.join(", ")}`)
       }
     }),
-).pipe(Command.withDescription("Убрать физику, на которую не ссылается ни одно окружение"))
+).pipe(Command.withDescription("remove physics no environment references"))
 
 const statusCommand = Command.make(
   "status",
@@ -673,40 +673,40 @@ const statusCommand = Command.make(
         return
       }
       if (report.models === 0) {
-        yield* Console.log(`окружение «${env}» не существует — его создаст первый apply`)
+        yield* Console.log(`environment "${env}" does not exist — the first apply creates it`)
         return
       }
       yield* Console.log(
-        `окружение «${env}»: моделей ${report.models}, промоушен ${report.promotedAt}, схема стора v${report.storeVersion}`,
+        `environment "${env}": models ${report.models}, promoted ${report.promotedAt}, store schema v${report.storeVersion}`,
       )
       if (report.lastPlan !== null) {
         yield* Console.log(
-          `последний план: ${report.lastPlan.appliedAt} (${report.lastPlan.appliedBy || "неизвестно"})`,
+          `last plan: ${report.lastPlan.appliedAt} (${report.lastPlan.appliedBy || "unknown"})`,
         )
       }
       for (const lag of report.lag) {
         const state =
           lag.missing === 0
-            ? `догнано до ${lag.doneUpTo}`
-            : `отстаёт на ${lag.missing} интервал(ов), догнано до ${lag.doneUpTo ?? "—"}`
-        const failed = lag.failed > 0 ? `  ⚠ failed-интервалов: ${lag.failed}` : ""
+            ? `caught up to ${lag.doneUpTo}`
+            : `behind by ${lag.missing} interval(s), caught up to ${lag.doneUpTo ?? "—"}`
+        const failed = lag.failed > 0 ? `  ⚠ failed intervals: ${lag.failed}` : ""
         yield* Console.log(`  ${lag.missing === 0 ? "✓" : "…"} ${lag.model}  ${state}${failed}`)
       }
       if (report.ticks.length === 0) {
-        yield* Console.log("тиков run ещё не было")
+        yield* Console.log("no run ticks yet")
       } else {
-        yield* Console.log("последние тики run:")
+        yield* Console.log("recent run ticks:")
         for (const tick of report.ticks) {
           const mark = tick.outcome === "ok" ? "✓" : tick.outcome === "error" ? "✗" : "…"
           const ms = Date.parse(tick.finishedAt) - Date.parse(tick.startedAt)
           yield* Console.log(
-            `  ${mark} ${tick.startedAt}  ${tick.outcome} (${ms} мс)${tick.detail !== "" ? `  ${tick.detail}` : ""}`,
+            `  ${mark} ${tick.startedAt}  ${tick.outcome} (${ms} ms)${tick.detail !== "" ? `  ${tick.detail}` : ""}`,
           )
         }
       }
     }),
 ).pipe(
-  Command.withDescription("Что происходит в окружении: промоушен, отставание, тики run"),
+  Command.withDescription("what is happening in an environment: promotion, lag, run ticks"),
 )
 
 const auditCommand = Command.make(
@@ -716,7 +716,7 @@ const auditCommand = Command.make(
     config: configFlag,
     model: Flag.string("model").pipe(
       Flag.withDefault(""),
-      Flag.withDescription("Только эти модели, через запятую (по умолчанию — все с аудитами)"),
+      Flag.withDescription("only these models, comma-separated (default — all with audits)"),
     ),
     json: jsonFlag,
   },
@@ -739,14 +739,14 @@ const auditCommand = Command.make(
         return
       }
       if (report.results.length === 0) {
-        yield* Console.log("аудитов нет — нечего проверять")
+        yield* Console.log("no audits — nothing to check")
         return
       }
       for (const result of report.results) {
         const mark = result.violations === 0 ? "✓" : result.blocking ? "✗" : "⚠"
         const tail =
           result.violations > 0
-            ? `  ${result.violations} нарушений${result.blocking ? "" : " (warn)"}`
+            ? `  ${result.violations} violations${result.blocking ? "" : " (warn)"}`
             : ""
         yield* Console.log(`  ${mark} ${result.model}  ${result.audit}${tail}`)
       }
@@ -756,10 +756,10 @@ const auditCommand = Command.make(
           blockingViolations: report.blockingViolations,
         })
       }
-      yield* Console.log(`blocking-аудиты окружения «${env}» чисты`)
+      yield* Console.log(`blocking audits of environment "${env}" are clean`)
     }),
 ).pipe(
-  Command.withDescription("Прогнать аудиты по view-слою окружения, ничего не меняя"),
+  Command.withDescription("run audits over an environment's view layer, changing nothing"),
 )
 
 const migrateCommand = Command.make(
@@ -773,14 +773,14 @@ const migrateCommand = Command.make(
         : migrateSqliteState({ path: loaded.state?.path ?? "efmesh.state.sqlite" }))
       yield* Console.log(
         report.from === report.to
-          ? `state store уже на версии ${report.to}`
-          : `state store: версия ${report.from} → ${report.to}`,
+          ? `state store already at version ${report.to}`
+          : `state store: version ${report.from} → ${report.to}`,
       )
       if (report.backup !== undefined) {
-        yield* Console.log(`копия старого стора: ${report.backup}`)
+        yield* Console.log(`backup of the old store: ${report.backup}`)
       }
     }),
-).pipe(Command.withDescription("Догнать схему state store до текущей версии"))
+).pipe(Command.withDescription("bring the state store schema up to the current version"))
 
 const graphCommand = Command.make(
   "graph",
@@ -788,7 +788,7 @@ const graphCommand = Command.make(
     config: configFlag,
     html: Flag.string("html").pipe(
       Flag.withDefault(""),
-      Flag.withDescription("Записать DAG самодостаточной HTML-страницей по указанному пути"),
+      Flag.withDescription("write the DAG as a self-contained HTML page at the given path"),
     ),
   },
   ({ config, html }) =>
@@ -797,7 +797,7 @@ const graphCommand = Command.make(
       const graph = yield* buildGraph(loaded.models)
       if (html !== "") {
         yield* Effect.sync(() => writeFileSync(html, renderGraphHtml(graph)))
-        yield* Console.log(`DAG записан: ${html}`)
+        yield* Console.log(`DAG written: ${html}`)
         return
       }
       for (const name of graph.order) {
@@ -806,7 +806,7 @@ const graphCommand = Command.make(
         yield* Console.log(`${name} (${model.kind._tag})${deps}`)
       }
     }),
-).pipe(Command.withDescription("DAG моделей в топологическом порядке (или --html файл)"))
+).pipe(Command.withDescription("the model DAG in topological order (or an --html file)"))
 
 const lineageCommand = Command.make(
   "lineage",
@@ -818,14 +818,14 @@ const lineageCommand = Command.make(
       if (segments.length < 2) {
         return yield* new LineageError({
           model: target,
-          reason: "ожидается <схема>.<таблица>[.<колонка>]",
+          reason: "expected <schema>.<table>[.<column>]",
         })
       }
       const modelName = `${segments[0]}.${segments[1]}`
       const graph = yield* buildGraph(loaded.models)
       const model = graph.models.get(modelName)
       if (model === undefined) {
-        return yield* new LineageError({ model: modelName, reason: "модели нет в проекте" })
+        return yield* new LineageError({ model: modelName, reason: "model is not in the project" })
       }
       const columns =
         segments.length >= 3 ? [segments.slice(2).join(".")] : Object.keys(model.schema.fields)
@@ -836,10 +836,10 @@ const lineageCommand = Command.make(
         for (const line of formatLineage(tree)) yield* Console.log(line)
       }
     }),
-).pipe(Command.withDescription("Колоночный lineage до сырьевых колонок (best-effort)"))
+).pipe(Command.withDescription("column lineage down to raw columns (best-effort)"))
 
 export const rootCommand = Command.make("efmesh").pipe(
-  Command.withDescription("sqlmesh на bun, typescript и Effect"),
+  Command.withDescription("sqlmesh on bun, typescript and Effect"),
   Command.withSubcommands([
     initCommand,
     planCommand,

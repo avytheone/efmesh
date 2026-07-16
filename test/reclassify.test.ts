@@ -87,7 +87,7 @@ const seedSource = Effect.gen(function* () {
   const engine = yield* EngineAdapter
   yield* engine.execute(`CREATE SCHEMA IF NOT EXISTS src`)
   yield* engine.execute(
-    `CREATE TABLE src.people AS SELECT * FROM (VALUES ('p1', 'Анна'), ('p2', 'Борис')) t(id, name)`,
+    `CREATE TABLE src.people AS SELECT * FROM (VALUES ('p1', 'Anna'), ('p2', 'Boris')) t(id, name)`,
   )
 })
 

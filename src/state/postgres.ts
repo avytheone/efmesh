@@ -294,7 +294,7 @@ export const PostgresStateLive = (
                     )) as ReadonlyArray<unknown>
                     if (alive.length === 0) {
                       throw new Error(
-                        `промоушен ${env}: снапшот ${entry.name}@${entry.fingerprint.slice(0, 8)} исчез из стора (снесён janitor?) — повторите apply`,
+                        `promotion "${env}": snapshot ${entry.name}@${entry.fingerprint.slice(0, 8)} vanished from the store (removed by janitor?) — retry apply`,
                       )
                     }
                   }

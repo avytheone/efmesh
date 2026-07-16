@@ -19,7 +19,7 @@ describe("seed (SPEC §3.1)", () => {
   test("a CSV reference table is materialized; editing the file = a new version", async () => {
     const dir = mkdtempSync(join(tmpdir(), "efmesh-seed-"))
     const file = join(dir, "departments.csv")
-    writeFileSync(file, "code,title\noric,ОРИТ\nther,терапия\n")
+    writeFileSync(file, "code,title\noric,ICU\nther,therapy\n")
 
     const departments = defineSeed({
       name: "ref.departments",
@@ -40,7 +40,7 @@ describe("seed (SPEC §3.1)", () => {
         expect(same.plan.hasChanges).toBe(false)
 
         // appended a row — the version changed, a rebuild
-        writeFileSync(file, "code,title\noric,ОРИТ\nther,терапия\nsurg,хирургия\n")
+        writeFileSync(file, "code,title\noric,ICU\nther,therapy\nsurg,surgery\n")
         const plan = yield* Efmesh.plan("dev", [departments])
         expect(plan.actions[0]?.change).toBe("breaking")
         yield* Efmesh.apply("dev", [departments])
@@ -68,7 +68,7 @@ describe("incrementalByUniqueKey (SPEC §3.1)", () => {
         const engine = yield* EngineAdapter
         yield* engine.execute(`CREATE SCHEMA src`)
         yield* engine.execute(
-          `CREATE TABLE src.people AS SELECT * FROM (VALUES ('p1','Анна'), ('p2','Борис')) t(id, name)`,
+          `CREATE TABLE src.people AS SELECT * FROM (VALUES ('p1','Anna'), ('p2','Boris')) t(id, name)`,
         )
         const people = defineModel(
           {
@@ -82,22 +82,22 @@ describe("incrementalByUniqueKey (SPEC §3.1)", () => {
         yield* Efmesh.apply("dev", [people])
         const initial = yield* engine.query(`SELECT * FROM dev__med.people ORDER BY id`)
         expect(initial).toEqual([
-          { id: "p1", name: "Анна" },
-          { id: "p2", name: "Борис" },
+          { id: "p1", name: "Anna" },
+          { id: "p2", name: "Boris" },
         ])
 
         // the source changed: p2 renamed, p3 added, p1 dropped from the selection
         yield* engine.execute(`DELETE FROM src.people WHERE id = 'p1'`)
-        yield* engine.execute(`UPDATE src.people SET name = 'Борис И.' WHERE id = 'p2'`)
-        yield* engine.execute(`INSERT INTO src.people VALUES ('p3', 'Вера')`)
+        yield* engine.execute(`UPDATE src.people SET name = 'Boris I.' WHERE id = 'p2'`)
+        yield* engine.execute(`INSERT INTO src.people VALUES ('p3', 'Vera')`)
 
         const applied = yield* Efmesh.apply("dev", [people])
         expect(applied.built).toEqual(["med.people"]) // refresh on every apply
         const after = yield* engine.query(`SELECT * FROM dev__med.people ORDER BY id`)
         expect(after).toEqual([
-          { id: "p1", name: "Анна" }, // upsert does not delete rows absent from the selection
-          { id: "p2", name: "Борис И." },
-          { id: "p3", name: "Вера" },
+          { id: "p1", name: "Anna" }, // upsert does not delete rows absent from the selection
+          { id: "p2", name: "Boris I." },
+          { id: "p3", name: "Vera" },
         ])
       }),
     )

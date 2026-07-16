@@ -44,7 +44,7 @@ const seedSource = Effect.gen(function* () {
   yield* engine.execute(`CREATE SCHEMA IF NOT EXISTS src`)
   yield* engine.execute(`
     CREATE TABLE src.moves AS SELECT * FROM (VALUES
-      ('m1', 'ОРИТ'), ('m2', 'терапия'), ('m3', 'ОРИТ')
+      ('m1', 'ICU'), ('m2', 'therapy'), ('m3', 'ICU')
     ) t(id, dept)
   `)
 })
@@ -55,7 +55,7 @@ describe("embedded (SPEC §3.1)", () => {
       Effect.gen(function* () {
         const engine = yield* EngineAdapter
         yield* seedSource
-        const icu = makeIcu("ОРИТ")
+        const icu = makeIcu("ICU")
         yield* Efmesh.apply("dev", [raw, icu, makeCount(icu)])
 
         const count = yield* engine.query(`SELECT n FROM dev__med.icu_count`)
@@ -77,10 +77,10 @@ describe("embedded (SPEC §3.1)", () => {
       Effect.gen(function* () {
         const engine = yield* EngineAdapter
         yield* seedSource
-        const v1 = makeIcu("ОРИТ")
+        const v1 = makeIcu("ICU")
         yield* Efmesh.apply("dev", [raw, v1, makeCount(v1)])
 
-        const v2 = makeIcu("терапия")
+        const v2 = makeIcu("therapy")
         const plan = yield* Efmesh.plan("dev", [raw, v2, makeCount(v2)])
         expect(plan.actions.find((a) => a.name === "med.icu_moves")!.change).toBe("breaking")
         expect(plan.actions.find((a) => a.name === "med.icu_count")!.change).toBe("indirect")
@@ -93,8 +93,8 @@ describe("embedded (SPEC §3.1)", () => {
   })
 
   test("renderFor inlines embedded and the external source", async () => {
-    const icu = makeIcu("ОРИТ")
+    const icu = makeIcu("ICU")
     const sql = await Effect.runPromise(Efmesh.renderFor([raw, icu, makeCount(icu)], "med.icu_count", "dev"))
-    expect(sql).toContain("(SELECT id, dept FROM src.moves WHERE dept = 'ОРИТ')")
+    expect(sql).toContain("(SELECT id, dept FROM src.moves WHERE dept = 'ICU')")
   })
 })

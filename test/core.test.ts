@@ -15,7 +15,7 @@ const moves = defineModel(
       dept: Schema.String,
     }),
   },
-  (ctx) => ctx.sql`SELECT 'm1' AS move_id, 'c1' AS case_id, 'ОРИТ' AS dept`,
+  (ctx) => ctx.sql`SELECT 'm1' AS move_id, 'c1' AS case_id, 'ICU' AS dept`,
 )
 
 const stays = defineModel(
@@ -28,7 +28,7 @@ const stays = defineModel(
   (ctx) => ctx.sql`
     SELECT ${ctx.cols(moves, "move_id", "dept")}
     FROM ${ctx.ref(moves)}
-    WHERE dept = ${"ОРИТ"}
+    WHERE dept = ${"ICU"}
   `,
 )
 
@@ -42,13 +42,13 @@ describe("defineModel", () => {
     const text = render(stays.fragment, { resolveRef: (n) => `<${n}>` })
     expect(text).toContain(`FROM <med.moves>`)
     expect(text).toContain(`"move_id", "dept"`)
-    expect(text).toContain(`dept = 'ОРИТ'`)
+    expect(text).toContain(`dept = 'ICU'`)
   })
 
   test("malformed model name — ModelDefinitionError", () => {
     try {
       defineModel(
-        { name: "плохое имя", kind: kind.full(), schema: Schema.Struct({}) },
+        { name: "bad name", kind: kind.full(), schema: Schema.Struct({}) },
         (ctx) => ctx.sql`SELECT 1`,
       )
       expect.unreachable()

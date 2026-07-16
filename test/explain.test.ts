@@ -62,8 +62,8 @@ describe("plan --explain (#4)", () => {
     )
     const action = (await actionsAfter([src], [widened])).get("med.src")!
     expect(action.change).toBe("non-breaking")
-    expect(action.explain?.reason).toContain("в конец")
-    expect(action.explain?.diverged).toEqual(["select_list[2] (добавлен)"])
+    expect(action.explain?.reason).toContain("appended to the end")
+    expect(action.explain?.diverged).toEqual(["select_list[2] (added)"])
   })
 
   test("editing a column expression: breaking, the path points into its value", async () => {
@@ -77,7 +77,7 @@ describe("plan --explain (#4)", () => {
     )
     const action = (await actionsAfter([src], [reworked])).get("med.src")!
     expect(action.change).toBe("breaking")
-    expect(action.explain?.reason).toContain("не только хвостом")
+    expect(action.explain?.reason).toContain("not only at its tail")
     expect(
       action.explain?.diverged.some((path) => path.startsWith("select_list[0]")),
     ).toBe(true)
@@ -94,8 +94,8 @@ describe("plan --explain (#4)", () => {
     )
     const action = (await actionsAfter([src], [dropped])).get("med.src")!
     expect(action.change).toBe("breaking")
-    expect(action.explain?.reason).toContain("удалены")
-    expect(action.explain?.diverged).toContain("select_list[1] (удалён)")
+    expect(action.explain?.reason).toContain("removed from SELECT")
+    expect(action.explain?.diverged).toContain("select_list[1] (removed)")
   })
 
   test("editing WHERE: breaking, the tree diverged outside the SELECT list", async () => {
@@ -109,7 +109,7 @@ describe("plan --explain (#4)", () => {
     )
     const action = (await actionsAfter([src], [filtered])).get("med.src")!
     expect(action.change).toBe("breaking")
-    expect(action.explain?.reason).toContain("вне списка SELECT")
+    expect(action.explain?.reason).toContain("outside the SELECT list")
     expect(
       action.explain?.diverged.some((path) => path.includes("where_clause")),
     ).toBe(true)
@@ -145,7 +145,7 @@ describe("plan --explain (#4)", () => {
     const action = (await actionsAfter([src], [regrained])).get("med.src")!
     expect(action.change).toBe("indirect")
     expect(action.explain?.cascadeFrom).toBeUndefined()
-    expect(action.explain?.reason).toContain("метаданные")
+    expect(action.explain?.reason).toContain("metadata diverged")
   })
 
   test("unchanged and added — no explain (nothing to compare against)", async () => {

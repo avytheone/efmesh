@@ -99,10 +99,10 @@ export const renderGraphHtml = (graph: ModelGraph): string => {
     .join("")
 
   return `<!doctype html>
-<html lang="ru">
+<html lang="en">
 <head>
 <meta charset="utf-8">
-<title>efmesh — DAG моделей</title>
+<title>efmesh — model DAG</title>
 <style>
   :root { color-scheme: light dark; }
   body { font: 14px/1.4 system-ui, sans-serif; margin: 0; padding: 16px;
@@ -124,7 +124,7 @@ export const renderGraphHtml = (graph: ModelGraph): string => {
 </style>
 </head>
 <body>
-<h1>efmesh — DAG моделей</h1>
+<h1>efmesh — model DAG</h1>
 <div class="legend">${legend}</div>
 <svg id="dag" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
 ${edges.join("\n")}

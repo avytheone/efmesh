@@ -154,7 +154,7 @@ export const render = (fragment: SqlFragment, options: RenderOptions): string =>
         out += options.interval === undefined ? `$${node.which}` : options.interval[node.which]
         break
       case "Self":
-        if (options.self === undefined) throw new Error("рендер ctx.self без options.self")
+        if (options.self === undefined) throw new Error("rendering ctx.self without options.self")
         out += options.self
         break
     }

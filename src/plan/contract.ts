@@ -92,19 +92,19 @@ export const checkContract = (
     for (const [name, field] of declared) {
       const engineType = actualByName.get(name)
       if (engineType === undefined) {
-        problems.push(`колонка «${name}» объявлена в схеме, но запрос её не возвращает`)
+        problems.push(`column «${name}» is declared in the schema but the query does not return it`)
         continue
       }
       const expected = familyOfAst(field.ast)
       const got = familyOfEngineType(engineType)
       if (expected !== "any" && got !== "any" && expected !== got) {
-        problems.push(`колонка «${name}»: схема ждёт ${expected}, запрос отдаёт ${engineType}`)
+        problems.push(`column «${name}»: schema expects ${expected}, query returns ${engineType}`)
       }
     }
     const declaredNames = new Set(declared.map(([name]) => name))
     for (const column of actual) {
       if (!declaredNames.has(column.name)) {
-        problems.push(`запрос возвращает колонку «${column.name}», которой нет в схеме`)
+        problems.push(`query returns column «${column.name}» which is not in the schema`)
       }
     }
 

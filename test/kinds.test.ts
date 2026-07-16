@@ -24,7 +24,7 @@ const incremental = defineModel(
 describe("kinds F1", () => {
   test("incrementalByTimeRange: grain/batch/lookback defaults", () => {
     const k = incremental.kind
-    if (k._tag !== "incrementalByTimeRange") throw new Error("не тот вид")
+    if (k._tag !== "incrementalByTimeRange") throw new Error("wrong kind")
     expect(k.interval).toBe("day")
     expect(k.batchSize).toBe(30)
     expect(k.lookback).toBe(0)
@@ -52,7 +52,7 @@ describe("kinds F1", () => {
         },
         (ctx) => ctx.sql`SELECT 1 WHERE ts >= ${ctx.start}`,
       )
-      throw new Error("должно было упасть")
+      throw new Error("should have failed")
     } catch (error) {
       expect((error as { _tag: string })._tag).toBe("ModelDefinitionError")
     }
@@ -68,7 +68,7 @@ describe("kinds F1", () => {
         },
         (ctx) => ctx.sql`SELECT 1`,
       )
-      throw new Error("должно было упасть")
+      throw new Error("should have failed")
     } catch (error) {
       expect((error as { _tag: string })._tag).toBe("ModelDefinitionError")
     }

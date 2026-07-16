@@ -34,30 +34,30 @@ const walk = (before: unknown, after: unknown, path: string, out: Array<string>)
     const shared = Math.min(before.length, after.length)
     for (let i = 0; i < shared; i++) walk(before[i], after[i], `${path}[${i}]`, out)
     for (let i = shared; i < after.length && out.length < MAX_DIVERGED; i++) {
-      out.push(`${path}[${i}] (добавлен)`)
+      out.push(`${path}[${i}] (added)`)
     }
     for (let i = shared; i < before.length && out.length < MAX_DIVERGED; i++) {
-      out.push(`${path}[${i}] (удалён)`)
+      out.push(`${path}[${i}] (removed)`)
     }
     return
   }
   if (isRecord(before) && isRecord(after)) {
     // node replaced by an expression of another type — pointwise paths inside are meaningless
     if (before["type"] !== after["type"]) {
-      out.push(path === "" ? "(корень)" : path)
+      out.push(path === "" ? "(root)" : path)
       return
     }
     const keys = [...new Set([...Object.keys(before), ...Object.keys(after)])].sort()
     for (const key of keys) walk(before[key], after[key], at(path, key), out)
     return
   }
-  out.push(path === "" ? "(корень)" : path)
+  out.push(path === "" ? "(root)" : path)
 }
 
 /** The statement's boilerplate wrapper in the path is uninteresting — trim to the query body. */
 const trimStatement = (path: string): string =>
   path.replace(/^statements\[0\]\.node\.?/, "").replace(/^stmts\[0\]\.stmt\.?/, "") ||
-  "(корень)"
+  "(root)"
 
 /** Divergence paths of two canonical ASTs (JSON strings); garbage input — empty. */
 export const divergedPaths = (oldAst: string, newAst: string): ReadonlyArray<string> => {
@@ -97,18 +97,18 @@ export const explainCategorized = (
     return {
       diverged,
       reason:
-        "колонки добавлены в конец верхнего SELECT, остальное дерево нетронуто — потребители читают по именам, пересборка не нужна",
+        "columns were appended to the end of the top SELECT, the rest of the tree is untouched — consumers read by name, no rebuild needed",
     }
   }
   const before = topSelect(oldAst)
   const after = topSelect(newAst)
   const reason =
     before === null || after === null
-      ? "канонический AST неожиданной формы — консервативно breaking"
+      ? "canonical AST of an unexpected shape — conservatively breaking"
       : before.rest !== after.rest
-        ? "дерево разошлось вне списка SELECT (FROM/WHERE/JOIN/GROUP BY/модификаторы)"
+        ? "the tree diverged outside the SELECT list (FROM/WHERE/JOIN/GROUP BY/modifiers)"
         : after.list.length < before.list.length
-          ? "колонки удалены из SELECT — потомки вставляют по позициям, физику надо пересобирать"
-          : "список SELECT изменён не только хвостом — правка или перестановка колонок ломает позиции потомков"
+          ? "columns were removed from SELECT — descendants insert by position, physics must be rebuilt"
+          : "the SELECT list changed not only at its tail — editing or reordering columns breaks descendants' positions"
   return { diverged, reason }
 }

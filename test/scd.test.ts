@@ -38,7 +38,7 @@ const seedSource = Effect.gen(function* () {
   yield* engine.execute(`CREATE SCHEMA IF NOT EXISTS src`)
   yield* engine.execute(`
     CREATE TABLE src.depts AS SELECT * FROM (VALUES
-      ('icu', 'Иванов'), ('therapy', 'Петрова')
+      ('icu', 'Ivanov'), ('therapy', 'Petrova')
     ) t(id, head)
   `)
 })
@@ -65,30 +65,30 @@ describe("scdType2 (SPEC §3.1)", () => {
         // first load: all rows opened with valid_from = t1
         yield* Efmesh.apply("dev", models, { now: t1 })
         expect(yield* snapshotRows).toEqual([
-          { id: "icu", head: "Иванов", f: "2026-02-01 00:00:00", t: null },
-          { id: "therapy", head: "Петрова", f: "2026-02-01 00:00:00", t: null },
+          { id: "icu", head: "Ivanov", f: "2026-02-01 00:00:00", t: null },
+          { id: "therapy", head: "Petrova", f: "2026-02-01 00:00:00", t: null },
         ])
 
         // the ICU head changed, therapy closed, surgery appeared
-        yield* engine.execute(`UPDATE src.depts SET head = 'Сидоров' WHERE id = 'icu'`)
+        yield* engine.execute(`UPDATE src.depts SET head = 'Sidorov' WHERE id = 'icu'`)
         yield* engine.execute(`DELETE FROM src.depts WHERE id = 'therapy'`)
-        yield* engine.execute(`INSERT INTO src.depts VALUES ('surgery', 'Козлов')`)
+        yield* engine.execute(`INSERT INTO src.depts VALUES ('surgery', 'Kozlov')`)
 
         yield* Efmesh.apply("dev", models, { now: t2 })
         expect(yield* snapshotRows).toEqual([
-          { id: "icu", head: "Иванов", f: "2026-02-01 00:00:00", t: "2026-02-02 00:00:00" },
-          { id: "icu", head: "Сидоров", f: "2026-02-02 00:00:00", t: null },
-          { id: "surgery", head: "Козлов", f: "2026-02-02 00:00:00", t: null },
-          { id: "therapy", head: "Петрова", f: "2026-02-01 00:00:00", t: "2026-02-02 00:00:00" },
+          { id: "icu", head: "Ivanov", f: "2026-02-01 00:00:00", t: "2026-02-02 00:00:00" },
+          { id: "icu", head: "Sidorov", f: "2026-02-02 00:00:00", t: null },
+          { id: "surgery", head: "Kozlov", f: "2026-02-02 00:00:00", t: null },
+          { id: "therapy", head: "Petrova", f: "2026-02-01 00:00:00", t: "2026-02-02 00:00:00" },
         ])
 
         // with no source changes: nothing wobbles (valid_from are not rewritten)
         yield* Efmesh.apply("dev", models, { now: t3 })
         expect(yield* snapshotRows).toEqual([
-          { id: "icu", head: "Иванов", f: "2026-02-01 00:00:00", t: "2026-02-02 00:00:00" },
-          { id: "icu", head: "Сидоров", f: "2026-02-02 00:00:00", t: null },
-          { id: "surgery", head: "Козлов", f: "2026-02-02 00:00:00", t: null },
-          { id: "therapy", head: "Петрова", f: "2026-02-01 00:00:00", t: "2026-02-02 00:00:00" },
+          { id: "icu", head: "Ivanov", f: "2026-02-01 00:00:00", t: "2026-02-02 00:00:00" },
+          { id: "icu", head: "Sidorov", f: "2026-02-02 00:00:00", t: null },
+          { id: "surgery", head: "Kozlov", f: "2026-02-02 00:00:00", t: null },
+          { id: "therapy", head: "Petrova", f: "2026-02-01 00:00:00", t: "2026-02-02 00:00:00" },
         ])
       }),
     )

@@ -203,7 +203,7 @@ describe.skipIf(!hasPostgres)("Postgres adapter (SPEC §9.1, F3)", () => {
         const engine = yield* EngineAdapter
         yield* engine.execute(`CREATE SCHEMA IF NOT EXISTS src2`)
         yield* engine.execute(
-          `CREATE TABLE src2.depts AS SELECT * FROM (VALUES ('icu', 'Иванов')) t(id, head)`,
+          `CREATE TABLE src2.depts AS SELECT * FROM (VALUES ('icu', 'Ivanov')) t(id, head)`,
         )
         const raw = defineExternal({
           name: "src2.depts",
@@ -236,18 +236,18 @@ describe.skipIf(!hasPostgres)("Postgres adapter (SPEC §9.1, F3)", () => {
         const t2 = fromIso("2026-02-02T00:00:00Z")
 
         yield* Efmesh.apply("dev", models, { now: t1 })
-        yield* engine.execute(`UPDATE src2.depts SET head = 'Сидоров' WHERE id = 'icu'`)
+        yield* engine.execute(`UPDATE src2.depts SET head = 'Sidorov' WHERE id = 'icu'`)
         yield* Efmesh.apply("dev", models, { now: t2 })
 
         const upserted = yield* engine.query(`SELECT head FROM dev__med2.latest`)
-        expect(upserted).toEqual([{ head: "Сидоров" }])
+        expect(upserted).toEqual([{ head: "Sidorov" }])
         const history = yield* engine.query(`
           SELECT head, CAST(valid_to AS VARCHAR) AS t
           FROM dev__med2.dim ORDER BY valid_from
         `)
         expect(history).toEqual([
-          { head: "Иванов", t: "2026-02-02 00:00:00" },
-          { head: "Сидоров", t: null },
+          { head: "Ivanov", t: "2026-02-02 00:00:00" },
+          { head: "Sidorov", t: null },
         ])
       }),
     )

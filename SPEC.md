@@ -220,7 +220,7 @@ on encountering a snapshot of another version, honestly stops
    how many intervals will be recomputed, a textual SQL diff.
 6. `efmesh apply` shows the same plan and applies it: creates physical
    tables, runs the backfill, swaps the views. *Implemented in F4: in a TTY the plan
-   is applied only after an explicit "y" (y/yes/д/да; `--yes`/`-y` skips the
+   is applied only after an explicit "y" (y/yes, case-insensitive; `--yes`/`-y` skips the
    question), exactly the shown plan is applied without recomputation; non-TTY (CI,
    pipes) proceeds without asking.*
 

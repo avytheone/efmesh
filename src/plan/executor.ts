@@ -176,7 +176,7 @@ const runAudits = (
         })
       }
       yield* Effect.logWarning(
-        `аудит ${auditDef.name} модели ${model.name.full}: ${violations.length} нарушений (warn)`,
+        `audit ${auditDef.name} of model ${model.name.full}: ${violations.length} violations (warn)`,
       )
     }
   })
@@ -204,7 +204,7 @@ const evolveTableForForwardOnly = (
         model: model.name.full,
         problems: vanished.map(
           (column) =>
-            `forward-only: колонка «${column.name}» есть в унаследованной физике, но исчезла из запроса — удаление колонок требует обычного (breaking) применения`,
+            `forward-only: column «${column.name}» exists in the inherited physics but vanished from the query — dropping columns requires a regular (breaking) apply`,
         ),
       })
     }
@@ -368,7 +368,7 @@ export const applyPlan = (
       const model = graph.models.get(ref)
       const fingerprint = physicalFpOf.get(ref)
       if (model === undefined || fingerprint === undefined) {
-        throw new Error(`ссылка на модель вне плана: ${ref}`)
+        throw new Error(`reference to a model outside the plan: ${ref}`)
       }
       return physicalFor(model, fingerprint)
     }
@@ -394,9 +394,9 @@ export const applyPlan = (
             : model.kind._tag === "seed"
               ? "seed (read_csv/read_json)"
               : model.kind._tag === "external" && model.kind.source._tag === "files"
-                ? "external по файлам/URL (read_*)"
+                ? "external over files/URL (read_*)"
                 : model.export !== undefined
-                  ? "export в ATTACH-базу"
+                  ? "export to an ATTACH database"
                   : undefined
         if (feature !== undefined) {
           return yield* new EngineFeatureError({

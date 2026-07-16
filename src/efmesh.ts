@@ -81,7 +81,7 @@ export const Efmesh = {
     buildGraph(models).pipe(
       Effect.map((graph) => {
         const model = graph.models.get(name)
-        if (model === undefined) throw new Error(`модели ${name} нет в проекте`)
+        if (model === undefined) throw new Error(`model ${name} is not in the project`)
         // external and embedded have no view layer: source as-is / subquery
         const resolve = (ref: string): string => {
           const source = graph.models.get(ref)!

@@ -6,7 +6,7 @@ export const departments = defineSeed({
   name: "ref.departments",
   file: "departments.csv",
   schema: Schema.Struct({ code: Schema.String, title: Schema.String }),
-  description: "Отделения больницы",
+  description: "Hospital departments",
 })
 
 /** Raw data: a parquet dump from the HIS (see seed.ts). Not materialized — read directly. */
@@ -18,7 +18,7 @@ export const rawMoves = defineExternal({
     dept: Schema.String,
     moved_at: Schema.DateTimeUtc,
   }),
-  description: "Движения пациентов по отделениям — выгрузка КИС",
+  description: "Patient movements across departments — a HIS export",
 })
 
 /** Incremental feed of moves: recomputed by day, topped up on every apply. */
@@ -36,11 +36,11 @@ export const moves = defineModel(
       moved_at: Schema.DateTimeUtc,
     }),
     grain: ["case_id", "moved_at"],
-    description: "Лента движений, очищенная и порезанная по дням",
+    description: "Movement feed, cleaned and sliced by day",
     audits: [
       audit.notNull("case_id"),
       audit.unique("case_id", "moved_at"),
-      audit.warn(audit.accepted("dept", ["КПП", "ОРИТ", "терапия", "хирургия"])),
+      audit.warn(audit.accepted("dept", ["checkpoint", "ICU", "therapy", "surgery"])),
     ],
   },
   (ctx) => ctx.sql`
@@ -61,7 +61,7 @@ export const stays = defineModel(
       next_moved_at: Schema.NullOr(Schema.DateTimeUtc),
     }),
     grain: ["case_id", "moved_at"],
-    description: "Пребывания: движение + момент следующего движения",
+    description: "Stays: a movement plus the moment of the next movement",
   },
   (ctx) => ctx.sql`
     SELECT
@@ -76,7 +76,7 @@ export const deptLoad = defineModel(
     name: "med.dept_load",
     kind: kind.view(),
     schema: Schema.Struct({ dept: Schema.String, visits: Schema.Number }),
-    description: "Нагрузка на отделения — сколько заходов",
+    description: "Department load — how many visits",
   },
   (ctx) => ctx.sql`
     SELECT dept, count(*)::INT AS visits
@@ -97,7 +97,7 @@ export const deptDaily = defineModel(
       day: Schema.DateTimeUtc,
       arrivals: Schema.Number,
     }),
-    description: "Заходы в отделения по дням — в DuckLake",
+    description: "Department arrivals by day — in DuckLake",
   },
   (ctx) => ctx.sql`
     SELECT dept, date_trunc('day', moved_at) AS day, count(*)::INT AS arrivals
@@ -117,7 +117,7 @@ export const staysMart = defineModel(
       dept: Schema.String,
       moved_at: Schema.DateTimeUtc,
     }),
-    description: "Витрина пребываний для внешних потребителей озера",
+    description: "Stays mart for external lake consumers",
   },
   (ctx) => ctx.sql`
     SELECT ${ctx.cols(stays, "case_id", "dept", "moved_at")} FROM ${ctx.ref(stays)}

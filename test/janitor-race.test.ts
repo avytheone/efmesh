@@ -97,7 +97,7 @@ describe("the janitor↔apply race (F6)", () => {
       }),
     )
     expect(failure._tag).toBe("StateError")
-    expect(String((failure as { cause: unknown }).cause)).toContain("исчез из стора")
+    expect(String((failure as { cause: unknown }).cause)).toContain("vanished from the store")
   })
 
   test("promoting an external without a snapshot succeeds (requireSnapshot: false)", async () => {

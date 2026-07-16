@@ -21,14 +21,14 @@ describe("--reclassify — flag parsing (#5)", () => {
 })
 
 describe("plan confirmation (F4)", () => {
-  test("y/yes/д/да — affirmative, case and spaces don't matter", () => {
-    for (const answer of ["y", "Y", "yes", " YES ", "д", "Да", "да"]) {
+  test("y/yes — affirmative, case and spaces don't matter", () => {
+    for (const answer of ["y", "Y", "yes", " YES "]) {
       expect(isAffirmative(answer)).toBe(true)
     }
   })
 
   test("empty, null (EOF) and everything else — refusal", () => {
-    for (const answer of [null, "", " ", "n", "no", "нет", "ok", "apply"]) {
+    for (const answer of [null, "", " ", "n", "no", "д", "да", "ok", "apply"]) {
       expect(isAffirmative(answer)).toBe(false)
     }
   })
@@ -81,7 +81,7 @@ describe("plan --json — the shape contract (#3)", () => {
           build: true,
           refresh: false,
           backfill: [],
-          explain: { diverged: ["where_clause"], reason: "дерево разошлось" },
+          explain: { diverged: ["where_clause"], reason: "tree diverged" },
         },
       ],
     } as never)
@@ -102,7 +102,7 @@ describe("plan --json — the shape contract (#3)", () => {
           fingerprint: "def",
           build: true,
           backfill: [],
-          explain: { diverged: ["where_clause"], reason: "дерево разошлось" },
+          explain: { diverged: ["where_clause"], reason: "tree diverged" },
         },
       ],
     })

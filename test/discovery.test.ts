@@ -25,7 +25,7 @@ export const rawMoves = defineExternal({
   source: external.table("src.moves"),
   schema: Schema.Struct({ id: Schema.String }),
 })
-export const notAModel = { just: "константа" }
+export const notAModel = { just: "constant" }
 `,
 )
 
@@ -34,7 +34,7 @@ write(
   `import { Schema } from "effect"
 import { defineModel, kind } from "${srcIndex}"
 import { rawMoves } from "../sources.ts"
-// реэкспорт родителя — не дубликат: тот же объект считается один раз
+// re-export of the parent — not a duplicate: the same object is counted once
 export { rawMoves }
 export const moves = defineModel(
   { name: "med.moves", kind: kind.full(), schema: Schema.Struct({ id: Schema.String }) },

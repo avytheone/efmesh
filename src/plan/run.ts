@@ -59,7 +59,7 @@ export const run = (
             ...entry,
           }),
         ),
-        Effect.catchCause((cause) => Effect.logWarning("журнал тиков недоступен", cause)),
+        Effect.catchCause((cause) => Effect.logWarning("tick journal is unavailable", cause)),
       )
 
     return yield* Effect.gen(function* () {
@@ -95,13 +95,13 @@ export const daemon = (
   run(env, models, options).pipe(
     Effect.tap((applied) =>
       applied.built.length > 0
-        ? Effect.logInfo(`run ${env}: обработано ${applied.built.join(", ")}`)
+        ? Effect.logInfo(`run ${env}: built ${applied.built.join(", ")}`)
         : Effect.void,
     ),
     Effect.catchTag("LockHeldError", () =>
-      Effect.logDebug(`run ${env}: лок занят другим процессом, пропуск тика`),
+      Effect.logDebug(`run ${env}: lock held by another process, skipping tick`),
     ),
-    Effect.catchCause((cause) => Effect.logError(`run ${env}: тик упал`, cause)),
+    Effect.catchCause((cause) => Effect.logError(`run ${env}: tick failed`, cause)),
     Effect.schedule(schedule),
     Effect.andThen(Effect.never),
   )

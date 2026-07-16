@@ -46,7 +46,7 @@ const fixtureLiteral = (value: unknown, family: TypeFamily): string => {
   ) {
     return escapeLiteral(value)
   }
-  throw new Error(`фикстура содержит нерендерируемое значение: ${String(value)}`)
+  throw new Error(`fixture contains a non-renderable value: ${String(value)}`)
 }
 
 /**
@@ -64,7 +64,7 @@ const validateFixture = (
   const known = new Set(fields.map(([name]) => name))
   for (const key of Object.keys(row)) {
     if (!known.has(key)) {
-      throw new Error(`фикстура ${source.name.full}: лишняя колонка «${key}»`)
+      throw new Error(`fixture ${source.name.full}: extra column «${key}»`)
     }
   }
   for (const [name, field] of fields) {
@@ -83,7 +83,7 @@ const validateFixture = (
               : true
     if (!ok) {
       throw new Error(
-        `фикстура ${source.name.full}: колонка «${name}» ждёт ${family}, получено ${JSON.stringify(value)}`,
+        `fixture ${source.name.full}: column «${name}» expects ${family}, got ${JSON.stringify(value)}`,
       )
     }
   }
@@ -139,16 +139,16 @@ export const runModel = async (
   const inputs = spec.inputs ?? {}
   for (const dep of model.deps) {
     if (!(dep in inputs)) {
-      throw new Error(`нет фикстуры для источника ${dep} (deps модели ${model.name.full})`)
+      throw new Error(`no fixture for source ${dep} (deps of model ${model.name.full})`)
     }
   }
   for (const name of Object.keys(inputs)) {
     if (!model.deps.has(name)) {
-      throw new Error(`фикстура «${name}» не является источником модели ${model.name.full}`)
+      throw new Error(`fixture «${name}» is not a source of model ${model.name.full}`)
     }
   }
   if (usesBounds(model.fragment) && spec.interval === undefined) {
-    throw new Error(`модель ${model.name.full} использует ctx.start/ctx.end — укажи interval`)
+    throw new Error(`model ${model.name.full} uses ctx.start/ctx.end — provide interval`)
   }
 
   const ctes = [...model.deps]
@@ -183,10 +183,10 @@ export const testModel = async (model: AnyModel, spec: TestModelSpec): Promise<v
   if (got.length !== want.length || got.some((row, index) => row !== want[index])) {
     throw new Error(
       [
-        `результат модели ${model.name.full} не совпал с ожиданием:`,
-        `— получено (${got.length}):`,
+        `result of model ${model.name.full} did not match the expectation:`,
+        `— got (${got.length}):`,
         ...got.map((row) => `    ${row}`),
-        `— ожидалось (${want.length}):`,
+        `— expected (${want.length}):`,
         ...want.map((row) => `    ${row}`),
       ].join("\n"),
     )

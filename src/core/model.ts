@@ -123,7 +123,7 @@ export const parseModelName = (raw: string): ModelName => {
   if (!MODEL_NAME.test(raw)) {
     throw new ModelDefinitionError({
       model: raw,
-      reason: "имя модели должно быть вида <схема>.<таблица> (латиница, цифры, _)",
+      reason: "model name must be of the form <schema>.<table> (latin letters, digits, _)",
     })
   }
   const [schema, table] = raw.split(".") as [string, string]
@@ -206,13 +206,13 @@ const validateKindConfig = <Fields extends Schema.Struct.Fields>(
   if (config.kind._tag === "external") {
     throw new ModelDefinitionError({
       model: name.full,
-      reason: "external-модель не имеет тела — используй defineExternal",
+      reason: "an external model has no body — use defineExternal",
     })
   }
   if (config.kind._tag === "seed") {
     throw new ModelDefinitionError({
       model: name.full,
-      reason: "seed-модель не имеет тела — используй defineSeed",
+      reason: "a seed model has no body — use defineSeed",
     })
   }
   if (config.kind._tag === "incrementalByUniqueKey" || config.kind._tag === "scdType2") {
@@ -220,12 +220,12 @@ const validateKindConfig = <Fields extends Schema.Struct.Fields>(
       if (!(keyColumn in config.schema.fields)) {
         throw new ModelDefinitionError({
           model: name.full,
-          reason: `ключевой колонки «${keyColumn}» нет в схеме модели`,
+          reason: `key column «${keyColumn}» is not in the model schema`,
         })
       }
     }
     if (config.kind.key.length === 0) {
-      throw new ModelDefinitionError({ model: name.full, reason: "key не может быть пустым" })
+      throw new ModelDefinitionError({ model: name.full, reason: "key cannot be empty" })
     }
   }
   if (config.kind._tag === "scdType2") {
@@ -233,27 +233,27 @@ const validateKindConfig = <Fields extends Schema.Struct.Fields>(
     if (validFrom === validTo) {
       throw new ModelDefinitionError({
         model: name.full,
-        reason: "validFrom и validTo не могут совпадать",
+        reason: "validFrom and validTo cannot be the same",
       })
     }
     for (const column of [validFrom, validTo]) {
       if (!(column in config.schema.fields)) {
         throw new ModelDefinitionError({
           model: name.full,
-          reason: `колонки версионирования «${column}» нет в схеме модели — потребители должны её видеть`,
+          reason: `versioning column «${column}» is not in the model schema — consumers must see it`,
         })
       }
       if (config.kind.key.includes(column)) {
         throw new ModelDefinitionError({
           model: name.full,
-          reason: `колонка версионирования «${column}» не может входить в key`,
+          reason: `versioning column «${column}» cannot be part of key`,
         })
       }
     }
     if (config.target === "parquet") {
       throw new ModelDefinitionError({
         model: name.full,
-        reason: "scdType2 закрывает строки на месте — parquet-цель неприменима",
+        reason: "scdType2 closes rows in place — a parquet target is not applicable",
       })
     }
   }
@@ -264,26 +264,26 @@ const validateKindConfig = <Fields extends Schema.Struct.Fields>(
   ) {
     throw new ModelDefinitionError({
       model: name.full,
-      reason: `${config.kind._tag} не материализуется — цель «${config.target}» к нему неприменима`,
+      reason: `${config.kind._tag} is not materialized — target «${config.target}» is not applicable to it`,
     })
   }
   if (config.kind._tag === "incrementalByUniqueKey" && config.target === "parquet") {
     throw new ModelDefinitionError({
       model: name.full,
-      reason: "upsert по ключу в parquet-файлы невозможен — используй target: \"table\"",
+      reason: "key upsert into parquet files is impossible — use target: \"table\"",
     })
   }
   if (config.kind._tag === "incrementalByTimeRange") {
     if (!(config.kind.timeColumn in config.schema.fields)) {
       throw new ModelDefinitionError({
         model: name.full,
-        reason: `timeColumn «${config.kind.timeColumn}» нет в схеме модели`,
+        reason: `timeColumn «${config.kind.timeColumn}» is not in the model schema`,
       })
     }
     if (Number.isNaN(Date.parse(config.kind.start))) {
       throw new ModelDefinitionError({
         model: name.full,
-        reason: `start «${config.kind.start}» — не ISO-время`,
+        reason: `start «${config.kind.start}» is not an ISO time`,
       })
     }
   }
@@ -299,12 +299,12 @@ const assembleModel = <Fields extends Schema.Struct.Fields>(
   if (usesBounds(fragment) && config.kind._tag !== "incrementalByTimeRange") {
     throw new ModelDefinitionError({
       model: name.full,
-      reason: `ctx.start/ctx.end доступны только incrementalByTimeRange, вид модели — ${config.kind._tag}`,
+      reason: `ctx.start/ctx.end are available only in incrementalByTimeRange, model kind is ${config.kind._tag}`,
     })
   }
   const deps = collectRefs(fragment)
   if (deps.has(name.full)) {
-    throw new ModelDefinitionError({ model: name.full, reason: "модель ссылается сама на себя" })
+    throw new ModelDefinitionError({ model: name.full, reason: "model references itself" })
   }
   return {
     _tag: "Model",
@@ -347,7 +347,7 @@ export const defineModel = <const Fields extends Schema.Struct.Fields>(
           // unreachable under honest typing; guards against `as any`
           throw new ModelDefinitionError({
             model: config.name,
-            reason: `колонки «${column}» нет в схеме модели ${model.name.full}`,
+            reason: `column «${column}» is not in the schema of model ${model.name.full}`,
           })
         }
       }
@@ -387,7 +387,7 @@ export const defineSqlModel = <const Fields extends Schema.Struct.Fields>(
   } catch (cause) {
     throw new ModelDefinitionError({
       model: name.full,
-      reason: `не удалось прочитать ${config.file}: ${String(cause)}`,
+      reason: `could not read ${config.file}: ${String(cause)}`,
     })
   }
   const fragment = parseSqlText(text)
@@ -397,7 +397,7 @@ export const defineSqlModel = <const Fields extends Schema.Struct.Fields>(
     if (!declared.has(ref)) {
       throw new ModelDefinitionError({
         model: name.full,
-        reason: `@ref(${ref}) в ${config.file} не объявлен в refs`,
+        reason: `@ref(${ref}) in ${config.file} is not declared in refs`,
       })
     }
   }
@@ -405,7 +405,7 @@ export const defineSqlModel = <const Fields extends Schema.Struct.Fields>(
     if (!used.has(declaredName)) {
       throw new ModelDefinitionError({
         model: name.full,
-        reason: `модель ${declaredName} объявлена в refs, но @ref в ${config.file} её не использует`,
+        reason: `model ${declaredName} is declared in refs but @ref in ${config.file} does not use it`,
       })
     }
   }

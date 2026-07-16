@@ -51,10 +51,10 @@ describe("audits (SPEC §8)", () => {
             audits: [
               audit.notNull("id"),
               audit.unique("id"),
-              audit.accepted("dept", ["ОРИТ", "терапия"]),
+              audit.accepted("dept", ["ICU", "therapy"]),
             ],
           },
-          (ctx) => ctx.sql`SELECT * FROM (VALUES ('a','ОРИТ'), ('b','терапия')) t(id, dept)`,
+          (ctx) => ctx.sql`SELECT * FROM (VALUES ('a','ICU'), ('b','therapy')) t(id, dept)`,
         )
         const applied = yield* Efmesh.apply("dev", [clean])
         expect(applied.built).toEqual(["med.clean"])
@@ -70,9 +70,9 @@ describe("audits (SPEC §8)", () => {
             name: "med.warned",
             kind: kind.full(),
             schema: Schema.Struct({ dept: Schema.String }),
-            audits: [audit.warn(audit.accepted("dept", ["ОРИТ"]))],
+            audits: [audit.warn(audit.accepted("dept", ["ICU"]))],
           },
-          (ctx) => ctx.sql`SELECT 'морг' AS dept`,
+          (ctx) => ctx.sql`SELECT 'morgue' AS dept`,
         )
         const applied = yield* Efmesh.apply("dev", [warned])
         expect(applied.built).toEqual(["med.warned"])
@@ -112,7 +112,7 @@ describe("audits (SPEC §8)", () => {
               id: Schema.NullOr(Schema.String),
               happened_at: Schema.DateTimeUtc,
             }),
-            audits: [audit.custom("нет NULL id", (a) => a.sql`
+            audits: [audit.custom("no NULL id", (a) => a.sql`
               SELECT * FROM ${a.self} WHERE id IS NULL
             `)],
           },

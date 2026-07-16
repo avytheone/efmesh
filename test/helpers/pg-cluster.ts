@@ -59,11 +59,11 @@ export const startCluster = async (): Promise<TestCluster> => {
       try {
         return execSync(`cat '${join(dir, "log")}'`).toString()
       } catch {
-        return "<нет лога>"
+        return "<no log>"
       }
     })()
     rmSync(dir, { recursive: true, force: true })
-    throw new Error(`pg_ctl start не удался:\n${log}`)
+    throw new Error(`pg_ctl start failed:\n${log}`)
   }
 
   return {

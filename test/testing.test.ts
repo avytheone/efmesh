@@ -37,13 +37,13 @@ describe("testModel (SPEC §8)", () => {
     await testModel(stays, {
       inputs: {
         [moves.name.full]: [
-          { case_id: "c1", dept: "ОРИТ", moved_at: "2026-01-01T10:00:00Z" },
-          { case_id: "c1", dept: "терапия", moved_at: "2026-01-02T10:00:00Z" },
+          { case_id: "c1", dept: "ICU", moved_at: "2026-01-01T10:00:00Z" },
+          { case_id: "c1", dept: "therapy", moved_at: "2026-01-02T10:00:00Z" },
         ],
       },
       expect: [
-        { case_id: "c1", dept: "ОРИТ", duration: 86400 },
-        { case_id: "c1", dept: "терапия", duration: null },
+        { case_id: "c1", dept: "ICU", duration: 86400 },
+        { case_id: "c1", dept: "therapy", duration: null },
       ],
     })
   })
@@ -52,18 +52,18 @@ describe("testModel (SPEC §8)", () => {
     await expect(
       testModel(stays, {
         inputs: {
-          [moves.name.full]: [{ case_id: "c1", dept: "ОРИТ", moved_at: "2026-01-01T10:00:00Z" }],
+          [moves.name.full]: [{ case_id: "c1", dept: "ICU", moved_at: "2026-01-01T10:00:00Z" }],
         },
-        expect: [{ case_id: "c1", dept: "ОРИТ", duration: 999 }],
+        expect: [{ case_id: "c1", dept: "ICU", duration: 999 }],
       }),
-    ).rejects.toThrow("не совпал с ожиданием")
+    ).rejects.toThrow("did not match the expectation")
   })
 
   test("a fixture invalid per Schema is rejected", async () => {
     await expect(
       testModel(stays, {
         inputs: {
-          [moves.name.full]: [{ case_id: 42, dept: "ОРИТ", moved_at: "2026-01-01T10:00:00Z" }],
+          [moves.name.full]: [{ case_id: 42, dept: "ICU", moved_at: "2026-01-01T10:00:00Z" }],
         },
         expect: [],
       }),
@@ -71,13 +71,13 @@ describe("testModel (SPEC §8)", () => {
   })
 
   test("a missing fixture and a typo in the name — errors before the run", async () => {
-    await expect(testModel(stays, { expect: [] })).rejects.toThrow("нет фикстуры")
+    await expect(testModel(stays, { expect: [] })).rejects.toThrow("no fixture")
     await expect(
       testModel(stays, {
         inputs: { "med.typo": [], [moves.name.full]: [] },
         expect: [],
       }),
-    ).rejects.toThrow("не является источником")
+    ).rejects.toThrow("is not a source")
   })
 
   test("incremental: interval is required and filters fixtures", async () => {
@@ -94,13 +94,13 @@ describe("testModel (SPEC §8)", () => {
     )
     await expect(
       testModel(daily, { inputs: { [moves.name.full]: [] }, expect: [] }),
-    ).rejects.toThrow("укажи interval")
+    ).rejects.toThrow("provide interval")
 
     const rows = await runModel(daily, {
       inputs: {
         [moves.name.full]: [
-          { case_id: "in", dept: "ОРИТ", moved_at: "2026-01-01T12:00:00Z" },
-          { case_id: "out", dept: "ОРИТ", moved_at: "2026-02-01T12:00:00Z" },
+          { case_id: "in", dept: "ICU", moved_at: "2026-01-01T12:00:00Z" },
+          { case_id: "out", dept: "ICU", moved_at: "2026-02-01T12:00:00Z" },
         ],
       },
       interval: ["2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z"],

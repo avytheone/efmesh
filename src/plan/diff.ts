@@ -145,12 +145,12 @@ export const dataDiffEnvironments = (
     const inB = new Set((yield* store.getEnvironment(envB)).map((row) => row.name))
     for (const name of options?.models ?? []) {
       if (!graph.models.has(name)) {
-        return yield* new DataDiffError({ model: name, reason: "модели нет в проекте" })
+        return yield* new DataDiffError({ model: name, reason: "model is not in the project" })
       }
       if (!inA.has(name) || !inB.has(name)) {
         return yield* new DataDiffError({
           model: name,
-          reason: `модели нет в окружении ${inA.has(name) ? envB : envA}`,
+          reason: `model is not in environment "${inA.has(name) ? envB : envA}"`,
         })
       }
     }

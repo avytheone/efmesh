@@ -83,12 +83,12 @@ export const lineage = (
     const engine = yield* EngineAdapter
     const root = graph.models.get(modelName)
     if (root === undefined) {
-      return yield* new LineageError({ model: modelName, reason: "модели нет в проекте" })
+      return yield* new LineageError({ model: modelName, reason: "model is not in the project" })
     }
     if (!(column in root.schema.fields)) {
       return yield* new LineageError({
         model: modelName,
-        reason: `колонки «${column}» нет в схеме`,
+        reason: `column «${column}» is not in the schema`,
       })
     }
 

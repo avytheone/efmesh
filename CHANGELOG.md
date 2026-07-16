@@ -5,6 +5,18 @@ versioning — [SemVer](https://semver.org/).
 Internal development history was tracked in phases F0–F6 (SPEC.md §13);
 the first version gathers them in full.
 
+## [Unreleased]
+
+- The entire user-facing surface is English: CLI output and help, error
+  messages, `--json` string values (key names and exit codes unchanged),
+  the `init` scaffold, the hospital example data (#11). Source comments
+  and test names too (#12).
+- **Breaking:** the `apply` confirmation prompt accepts only `y`/`yes`
+  (case-insensitive); the Cyrillic tokens are no longer recognized.
+- `efmesh init` scaffold now teaches the core lifecycle: a seed feeding
+  an incremental-by-time-range model with a blocking audit and a full
+  rollup on top, runnable immediately after `init` (#11).
+
 ## [0.2.0] — 2026-07-16
 
 Theme: "operator and team" — efmesh in the hands of a non-author: the

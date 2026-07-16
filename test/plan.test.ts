@@ -13,7 +13,7 @@ const moves = defineModel(
     schema: Schema.Struct({ case_id: Schema.String, dept: Schema.String }),
   },
   (ctx) => ctx.sql`
-    SELECT * FROM (VALUES ('c1', 'ОРИТ'), ('c2', 'терапия')) AS t(case_id, dept)
+    SELECT * FROM (VALUES ('c1', 'ICU'), ('c2', 'therapy')) AS t(case_id, dept)
   `,
 )
 
@@ -34,7 +34,7 @@ const staysV2 = defineModel(
     schema: Schema.Struct({ case_id: Schema.String, dept: Schema.String }),
   },
   (ctx) => ctx.sql`
-    SELECT ${ctx.cols(moves, "case_id", "dept")} FROM ${ctx.ref(moves)} WHERE dept = ${"ОРИТ"}
+    SELECT ${ctx.cols(moves, "case_id", "dept")} FROM ${ctx.ref(moves)} WHERE dept = ${"ICU"}
   `,
 )
 

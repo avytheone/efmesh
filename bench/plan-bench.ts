@@ -40,7 +40,7 @@ for (let i = 0; i < N; i++) {
 }
 
 const layer = Layer.mergeAll(DuckDBEngineLive(), SqliteStateLive())
-const ms = (from: number) => `${(performance.now() - from).toFixed(0)} мс`
+const ms = (from: number) => `${(performance.now() - from).toFixed(0)} ms`
 
 await Effect.runPromise(
   Effect.gen(function* () {
@@ -51,24 +51,24 @@ await Effect.runPromise(
 
     let t = performance.now()
     const graph = yield* buildGraph(models)
-    console.log(`buildGraph (${N} моделей):      ${ms(t)}`)
+    console.log(`buildGraph (${N} models):        ${ms(t)}`)
 
     t = performance.now()
     const plan = yield* planChanges("dev", graph)
-    console.log(`plan холодный (всё added):     ${ms(t)}`)
+    console.log(`plan cold (all added):          ${ms(t)}`)
 
     t = performance.now()
     yield* applyPlan(plan, graph)
-    console.log(`apply (физика ${N} таблиц):     ${ms(t)}`)
+    console.log(`apply (physics of ${N} tables):  ${ms(t)}`)
 
     t = performance.now()
     const idle = yield* planChanges("dev", graph)
-    console.log(`plan повторный (unchanged):    ${ms(t)}`)
-    if (idle.hasChanges) throw new Error("ожидался пустой план")
+    console.log(`plan repeat (unchanged):        ${ms(t)}`)
+    if (idle.hasChanges) throw new Error("expected an empty plan")
 
     t = performance.now()
     const plan2 = yield* planChanges("prod", graph)
     yield* applyPlan(plan2, graph)
-    console.log(`промоушен prod (view-swap):    ${ms(t)}`)
+    console.log(`promote to prod (view-swap):    ${ms(t)}`)
   }).pipe(Effect.provide(layer)),
 )

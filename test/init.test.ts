@@ -13,7 +13,7 @@ describe("efmesh init (SPEC §12, F4)", () => {
   test("scaffold creates a project, a repeated init — an honest error", async () => {
     const dir = mkdtempSync(join(tmpdir(), "efmesh-init-"))
     const created = await Effect.runPromise(scaffold(dir))
-    expect(created).toEqual(["efmesh.config.ts", "models.ts", "seeds/departments.csv"])
+    expect(created).toEqual(["efmesh.config.ts", "models.ts", "seeds/events.csv"])
     for (const file of created) expect(existsSync(join(dir, file))).toBe(true)
 
     const again = await Effect.runPromise(Effect.flip(scaffold(dir)))
@@ -29,16 +29,22 @@ describe("efmesh init (SPEC §12, F4)", () => {
       // to run from the test we swap them for the local src and an absolute path
       const models = readFileSync(join(dir, "models.ts"), "utf8")
         .replaceAll(`"@avytheone/efmesh"`, `"${join(import.meta.dir, "../src/index.ts")}"`)
-        .replaceAll(`"seeds/departments.csv"`, `"${join(dir, "seeds/departments.csv")}"`)
+        .replaceAll(`"seeds/events.csv"`, `"${join(dir, "seeds/events.csv")}"`)
       writeFileSync(join(dir, "models.ts"), models)
       const loaded = (await import(join(dir, "models.ts"))) as Record<string, AnyModel>
 
       const applied = await Effect.runPromise(
-        Efmesh.apply("dev", [loaded["departments"]!, loaded["floors"]!]).pipe(
-          Effect.provide(Layer.mergeAll(DuckDBEngineLive(), SqliteStateLive())),
-        ),
+        Efmesh.apply(
+          "dev",
+          [loaded["events"]!, loaded["dailyRevenue"]!, loaded["regionRevenue"]!],
+          { now: Date.parse("2026-01-04T00:00:00Z") },
+        ).pipe(Effect.provide(Layer.mergeAll(DuckDBEngineLive(), SqliteStateLive()))),
       )
-      expect(applied.built).toEqual(["ref.departments", "mart.floors"])
+      expect(applied.built).toEqual([
+        "raw.events",
+        "mart.daily_revenue",
+        "mart.region_revenue",
+      ])
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

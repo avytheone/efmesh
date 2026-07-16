@@ -24,9 +24,9 @@ describe("efmesh audit — standalone run over an environment (SPEC §8, F4)", (
             name: "med.depts",
             kind: kind.full(),
             schema: Schema.Struct({ dept: Schema.NullOr(Schema.String) }),
-            audits: [audit.notNull("dept"), audit.warn(audit.accepted("dept", ["ОРИТ"]))],
+            audits: [audit.notNull("dept"), audit.warn(audit.accepted("dept", ["ICU"]))],
           },
-          (ctx) => ctx.sql`SELECT 'ОРИТ' AS dept`,
+          (ctx) => ctx.sql`SELECT 'ICU' AS dept`,
         )
         const models = [depts]
         yield* Efmesh.apply("dev", models)
@@ -44,7 +44,7 @@ describe("efmesh audit — standalone run over an environment (SPEC §8, F4)", (
           `SELECT table_name AS t FROM duckdb_tables() WHERE schema_name = '_efmesh'`,
         )
         yield* engine.execute(
-          `INSERT INTO "_efmesh"."${String(physical!["t"])}" VALUES (NULL), ('морг')`,
+          `INSERT INTO "_efmesh"."${String(physical!["t"])}" VALUES (NULL), ('morgue')`,
         )
         const dirty = yield* auditEnvironment("dev", models)
         // NULL — a blocking not_null violation; the unaccepted dept — a warn accepted violation

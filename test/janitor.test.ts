@@ -29,8 +29,8 @@ describe("janitor (SPEC §5.4)", () => {
     await scenario(
       Effect.gen(function* () {
         const engine = yield* EngineAdapter
-        const v1 = srcOf("один")
-        const v2 = srcOf("два")
+        const v1 = srcOf("one")
+        const v2 = srcOf("two")
 
         // v1 in dev and prod, then dev and prod move to v2 — v1 is an orphan
         yield* Efmesh.apply("dev", [v1])
@@ -54,7 +54,7 @@ describe("janitor (SPEC §5.4)", () => {
         const gone = yield* Effect.flip(engine.query(`SELECT * FROM ${table}`))
         expect(gone._tag).toBe("EngineError")
         const alive = yield* engine.query(`SELECT a FROM med.src`)
-        expect(alive).toEqual([{ a: "два" }])
+        expect(alive).toEqual([{ a: "two" }])
 
         // a repeated run — already clean
         const again = yield* janitor({ ttlDays: 1, now: farFuture })

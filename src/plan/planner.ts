@@ -167,19 +167,19 @@ export const planChanges = (
     for (const flagged of forwardOnly) {
       const model = graph.models.get(flagged)
       if (model === undefined) {
-        return yield* new ForwardOnlyError({ model: flagged, reason: "модели нет в проекте" })
+        return yield* new ForwardOnlyError({ model: flagged, reason: "model is not in the project" })
       }
       if (model.kind._tag !== "incrementalByTimeRange") {
         return yield* new ForwardOnlyError({
           model: flagged,
-          reason: `forward-only переиспользует физику и учёт интервалов — применим только к incrementalByTimeRange, вид модели — ${model.kind._tag}`,
+          reason: `forward-only reuses physics and interval accounting — applicable only to incrementalByTimeRange, model kind is ${model.kind._tag}`,
         })
       }
     }
     const reclassify = options?.reclassify ?? {}
     for (const flagged of Object.keys(reclassify)) {
       if (!graph.models.has(flagged)) {
-        return yield* new ReclassifyError({ model: flagged, reason: "модели нет в проекте" })
+        return yield* new ReclassifyError({ model: flagged, reason: "model is not in the project" })
       }
     }
     // canonicalization cache (#8) — the store is at hand; its failures are
@@ -229,8 +229,8 @@ export const planChanges = (
             diverged: [],
             reason:
               ast === null
-                ? "у модели нет SQL-тела (external/seed) — версию сдвинули источник/файл, схема или родители; сравнивать AST не с чем"
-                : "у прошлого снапшота не сохранён канонический AST — сравнивать не с чем, консервативно breaking",
+                ? "model has no SQL body (external/seed) — the version was shifted by source/file, schema or parents; there is no AST to compare against"
+                : "the previous snapshot did not store a canonical AST — nothing to compare against, conservatively breaking",
           }
         } else if (oldAst === ast) {
           change = "indirect" // version shifted by a parent/metadata
@@ -238,13 +238,13 @@ export const planChanges = (
             changedParents.length > 0
               ? {
                   diverged: [],
-                  reason: `собственный AST не менялся — версию сдвинул каскад от родителей: ${changedParents.join(", ")}`,
+                  reason: `own AST did not change — the version was shifted by a cascade from parents: ${changedParents.join(", ")}`,
                   cascadeFrom: changedParents,
                 }
               : {
                   diverged: [],
                   reason:
-                    "собственный AST не менялся — разошлись метаданные (kind/grain/columns/target)",
+                    "own AST did not change — metadata diverged (kind/grain/columns/target)",
                 }
         } else {
           change = categorizeAstChange(oldAst, ast)
@@ -262,20 +262,20 @@ export const planChanges = (
             return yield* new ReclassifyError({
               model: name,
               reason:
-                "канонического AST нет — проверить вердикт нечем, override не принимается",
+                "no canonical AST — nothing to check the verdict against, override is not accepted",
             })
           }
           if (override === "non-breaking" && ast !== null && dropsColumns(oldAst, ast)) {
             return yield* new ReclassifyError({
               model: name,
               reason:
-                "в новом SELECT колонок меньше — потомки читают удалённые колонки по именам, non-breaking противоречит AST",
+                "the new SELECT has fewer columns — descendants read the removed columns by name, non-breaking contradicts the AST",
             })
           }
           reclassifiedFrom = change
           explain = {
             diverged: explain?.diverged ?? [],
-            reason: `override оператора: ${change} → ${override}; вердикт планировщика: ${explain?.reason ?? "—"}`,
+            reason: `operator override: ${change} → ${override}; planner verdict: ${explain?.reason ?? "—"}`,
           }
           change = override
         }
@@ -308,12 +308,12 @@ export const planChanges = (
           explain = forwardOnly.has(name)
             ? {
                 diverged: explain?.diverged ?? [],
-                reason: `forward-only по флагу: физика и done-интервалы наследуются от @${known.slice(0, 8)}, история не переигрывается`,
+                reason: `forward-only by flag: physics and done intervals are inherited from @${known.slice(0, 8)}, history is not replayed`,
               }
             : {
                 diverged: [],
                 reason:
-                  "собственный AST не менялся, все изменившиеся родители forward-only — физика реюзается каскадом",
+                  "own AST did not change, all changed parents are forward-only — physics is reused by cascade",
                 cascadeFrom: changedParents,
               }
         }
@@ -342,7 +342,7 @@ export const planChanges = (
           reusedPhysics.add(name)
           explain = {
             diverged: [],
-            reason: `изменившиеся родители не трогают существующие данные (non-breaking/forward-only) — физика и учёт наследуются от @${known.slice(0, 8)}, пересборки нет`,
+            reason: `changed parents do not touch existing data (non-breaking/forward-only) — physics and accounting are inherited from @${known.slice(0, 8)}, no rebuild`,
             cascadeFrom: changedParents,
           }
         }

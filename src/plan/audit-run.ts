@@ -68,7 +68,7 @@ export const auditEnvironment = (
     const graph = yield* buildGraph(models)
     for (const name of only ?? []) {
       if (!graph.models.has(name)) {
-        return yield* new AuditTargetError({ model: name, reason: "модели нет в проекте" })
+        return yield* new AuditTargetError({ model: name, reason: "model is not in the project" })
       }
     }
     const wanted = only === undefined ? undefined : new Set(only)

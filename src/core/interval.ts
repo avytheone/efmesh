@@ -80,7 +80,7 @@ export const splitIntoBatches = (
   batchSize: number,
 ): ReadonlyArray<Interval> => {
   if (!Number.isInteger(batchSize) || batchSize < 1) {
-    throw new RangeError(`batchSize должен быть целым ≥ 1, получен ${batchSize}`)
+    throw new RangeError(`batchSize must be an integer ≥ 1, got ${batchSize}`)
   }
   const step = unitMillis[unit] * batchSize
   const batches: Array<Interval> = []
@@ -108,7 +108,7 @@ export const toIso = (ms: number): string => new Date(ms).toISOString()
 
 export const fromIso = (iso: string): number => {
   const ms = Date.parse(iso)
-  if (Number.isNaN(ms)) throw new RangeError(`не ISO-время: ${iso}`)
+  if (Number.isNaN(ms)) throw new RangeError(`not an ISO time: ${iso}`)
   return ms
 }
 
