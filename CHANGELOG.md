@@ -5,7 +5,10 @@ versioning — [SemVer](https://semver.org/).
 Internal development history was tracked in phases F0–F6 (SPEC.md §13);
 the first version gathers them in full.
 
-## [Unreleased]
+## [0.2.1] — 2026-07-16
+
+Theme: hygiene for the first stranger — the whole surface is English,
+failures explain themselves, execution is visible.
 
 - Detailed execution log (#14). `apply` and `run` now narrate their work
   through Effect's logging system: per-model build start/finish with duration,
