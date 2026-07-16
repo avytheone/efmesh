@@ -50,22 +50,35 @@ export const janitor = (
     const removed: Array<string> = []
     const kept: Array<string> = []
 
-    for (const snapshot of yield* store.listSnapshots()) {
+    const snapshots = yield* store.listSnapshots()
+    const isDoomed = (snapshot: (typeof snapshots)[number]): boolean =>
+      !referenced.has(snapshot.fingerprint) &&
+      now - Date.parse(snapshot.orphanedAt ?? snapshot.createdAt) >= ttlMs
+    // физика делится между версиями при forward-only — таблица/префикс
+    // сносятся, только когда их не использует ни один выживающий снапшот
+    const physicalInUse = new Set(
+      snapshots.filter((snapshot) => !isDoomed(snapshot)).map((snapshot) => snapshot.physicalFp),
+    )
+
+    for (const snapshot of snapshots) {
       if (referenced.has(snapshot.fingerprint)) continue
       const label = `${snapshot.name}@${snapshot.fingerprint.slice(0, 8)}`
-      const orphanedSince = snapshot.orphanedAt ?? snapshot.createdAt
-      if (now - Date.parse(orphanedSince) < ttlMs) {
+      if (!isDoomed(snapshot)) {
         kept.push(label)
         continue
       }
       const name = parseModelName(snapshot.name)
-      const target = physicalRef(name, snapshot.fingerprint)
-      yield* engine.execute(
-        snapshot.kind === "view" ? `DROP VIEW IF EXISTS ${target}` : `DROP TABLE IF EXISTS ${target}`,
-      )
-      if (options?.lakePath !== undefined && !options.lakePath.startsWith("s3://")) {
-        const prefix = parquetPrefix(options.lakePath, name, snapshot.fingerprint)
-        yield* Effect.sync(() => rmSync(prefix, { recursive: true, force: true }))
+      if (!physicalInUse.has(snapshot.physicalFp)) {
+        const target = physicalRef(name, snapshot.physicalFp)
+        yield* engine.execute(
+          snapshot.kind === "view"
+            ? `DROP VIEW IF EXISTS ${target}`
+            : `DROP TABLE IF EXISTS ${target}`,
+        )
+        if (options?.lakePath !== undefined && !options.lakePath.startsWith("s3://")) {
+          const prefix = parquetPrefix(options.lakePath, name, snapshot.physicalFp)
+          yield* Effect.sync(() => rmSync(prefix, { recursive: true, force: true }))
+        }
       }
       yield* store.deleteSnapshot(snapshot.name, snapshot.fingerprint)
       removed.push(label)

@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS snapshots (
   fingerprint   TEXT NOT NULL,
   rendered_sql  TEXT NOT NULL,
   canonical_ast TEXT NOT NULL DEFAULT '',
+  physical_fp   TEXT NOT NULL DEFAULT '',
   kind          TEXT NOT NULL,
   created_at    TEXT NOT NULL,
   orphaned_at   TEXT,
@@ -73,9 +74,14 @@ export const SqliteStateLive = (
             } catch {
               // колонка уже есть
             }
-            // миграция баз, созданных до появления orphaned_at (F3)
+            // миграции баз, созданных до появления orphaned_at и physical_fp (F3)
             try {
               db.exec(`ALTER TABLE snapshots ADD COLUMN orphaned_at TEXT`)
+            } catch {
+              // колонка уже есть
+            }
+            try {
+              db.exec(`ALTER TABLE snapshots ADD COLUMN physical_fp TEXT NOT NULL DEFAULT ''`)
             } catch {
               // колонка уже есть
             }
@@ -95,14 +101,15 @@ export const SqliteStateLive = (
             Effect.flatMap((now) =>
               attempt("upsertSnapshot", () => {
                 db.query(
-                  `INSERT INTO snapshots (name, fingerprint, rendered_sql, canonical_ast, kind, created_at)
-                   VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+                  `INSERT INTO snapshots (name, fingerprint, rendered_sql, canonical_ast, physical_fp, kind, created_at)
+                   VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
                    ON CONFLICT (name, fingerprint) DO NOTHING`,
                 ).run(
                   snapshot.name,
                   snapshot.fingerprint,
                   snapshot.renderedSql,
                   snapshot.canonicalAst,
+                  snapshot.physicalFp,
                   snapshot.kind,
                   now,
                 )
@@ -116,7 +123,8 @@ export const SqliteStateLive = (
               .query(
                 `SELECT name, fingerprint, rendered_sql AS renderedSql,
                         canonical_ast AS canonicalAst, kind, created_at AS createdAt,
-                        orphaned_at AS orphanedAt
+                        orphaned_at AS orphanedAt,
+                        CASE WHEN physical_fp = '' THEN fingerprint ELSE physical_fp END AS physicalFp
                  FROM snapshots WHERE name = ?1 AND fingerprint = ?2`,
               )
               .get(name, fingerprint) as SnapshotRecord | null
@@ -137,7 +145,8 @@ export const SqliteStateLive = (
               .query(
                 `SELECT name, fingerprint, rendered_sql AS renderedSql,
                         canonical_ast AS canonicalAst, kind, created_at AS createdAt,
-                        orphaned_at AS orphanedAt
+                        orphaned_at AS orphanedAt,
+                        CASE WHEN physical_fp = '' THEN fingerprint ELSE physical_fp END AS physicalFp
                  FROM snapshots ORDER BY name, created_at`,
               )
               .all() as ReadonlyArray<SnapshotRecord>

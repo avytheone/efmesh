@@ -39,8 +39,13 @@ export const envSchema = (env: string, modelSchema: string): string =>
 export const parquetPrefix = (lakePath: string, name: ModelName, fingerprint: string): string =>
   `${lakePath.replace(/\/+$/, "")}/${name.schema}/${name.table}/fp=${fp8(fingerprint)}`
 
+/**
+ * union_by_name: партиции одного префикса могут отличаться схемой после
+ * forward-only-эволюции (новые колонки появляются только в новых файлах —
+ * история читается с NULL).
+ */
 export const parquetRef = (lakePath: string, name: ModelName, fingerprint: string): string =>
-  `read_parquet('${parquetPrefix(lakePath, name, fingerprint).replaceAll(`'`, `''`)}/**/*.parquet')`
+  `read_parquet('${parquetPrefix(lakePath, name, fingerprint).replaceAll(`'`, `''`)}/**/*.parquet', union_by_name=true)`
 
 /** Ключ партиции интервала — безопасен для файловых систем (без двоеточий). */
 export const intervalKey = (unit: "day" | "hour", startMs: number): string => {

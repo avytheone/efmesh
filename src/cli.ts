@@ -47,8 +47,24 @@ const CHANGE_MARK: Record<string, string> = {
   breaking: "!",
   "non-breaking": "~",
   indirect: "↻",
+  "forward-only": "→",
   removed: "-",
   unchanged: "·",
+}
+
+const forwardOnlyFlag = Flag.string("forward-only").pipe(
+  Flag.withDefault(""),
+  Flag.withDescription(
+    "Модели через запятую: изменения применяются forward-only — физика и история переиспользуются",
+  ),
+)
+
+const parseForwardOnly = (value: string): ReadonlyArray<string> | undefined => {
+  const names = value
+    .split(",")
+    .map((name) => name.trim())
+    .filter((name) => name !== "")
+  return names.length > 0 ? names : undefined
 }
 
 const formatRange = (range: { readonly start: number; readonly end: number }): string =>
@@ -73,26 +89,29 @@ const printPlan = (plan: Plan) =>
 
 const planCommand = Command.make(
   "plan",
-  { env: Argument.string("env"), config: configFlag },
-  ({ config, env }) =>
+  { env: Argument.string("env"), config: configFlag, forwardOnly: forwardOnlyFlag },
+  ({ config, env, forwardOnly }) =>
     Effect.gen(function* () {
       const loaded = yield* loadConfig(config)
-      const plan = yield* Efmesh.plan(env, loaded.models).pipe(
-        Effect.provide(configLayers(loaded)),
-      )
+      const names = parseForwardOnly(forwardOnly)
+      const plan = yield* Efmesh.plan(env, loaded.models, {
+        ...(names !== undefined ? { forwardOnly: names } : {}),
+      }).pipe(Effect.provide(configLayers(loaded)))
       yield* printPlan(plan)
     }),
 ).pipe(Command.withDescription("Показать diff проекта против окружения, ничего не меняя"))
 
 const applyCommand = Command.make(
   "apply",
-  { env: Argument.string("env"), config: configFlag },
-  ({ config, env }) =>
+  { env: Argument.string("env"), config: configFlag, forwardOnly: forwardOnlyFlag },
+  ({ config, env, forwardOnly }) =>
     Effect.gen(function* () {
       const loaded = yield* loadConfig(config)
+      const names = parseForwardOnly(forwardOnly)
       const applied = yield* Efmesh.apply(env, loaded.models, {
         ...(loaded.lake !== undefined ? { lakePath: loaded.lake.path } : {}),
         ...(loaded.attach !== undefined ? { attach: loaded.attach } : {}),
+        ...(names !== undefined ? { forwardOnly: names } : {}),
       }).pipe(Effect.provide(configLayers(loaded)))
       yield* printPlan(applied.plan)
       yield* Console.log(

@@ -20,6 +20,7 @@ describe("SqliteState", () => {
           fingerprint: "abc123",
           renderedSql: "SELECT 1",
           canonicalAst: `{"statements":[]}`,
+          physicalFp: "abc123",
           kind: "full",
         }
         yield* store.upsertSnapshot(record)
@@ -85,11 +86,11 @@ describe("SqliteState", () => {
     const phases = await withStore((store) =>
       Effect.gen(function* () {
         const base = { name: "med.a", renderedSql: "SELECT 1", canonicalAst: "{}", kind: "full" }
-        yield* store.upsertSnapshot({ ...base, fingerprint: "f1" })
+        yield* store.upsertSnapshot({ ...base, fingerprint: "f1", physicalFp: "f1" })
         yield* store.promote("dev", [{ name: "med.a", fingerprint: "f1" }])
         const referenced = yield* store.getSnapshot("med.a", "f1")
 
-        yield* store.upsertSnapshot({ ...base, fingerprint: "f2" })
+        yield* store.upsertSnapshot({ ...base, fingerprint: "f2", physicalFp: "f2" })
         yield* store.promote("dev", [{ name: "med.a", fingerprint: "f2" }])
         const orphaned = yield* store.getSnapshot("med.a", "f1")
 

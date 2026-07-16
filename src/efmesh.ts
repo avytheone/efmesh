@@ -13,6 +13,7 @@ import {
 } from "./plan/executor.ts"
 import {
   planChanges,
+  type ForwardOnlyError,
   type InvalidEnvironmentError,
   type Plan,
   type PlanOptions,
@@ -35,7 +36,13 @@ export const Efmesh = {
     options?: PlanOptions,
   ): Effect.Effect<
     Plan,
-    GraphError | StateError | InvalidEnvironmentError | EngineError | SqlParseError | SeedReadError,
+    | GraphError
+    | StateError
+    | InvalidEnvironmentError
+    | ForwardOnlyError
+    | EngineError
+    | SqlParseError
+    | SeedReadError,
     StateStore | EngineAdapter
   > => buildGraph(models).pipe(Effect.flatMap((graph) => planChanges(env, graph, options))),
 

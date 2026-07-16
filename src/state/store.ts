@@ -13,6 +13,12 @@ export interface SnapshotRecord {
   readonly renderedSql: string
   /** Канонический AST тела (JSON) — для категоризации изменений (SPEC §5.2). */
   readonly canonicalAst: string
+  /**
+   * Fingerprint, чьей физической таблицей/префиксом пользуется снапшот.
+   * Обычно равен собственному; при forward-only (SPEC §5.2) — наследуется
+   * от предыдущей версии: физика переиспользуется, история не переигрывается.
+   */
+  readonly physicalFp: string
   readonly kind: string
   readonly createdAt: string
   /**

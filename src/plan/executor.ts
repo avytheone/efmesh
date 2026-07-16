@@ -12,7 +12,7 @@ import type { Engine, EngineError, SqlParseError } from "../engine/adapter.ts"
 import { StateStore } from "../state/store.ts"
 import type { StateError, StateStoreShape } from "../state/store.ts"
 import { Metric } from "effect"
-import { checkContract, type SchemaMismatchError } from "./contract.ts"
+import { checkContract, SchemaMismatchError } from "./contract.ts"
 import { auditFailuresTotal, intervalsDone, snapshotsBuilt } from "./metrics.ts"
 import {
   envSchema,
@@ -24,7 +24,7 @@ import {
   physicalSchema,
   viewRef,
 } from "./naming.ts"
-import type { InvalidEnvironmentError, Plan, PlanAction } from "./planner.ts"
+import type { ForwardOnlyError, InvalidEnvironmentError, Plan, PlanAction } from "./planner.ts"
 
 export interface AppliedPlan {
   readonly plan: Plan
@@ -48,6 +48,7 @@ export type ApplyError =
   | AttachNotConfiguredError
   | AuditFailure
   | InvalidEnvironmentError
+  | ForwardOnlyError
 
 export interface ApplyOptions {
   /** Корень parquet-озера — локальная директория или s3://… (httpfs). */
@@ -110,6 +111,41 @@ const runAudits = (
   })
 
 /**
+ * Эволюция унаследованной таблицы при forward-only (SPEC §5.2): колонки,
+ * появившиеся в новом запросе, добавляются через ALTER (история получает
+ * NULL — она не переигрывается), удаление колонок реюзом не выражается —
+ * это честный breaking с пересборкой.
+ */
+const evolveTableForForwardOnly = (
+  engine: Engine,
+  model: AnyModel,
+  target: string,
+  emptyBody: string,
+): Effect.Effect<void, EngineError | SchemaMismatchError> =>
+  Effect.gen(function* () {
+    const wanted = yield* engine.describe(emptyBody)
+    const actual = yield* engine.describe(`SELECT * FROM ${target}`)
+    const have = new Set(actual.map((column) => column.name))
+    const wantedNames = new Set(wanted.map((column) => column.name))
+    const vanished = actual.filter((column) => !wantedNames.has(column.name))
+    if (vanished.length > 0) {
+      return yield* new SchemaMismatchError({
+        model: model.name.full,
+        problems: vanished.map(
+          (column) =>
+            `forward-only: колонка «${column.name}» есть в унаследованной физике, но исчезла из запроса — удаление колонок требует обычного (breaking) применения`,
+        ),
+      })
+    }
+    for (const column of wanted) {
+      if (have.has(column.name)) continue
+      yield* engine.execute(
+        `ALTER TABLE ${target} ADD COLUMN ${quoteIdent(column.name)} ${column.type}`,
+      )
+    }
+  })
+
+/**
  * Бэкфилл incrementalByTimeRange в таблицу (SPEC §5.3): каждый диапазон
  * плана режется на батчи ≤ batchSize; батч — транзакция DELETE-диапазона +
  * INSERT, после успеха его интервалы помечаются done. Упавший батч
@@ -138,9 +174,11 @@ const backfillIntoTable = (
         const body = render(model.fragment, { resolveRef, interval: { start, end } })
         const markFailed = () =>
           store.markIntervals(action.fingerprint, marks, "failed").pipe(Effect.ignore)
+        // BY NAME: после forward-only-эволюции порядок колонок физики может
+        // отличаться от запроса; контракт схемы гарантирует совпадение имён
         yield* transactional(engine, [
           `DELETE FROM ${target} WHERE ${quoteIdent(kind.timeColumn)} >= ${start} AND ${quoteIdent(kind.timeColumn)} < ${end}`,
-          `INSERT INTO ${target} ${body}`,
+          `INSERT INTO ${target} BY NAME ${body}`,
         ]).pipe(Effect.tapError(markFailed))
         // аудит свежезагруженного интервала — до отметки done (SPEC §8)
         yield* runAudits(
@@ -212,8 +250,9 @@ export const applyPlan = (
     const store = yield* StateStore
     const lakePath = options?.lakePath
 
-    const fingerprintOf = new Map(plan.actions.map((a) => [a.name, a.fingerprint]))
-    // физика модели — то, что увидят её потребители и view окружения
+    // физика модели — то, что увидят её потребители и view окружения;
+    // ключ — physicalFingerprint: при forward-only это физика старой версии
+    const physicalFpOf = new Map(plan.actions.map((a) => [a.name, a.physicalFingerprint]))
     const physicalFor = (model: AnyModel, fingerprint: string): string => {
       if (model.kind._tag === "external") return externalSourceRef(model.kind.source)
       if (model.target === "parquet") {
@@ -224,7 +263,7 @@ export const applyPlan = (
     }
     const resolveRef = (ref: string): string => {
       const model = graph.models.get(ref)
-      const fingerprint = fingerprintOf.get(ref)
+      const fingerprint = physicalFpOf.get(ref)
       if (model === undefined || fingerprint === undefined) {
         throw new Error(`ссылка на модель вне плана: ${ref}`)
       }
@@ -252,12 +291,13 @@ export const applyPlan = (
           const reader = model.kind.format === "csv" ? "read_csv" : "read_json"
           const body = `SELECT * FROM ${reader}('${model.kind.file.replaceAll(`'`, `''`)}')`
           yield* checkContract(engine, model, body)
-          const target = physicalRef(model.name, action.fingerprint)
+          const target = physicalRef(model.name, action.physicalFingerprint)
           yield* engine.execute(`CREATE OR REPLACE TABLE ${target} AS ${body}`)
           yield* runAudits(engine, model, target)
           yield* store.upsertSnapshot({
             name: action.name,
             fingerprint: action.fingerprint,
+            physicalFp: action.physicalFingerprint,
             canonicalAst: "",
             renderedSql: body,
             kind: model.kind._tag,
@@ -267,7 +307,7 @@ export const applyPlan = (
         case "incrementalByUniqueKey": {
           const body = render(model.fragment, { resolveRef })
           yield* checkContract(engine, model, body)
-          const target = physicalRef(model.name, action.fingerprint)
+          const target = physicalRef(model.name, action.physicalFingerprint)
           yield* engine.execute(
             `CREATE TABLE IF NOT EXISTS ${target} AS SELECT * FROM (${body}) q LIMIT 0`,
           )
@@ -281,6 +321,7 @@ export const applyPlan = (
           yield* store.upsertSnapshot({
             name: action.name,
             fingerprint: action.fingerprint,
+            physicalFp: action.physicalFingerprint,
             canonicalAst: action.canonicalAst ?? "",
             renderedSql: render(model.fragment, { resolveRef: (ref) => ref }),
             kind: model.kind._tag,
@@ -293,13 +334,13 @@ export const applyPlan = (
           // контракт схемы (SPEC §3.2): дрейф типов ловится до сборки
           yield* checkContract(engine, model, body)
           if (model.kind._tag === "full" && model.target === "parquet") {
-            const prefix = parquetPrefix(lakePath!, model.name, action.fingerprint)
+            const prefix = parquetPrefix(lakePath!, model.name, action.physicalFingerprint)
             yield* ensureDir(prefix)
             yield* engine.execute(
               `COPY (${body}) TO '${prefix.replaceAll(`'`, `''`)}/data.parquet' (FORMAT PARQUET)`,
             )
           } else {
-            const target = physicalRef(model.name, action.fingerprint)
+            const target = physicalRef(model.name, action.physicalFingerprint)
             const ddl =
               model.kind._tag === "view"
                 ? `CREATE OR REPLACE VIEW ${target} AS ${body}`
@@ -307,10 +348,11 @@ export const applyPlan = (
             yield* engine.execute(ddl)
           }
           // аудиты собранного снапшота — до промоушена (SPEC §8)
-          yield* runAudits(engine, model, physicalFor(model, action.fingerprint))
+          yield* runAudits(engine, model, physicalFor(model, action.physicalFingerprint))
           yield* store.upsertSnapshot({
             name: action.name,
             fingerprint: action.fingerprint,
+            physicalFp: action.physicalFingerprint,
             canonicalAst: action.canonicalAst ?? "",
             renderedSql: body,
             kind: model.kind._tag,
@@ -324,11 +366,20 @@ export const applyPlan = (
             interval: { start: zero, end: zero },
           })
           yield* checkContract(engine, model, emptyBody)
+          // forward-only: done-интервалы старой версии наследуются до бэкфилла —
+          // сделанное не переигрывается, пересчитывается только недостающее
+          if (action.reusedFrom !== undefined) {
+            const inherited = (yield* store.listIntervals(action.reusedFrom))
+              .filter((record) => record.status === "done")
+              .map((record) => ({ startTs: record.startTs, endTs: record.endTs }))
+            yield* store.markIntervals(action.fingerprint, inherited, "done")
+          }
           if (model.target === "parquet") {
-            const prefix = parquetPrefix(lakePath!, model.name, action.fingerprint)
+            const prefix = parquetPrefix(lakePath!, model.name, action.physicalFingerprint)
             yield* store.upsertSnapshot({
               name: action.name,
               fingerprint: action.fingerprint,
+              physicalFp: action.physicalFingerprint,
               canonicalAst: action.canonicalAst ?? "",
               renderedSql: render(model.fragment, { resolveRef: (ref) => ref }),
               kind: model.kind._tag,
@@ -336,13 +387,20 @@ export const applyPlan = (
             yield* backfillIntoParquet(engine, store, model, action, prefix, resolveRef)
           } else {
             // пустой скелет с формой запроса; при resume уже существует
-            const target = physicalRef(model.name, action.fingerprint)
+            const target = physicalRef(model.name, action.physicalFingerprint)
             yield* engine.execute(
               `CREATE TABLE IF NOT EXISTS ${target} AS SELECT * FROM (${emptyBody}) q LIMIT 0`,
             )
+            // forward-only на живой таблице: колонки, появившиеся в запросе,
+            // добавляются к унаследованной физике (история получает NULL);
+            // исчезнувшие из запроса — сигнал, что реюз невозможен
+            if (action.change === "forward-only") {
+              yield* evolveTableForForwardOnly(engine, model, target, emptyBody)
+            }
             yield* store.upsertSnapshot({
               name: action.name,
               fingerprint: action.fingerprint,
+              physicalFp: action.physicalFingerprint,
               canonicalAst: action.canonicalAst ?? "",
               renderedSql: render(model.fragment, { resolveRef: (ref) => ref }),
               kind: model.kind._tag,
@@ -373,7 +431,7 @@ export const applyPlan = (
         `CREATE SCHEMA IF NOT EXISTS "${envSchema(plan.env, model.name.schema)}"`,
       )
       yield* engine.execute(
-        `CREATE OR REPLACE VIEW ${viewRef(plan.env, model.name)} AS SELECT * FROM ${physicalFor(model, action.fingerprint)}`,
+        `CREATE OR REPLACE VIEW ${viewRef(plan.env, model.name)} AS SELECT * FROM ${physicalFor(model, action.physicalFingerprint)}`,
       )
     }
 
@@ -402,7 +460,7 @@ export const applyPlan = (
         `CREATE SCHEMA IF NOT EXISTS ${quoteIdent(model.export.attach)}.${quoteIdent(exportSchema)}`,
       )
       yield* engine.execute(
-        `CREATE OR REPLACE TABLE ${quoteIdent(model.export.attach)}.${quoteIdent(exportSchema)}.${quoteIdent(exportTable)} AS SELECT * FROM ${physicalFor(model, action.fingerprint)}`,
+        `CREATE OR REPLACE TABLE ${quoteIdent(model.export.attach)}.${quoteIdent(exportSchema)}.${quoteIdent(exportTable)} AS SELECT * FROM ${physicalFor(model, action.physicalFingerprint)}`,
       )
     }
 
