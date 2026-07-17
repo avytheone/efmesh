@@ -59,6 +59,15 @@ examples/hospital/ — live example, dogfooded here
 - **Dogfood.** After a notable change, run the live cycle on the example:
   `cd examples/hospital && bun ../../src/bin.ts apply dev --yes && bun ../../src/bin.ts run dev`.
 
+## Agent skills
+
+Recurring, mistake-prone procedures are captured as in-repo agent skills under
+[`.claude/skills/`](./.claude/skills/) (one `SKILL.md` per skill: `release`,
+`store-migration`, `fingerprint-change`, `add-model-kind`, `issue-workflow`).
+Each is a short checklist of the exact commands and the invariants for that
+task. Claude Code loads them by name; humans can read them as runbooks. If you
+change how one of these procedures works, update its skill in the same PR.
+
 ## Commits and PRs
 
 - Atomic commits in the [Conventional Commits](https://www.conventionalcommits.org/) style:
