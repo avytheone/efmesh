@@ -7,6 +7,17 @@ the first version gathers them in full.
 
 ## [Unreleased]
 
+- Operator skills for AI agents (#27). Five [Claude Code skills](https://github.com/avytheone/efmesh/tree/main/skills)
+  ship in the package (`skills/`, added to `files`) that teach an operating agent
+  the safe procedures — `efmesh-triage` (classify awaiting-human vs lock-held vs
+  a real error from `status --json`), `efmesh-safe-apply` (preview `plan
+  --explain --json`, then apply; the guard rails on `--reclassify` /
+  `--forward-only`), `efmesh-backfill-recovery`, `efmesh-environment-hygiene`
+  (`diff` / `diff --data`, janitor, backups), `efmesh-upgrade` (`efmesh
+  migrate`). Each drives `--json` outputs and the exit-code contract only, never
+  scraped text. README documents how to wire them into a project (symlink into
+  `.claude/skills/` or point the agent at `node_modules`); mirrored in the
+  Russian README.
 - Full `--json` and exit-code coverage for headless operation (#16). `janitor`,
   `migrate`, `lineage`, `render` and `schedule --list` now take `--json`,
   joining `plan`/`audit`/`status`/`diff` — every reporting command speaks a
