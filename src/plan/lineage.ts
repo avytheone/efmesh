@@ -102,7 +102,7 @@ export const lineage = (
         const cached = asts.get(model.name.full)
         if (cached !== undefined) return cached
         const ast = JSON.parse(
-          yield* engine.canonicalize(canonicalSql(graph, model.name.full)),
+          yield* engine.canonicalize(yield* Effect.orDie(canonicalSql(graph, model.name.full))),
         ) as unknown
         asts.set(model.name.full, ast)
         return ast

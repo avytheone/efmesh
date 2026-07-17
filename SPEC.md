@@ -531,7 +531,12 @@ Principles:
 - **Observability out of the box**: a span per model/interval, `Metric`s —
   `efmesh_intervals_done_total`, `efmesh_interval_duration`, `efmesh_audit_failures_total`.
 - **Library before CLI.** `Efmesh.plan(env)` is an ordinary `Effect` that can be
-  run inside any application by supplying it with layers. The CLI is built on
+  run inside any application by supplying it with layers. The public surface is a
+  whitelist (`src/index.ts`), frozen by a golden test
+  (`test/public-api-golden.test.ts`) so an accidental export or removal fails CI
+  the way `FINGERPRINT_VERSION` freezes canonicalization; even the canonical
+  renderer `canonicalSql` fails an unknown model through the error channel
+  (`UnknownModelError`), never a `throw`. The CLI is built on
   the Effect CLI module and is compiled with `bun build --compile` into a single binary.
   *Clarification in F5: the binary builds and works (`--external` for other
   platforms' `@duckdb/node-bindings-*`), but standalone Bun executables

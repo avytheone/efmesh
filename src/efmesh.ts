@@ -69,13 +69,7 @@ export const Efmesh = {
     models: Iterable<AnyModel>,
     name: string,
   ): Effect.Effect<string, GraphError | UnknownModelError> =>
-    buildGraph(models).pipe(
-      Effect.flatMap((graph) =>
-        graph.models.has(name)
-          ? Effect.succeed(canonicalSql(graph, name))
-          : new UnknownModelError({ model: name }),
-      ),
-    ),
+    buildGraph(models).pipe(Effect.flatMap((graph) => canonicalSql(graph, name))),
 
   /** SQL render of a model against an environment's view layer — "as the engine would run it". */
   renderFor: (
