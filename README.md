@@ -282,6 +282,30 @@ Next up: making efmesh legible to an evaluating AI agent — broader `--json` co
 - [CONTRIBUTING.md](https://github.com/avytheone/efmesh/blob/main/CONTRIBUTING.md) — build, test and PR guide;
 - [llms.txt](https://github.com/avytheone/efmesh/blob/main/llms.txt) — a machine-oriented map of the repo for an evaluating AI agent.
 
+### Agent skills
+
+efmesh expects most of its *operation* to run through AI agents, so it ships
+[Claude Code skills](https://github.com/avytheone/efmesh/tree/main/skills) that
+teach an operating agent the safe procedures — each drives `--json` outputs and
+[exit codes](#exit-codes) only, never scraped text:
+
+- `efmesh-triage` — read `status --json` + the tick journal; tell awaiting-human
+  (exit 2) from lock-held from a real error, and what to do for each;
+- `efmesh-safe-apply` — preview `plan --explain --json`, then apply; when
+  `--reclassify` / `--forward-only` are appropriate and when they are forbidden;
+- `efmesh-backfill-recovery` — find failed/missing intervals and rerun with `run`;
+- `efmesh-environment-hygiene` — `diff` / `diff --data` before promotion, janitor
+  cadence, and what to back up;
+- `efmesh-upgrade` — bump the package, `efmesh migrate`, verify with `status --json`.
+
+Wire them into your project by pointing your agent at the installed package —
+`node_modules/@avytheone/efmesh/skills/` — or copy/symlink the ones you want into
+your project's `.claude/skills/`:
+
+```sh
+ln -s ../../node_modules/@avytheone/efmesh/skills/efmesh-safe-apply .claude/skills/
+```
+
 ## License
 
 [MIT](https://github.com/avytheone/efmesh/blob/main/LICENSE) © Alexey Yakimanskiy

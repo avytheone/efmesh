@@ -287,6 +287,31 @@ state:  { url: "postgres://…" },  // схема efmesh_state
 - [CONTRIBUTING.md](https://github.com/avytheone/efmesh/blob/main/CONTRIBUTING.md) — как собрать, погонять тесты и предложить правку;
 - [llms.txt](https://github.com/avytheone/efmesh/blob/main/llms.txt) — машинно-ориентированная карта репозитория для оценивающего ИИ-агента.
 
+### Агентские скилы
+
+Эксплуатировать efmesh предполагается в основном силами ИИ-агентов, поэтому в
+пакете едут [скилы Claude Code](https://github.com/avytheone/efmesh/tree/main/skills),
+обучающие агента безопасным процедурам. Каждый работает только через вывод
+`--json` и [коды выхода](#exit-коды), без разбора человекочитаемого текста
+(тексты самих скилов — на английском, как и вся документация исходников):
+
+- `efmesh-triage` — читает `status --json` и журнал тиков; отличает «ждёт
+  человека» (код 2) от удержанной блокировки и от настоящей ошибки;
+- `efmesh-safe-apply` — превью `plan --explain --json`, затем apply; когда
+  уместны `--reclassify` / `--forward-only`, а когда запрещены;
+- `efmesh-backfill-recovery` — найти упавшие/недостающие интервалы и перезапустить `run`;
+- `efmesh-environment-hygiene` — `diff` / `diff --data` перед промоушеном,
+  ритм janitor и что бэкапить;
+- `efmesh-upgrade` — поднять версию пакета, `efmesh migrate`, проверить `status --json`.
+
+Подключение: указать агенту на скилы в установленном пакете
+(`node_modules/@avytheone/efmesh/skills/`) либо скопировать/симлинкнуть нужные в
+`.claude/skills/` своего проекта:
+
+```sh
+ln -s ../../node_modules/@avytheone/efmesh/skills/efmesh-safe-apply .claude/skills/
+```
+
 ## Лицензия
 
 [MIT](https://github.com/avytheone/efmesh/blob/main/LICENSE) © Alexey Yakimanskiy
