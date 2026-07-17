@@ -6,7 +6,13 @@ import type { EngineError, SqlParseError } from "./engine/adapter.ts"
 import type { EngineAdapter } from "./engine/adapter.ts"
 import { canonicalSql } from "./plan/fingerprint.ts"
 import { applyPlan, type AppliedPlan, type ApplyError, type ApplyOptions } from "./plan/executor.ts"
-import { envLockName, withStateLock, type LockHeldError, type LockOptions } from "./plan/lock.ts"
+import {
+  envLockName,
+  withStateLock,
+  type LockHeldError,
+  type LockLostError,
+  type LockOptions,
+} from "./plan/lock.ts"
 import {
   planChanges,
   type FingerprintVersionError,
@@ -57,7 +63,11 @@ export const Efmesh = {
     env: string,
     models: Iterable<AnyModel>,
     options?: PlanOptions & ApplyOptions & LockOptions,
-  ): Effect.Effect<AppliedPlan, ApplyError | LockHeldError, EngineAdapter | StateStore> =>
+  ): Effect.Effect<
+    AppliedPlan,
+    ApplyError | LockHeldError | LockLostError,
+    EngineAdapter | StateStore
+  > =>
     Effect.gen(function* () {
       const graph = yield* buildGraph(models)
       const plan = yield* planChanges(env, graph, options)

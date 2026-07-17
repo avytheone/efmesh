@@ -414,9 +414,39 @@ export const SqliteStateLive = (
             ),
           ),
 
-        releaseLock: (name) =>
+        renewLock: (name, expectedExpiresAt, ttlMs) =>
+          Clock.currentTimeMillis.pipe(
+            Effect.flatMap((nowMs) =>
+              attempt("renewLock", () => {
+                const next = new Date(nowMs + ttlMs).toISOString()
+                // fenced on the expiry we last set: a reclaimed lock has a
+                // different one, so this UPDATE misses and we report the loss
+                const result = db
+                  .query(`UPDATE locks SET expires_at = ?1 WHERE name = ?2 AND expires_at = ?3`)
+                  .run(next, name, expectedExpiresAt)
+                return result.changes > 0 ? next : null
+              }),
+            ),
+          ),
+
+        lockExpiry: (name) =>
+          attempt("lockExpiry", () => {
+            const row = db.query(`SELECT expires_at FROM locks WHERE name = ?1`).get(name) as {
+              expires_at: string
+            } | null
+            return row?.expires_at ?? null
+          }),
+
+        releaseLock: (name, expectedExpiresAt) =>
           attempt("releaseLock", () => {
-            db.query(`DELETE FROM locks WHERE name = ?1`).run(name)
+            if (expectedExpiresAt === undefined) {
+              db.query(`DELETE FROM locks WHERE name = ?1`).run(name)
+            } else {
+              db.query(`DELETE FROM locks WHERE name = ?1 AND expires_at = ?2`).run(
+                name,
+                expectedExpiresAt,
+              )
+            }
           }),
 
         markIntervals: (snapshotFp, intervals, status) =>

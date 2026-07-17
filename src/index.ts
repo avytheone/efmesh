@@ -98,7 +98,7 @@ export {
 } from "./plan/executor.ts"
 export { AuditFailure } from "./core/audit.ts"
 export { SchemaMismatchError } from "./plan/contract.ts"
-export { LockHeldError, type LockOptions } from "./plan/lock.ts"
+export { LockHeldError, LockLostError, type LockOptions } from "./plan/lock.ts"
 export { FINGERPRINT_VERSION } from "./plan/fingerprint.ts"
 
 // — graph: compound project-loading errors —

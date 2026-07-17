@@ -22,6 +22,17 @@ the first version gathers them in full.
   surface all-Effects (SPEC §10). The public API whitelist in `src/index.ts` is
   frozen by a golden test — an accidental export or removal now fails CI, the way
   the fingerprint golden freezes canonicalization.
+### Fixed
+
+- Lock heartbeat under a long apply/run (#18). `apply` and `run` now renew the
+  environment lock on a background heartbeat (a third of the ttl) while the
+  guarded work runs, so a backfill that outlives the raw ttl is no longer
+  mistaken for a crashed process and reclaimed under it — closing the one path
+  to two writers on a single environment. The renewal is fenced to the holder's
+  own lease: if the lock was reclaimed anyway (a stall longer than the ttl), the
+  holder aborts loudly with a `LockLostError` instead of writing behind the new
+  owner, and its release is a no-op that leaves the reclaimer's lock intact. A
+  crashed (SIGKILL) holder still stops heartbeating, so ttl reclaim is unchanged.
 
 ## [0.2.2] — 2026-07-17
 

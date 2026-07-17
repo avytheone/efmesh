@@ -187,7 +187,30 @@ export interface StateStoreShape {
    * doesn't leave a lock held forever.
    */
   readonly acquireLock: (name: string, ttlMs: number) => Effect.Effect<boolean, StateError>
-  readonly releaseLock: (name: string) => Effect.Effect<void, StateError>
+  /**
+   * Extend the lease of a lock this process already holds (the apply/run
+   * heartbeat, SPEC §7). Ownership is fenced on `expectedExpiresAt`: the row is
+   * touched only while its expiry still equals the value we last wrote — so a
+   * lock that a second process reclaimed after ours went stale (its expiry
+   * differs) is NEVER bumped by us. Returns the new expiry on success, `null`
+   * when the lock is no longer ours.
+   */
+  readonly renewLock: (
+    name: string,
+    expectedExpiresAt: string,
+    ttlMs: number,
+  ) => Effect.Effect<string | null, StateError>
+  /** Current expiry of a held lock, or `null` if unheld — seeds the heartbeat fence. */
+  readonly lockExpiry: (name: string) => Effect.Effect<string | null, StateError>
+  /**
+   * Release a lock. With `expectedExpiresAt` the delete is fenced to our own
+   * lease, so a holder that already lost the lock cannot delete the row that
+   * now belongs to whoever reclaimed it.
+   */
+  readonly releaseLock: (
+    name: string,
+    expectedExpiresAt?: string,
+  ) => Effect.Effect<void, StateError>
   /** Transactional upsert of snapshot intervals (re-marking updates the status). */
   readonly markIntervals: (
     snapshotFp: string,

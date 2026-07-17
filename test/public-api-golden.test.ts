@@ -68,6 +68,7 @@ const FROZEN_VALUES: ReadonlyArray<string> = [
   "LakeNotConfiguredError",
   "LineageError",
   "LockHeldError",
+  "LockLostError",
   "ModelDefinitionError",
   "PostgresEngineLive",
   "PostgresStateLive",

@@ -406,9 +406,42 @@ export const PostgresStateLive = (
             ),
           ),
 
-        releaseLock: (name) =>
+        renewLock: (name, expectedExpiresAt, ttlMs) =>
+          Clock.currentTimeMillis.pipe(
+            Effect.flatMap((nowMs) =>
+              attempt("renewLock", async () => {
+                const next = new Date(nowMs + ttlMs).toISOString()
+                // fenced on the expiry we last set: a reclaimed lock has a
+                // different one, so this UPDATE misses and we report the loss
+                const rows = (await sql.unsafe(
+                  `UPDATE efmesh_state.locks SET expires_at = $1
+                   WHERE name = $2 AND expires_at = $3 RETURNING name`,
+                  [next, name, expectedExpiresAt],
+                )) as ReadonlyArray<unknown>
+                return rows.length > 0 ? next : null
+              }),
+            ),
+          ),
+
+        lockExpiry: (name) =>
+          attempt("lockExpiry", async () => {
+            const rows = (await sql.unsafe(
+              `SELECT expires_at FROM efmesh_state.locks WHERE name = $1`,
+              [name],
+            )) as ReadonlyArray<{ expires_at: string }>
+            return rows[0]?.expires_at ?? null
+          }),
+
+        releaseLock: (name, expectedExpiresAt) =>
           attempt("releaseLock", async () => {
-            await sql.unsafe(`DELETE FROM efmesh_state.locks WHERE name = $1`, [name])
+            if (expectedExpiresAt === undefined) {
+              await sql.unsafe(`DELETE FROM efmesh_state.locks WHERE name = $1`, [name])
+            } else {
+              await sql.unsafe(
+                `DELETE FROM efmesh_state.locks WHERE name = $1 AND expires_at = $2`,
+                [name, expectedExpiresAt],
+              )
+            }
           }),
 
         markIntervals: (snapshotFp, intervals, status) =>

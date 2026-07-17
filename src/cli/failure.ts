@@ -11,6 +11,7 @@ const FAILURE_HINTS: Readonly<Record<string, (error: Record<string, unknown>) =>
   FingerprintVersionError: () => "run `efmesh migrate` or upgrade efmesh, then re-apply",
   LockHeldError: (error) =>
     `wait for the other apply/run to finish, or clear the stale lock «${String(error["name"])}»`,
+  LockLostError: () => "nothing was left half-written; check `efmesh status`, then re-run",
   LakeNotConfiguredError: () => "add `lake: { path: … }` to efmesh.config.ts",
   DucklakeNotConfiguredError: () => "add `ducklake: { catalog: … }` to efmesh.config.ts",
   AttachNotConfiguredError: (error) =>

@@ -384,6 +384,12 @@ of a crashed process is reclaimed), the same in SQLite and Postgres.
 *Clarification in F5 (§14.6 closed): the lock is one per environment (`env:<name>`) and shared
 between `run` and `apply` — mutations of an environment from different processes mutually
 exclude each other; the `janitor` has its own global lock.*
+*Implemented in 0.2.2 (#18): a live holder renews its lease on a heartbeat
+(a third of the ttl) while the guarded work runs, so a backfill outliving the raw
+ttl is not reclaimed under it. The renewal is fenced to the holder's own lease
+(the `expires_at` it last wrote); if the lock was reclaimed anyway the holder
+aborts with a `LockLostError` rather than write behind the new owner. A SIGKILLed
+holder stops heartbeating, so ttl reclaim of a truly dead process is unchanged.*
 
 *Implemented in 0.2.0 (#1, #2):* every run tick writes its outcome to the
 `runs` journal in the state store — `ok` (with the list of built models),
