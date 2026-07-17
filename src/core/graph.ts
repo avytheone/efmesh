@@ -13,9 +13,7 @@ export interface ModelGraph {
 export type GraphError = DuplicateModelError | UnknownDependencyError | DagCycleError
 
 /** Builds a DAG from a set of models: duplicates, unknown dependencies, cycles — typed errors. */
-export const buildGraph = (
-  input: Iterable<AnyModel>,
-): Effect.Effect<ModelGraph, GraphError> =>
+export const buildGraph = (input: Iterable<AnyModel>): Effect.Effect<ModelGraph, GraphError> =>
   Effect.gen(function* () {
     const models = new Map<string, AnyModel>()
     for (const model of input) {
@@ -40,7 +38,10 @@ export const buildGraph = (
     const inDegree = new Map<string, number>()
     for (const [name, model] of models) inDegree.set(name, model.deps.size)
     // sort the queue so the order is deterministic across runs
-    const queue = [...inDegree.entries()].filter(([, d]) => d === 0).map(([n]) => n).sort()
+    const queue = [...inDegree.entries()]
+      .filter(([, d]) => d === 0)
+      .map(([n]) => n)
+      .sort()
     const order: Array<string> = []
     while (queue.length > 0) {
       const name = queue.shift()!

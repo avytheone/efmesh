@@ -86,7 +86,13 @@ describe("SqliteState", () => {
   test("orphaned_at: promotion marks an orphan and clears it on return", async () => {
     const phases = await withStore((store) =>
       Effect.gen(function* () {
-        const base = { name: "med.a", renderedSql: "SELECT 1", canonicalAst: "{}", kind: "full", fingerprintVersion: 1 }
+        const base = {
+          name: "med.a",
+          renderedSql: "SELECT 1",
+          canonicalAst: "{}",
+          kind: "full",
+          fingerprintVersion: 1,
+        }
         yield* store.upsertSnapshot({ ...base, fingerprint: "f1", physicalFp: "f1" })
         yield* store.promote("dev", [{ name: "med.a", fingerprint: "f1" }])
         const referenced = yield* store.getSnapshot("med.a", "f1")

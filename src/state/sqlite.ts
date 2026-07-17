@@ -74,9 +74,7 @@ export interface SqliteStateOptions {
 const isoNow = Clock.currentTimeMillis.pipe(Effect.map((ms) => new Date(ms).toISOString()))
 
 const tableExists = (db: Database, name: string): boolean =>
-  db
-    .query(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?1`)
-    .get(name) !== null
+  db.query(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?1`).get(name) !== null
 
 /** 0 — a store with no meta table (created before versioning existed, F0–F3). */
 const readVersion = (db: Database): number => {
@@ -301,7 +299,10 @@ export const SqliteStateLive = (
                     `SELECT 1 FROM snapshots WHERE name = ?1 AND fingerprint = ?2`,
                   )
                   for (const entry of entries) {
-                    if (entry.requireSnapshot === true && alive.get(entry.name, entry.fingerprint) === null) {
+                    if (
+                      entry.requireSnapshot === true &&
+                      alive.get(entry.name, entry.fingerprint) === null
+                    ) {
                       throw new Error(
                         `promotion "${env}": snapshot ${entry.name}@${entry.fingerprint.slice(0, 8)} vanished from the store (removed by janitor?) — retry apply`,
                       )
@@ -357,9 +358,9 @@ export const SqliteStateLive = (
 
         getCanon: (key) =>
           attempt("getCanon", () => {
-            const row = db
-              .query(`SELECT canonical FROM canon_cache WHERE key = ?1`)
-              .get(key) as { canonical: string } | null
+            const row = db.query(`SELECT canonical FROM canon_cache WHERE key = ?1`).get(key) as {
+              canonical: string
+            } | null
             return row?.canonical ?? undefined
           }),
 

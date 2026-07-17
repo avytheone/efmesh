@@ -11,7 +11,6 @@ import { defineExternal, defineModel, external, kind } from "../src/core/model.t
 import { EngineAdapter } from "../src/engine/adapter.ts"
 import { DuckDBEngineLive } from "../src/engine/duckdb.ts"
 import { SqliteStateLive } from "../src/state/sqlite.ts"
-import { StateStore } from "../src/state/store.ts"
 
 /**
  * The detailed execution log (#14) is emitted through Effect's logging system,
@@ -106,9 +105,7 @@ describe("detailed execution log (#14)", () => {
     }
     // lifecycle start/finish are info too
     expect(entries.some((e) => e.level === "Info" && e.message === "build start")).toBe(true)
-    expect(
-      entries.some((e) => e.level === "Info" && e.message.startsWith("build done")),
-    ).toBe(true)
+    expect(entries.some((e) => e.level === "Info" && e.message.startsWith("build done"))).toBe(true)
   })
 
   test("rendered SQL is emitted at debug, never at info", async () => {

@@ -23,8 +23,9 @@ jobs:
       - name: Postgres on PATH
         run: ls -d /usr/lib/postgresql/*/bin 2>/dev/null | head -1 >> "$GITHUB_PATH" || true
 
-      - name: Types
-        run: bunx tsc --noEmit
+      # Lint + format check (biome) and types (tsc), same `check` script as local
+      - name: Check
+        run: bun run check
 
       - name: Tests
         run: bun test

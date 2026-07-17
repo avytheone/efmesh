@@ -28,9 +28,7 @@ const lakeTables = (engine: {
   readonly query: (sql: string) => Effect.Effect<ReadonlyArray<Record<string, unknown>>, unknown>
 }) =>
   engine
-    .query(
-      `SELECT table_name FROM duckdb_tables() WHERE database_name = '${ducklakeAlias}'`,
-    )
+    .query(`SELECT table_name FROM duckdb_tables() WHERE database_name = '${ducklakeAlias}'`)
     .pipe(Effect.map((rows) => rows.map((row) => String(row["table_name"]))))
 
 describe("target: ducklake (SPEC §14.5)", () => {

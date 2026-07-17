@@ -62,7 +62,11 @@ describe("DAG concurrency of apply (SPEC §5.3)", () => {
           (ctx) => ctx.sql`SELECT * FROM (VALUES ('a'), (NULL)) t(id)`,
         )
         const child = defineModel(
-          { name: "dag.child", kind: kind.full(), schema: Schema.Struct({ id: Schema.NullOr(Schema.String) }) },
+          {
+            name: "dag.child",
+            kind: kind.full(),
+            schema: Schema.Struct({ id: Schema.NullOr(Schema.String) }),
+          },
           (ctx) => ctx.sql`SELECT id FROM ${ctx.ref(dirty)}`,
         )
         const models = [dirty, child]

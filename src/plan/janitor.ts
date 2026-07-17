@@ -84,11 +84,7 @@ export const janitor = (
         kept.push(label)
         continue
       }
-      const won = yield* store.deleteSnapshotIfDoomed(
-        snapshot.name,
-        snapshot.fingerprint,
-        deadline,
-      )
+      const won = yield* store.deleteSnapshotIfDoomed(snapshot.name, snapshot.fingerprint, deadline)
       if (!won) {
         kept.push(label)
         continue
@@ -117,9 +113,7 @@ export const janitor = (
           : `DROP TABLE IF EXISTS ${target}`,
       )
       if (ducklake !== undefined && engine.dialect === "duckdb" && snapshot.kind !== "view") {
-        yield* engine.execute(
-          `DROP TABLE IF EXISTS ${ducklakeRef(name, snapshot.physicalFp)}`,
-        )
+        yield* engine.execute(`DROP TABLE IF EXISTS ${ducklakeRef(name, snapshot.physicalFp)}`)
       }
       if (options?.lakePath !== undefined && !options.lakePath.startsWith("s3://")) {
         const prefix = parquetPrefix(options.lakePath, name, snapshot.physicalFp)

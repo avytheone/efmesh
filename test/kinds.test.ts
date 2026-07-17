@@ -36,7 +36,10 @@ describe("kinds F1", () => {
 
     const executable = render(incremental.fragment, {
       resolveRef: (r) => r,
-      interval: { start: "TIMESTAMP '2026-01-01 00:00:00'", end: "TIMESTAMP '2026-01-02 00:00:00'" },
+      interval: {
+        start: "TIMESTAMP '2026-01-01 00:00:00'",
+        end: "TIMESTAMP '2026-01-02 00:00:00'",
+      },
     })
     expect(executable).toContain("moved_at >= TIMESTAMP '2026-01-01 00:00:00'")
     expect(executable).toContain("moved_at < TIMESTAMP '2026-01-02 00:00:00'")

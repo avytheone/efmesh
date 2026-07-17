@@ -1,17 +1,13 @@
 import { describe, expect, test } from "bun:test"
 import { Effect } from "effect"
-import {
-  decideApply,
-  EXIT_AWAITING_HUMAN,
-  isAffirmative,
-  parseReclassify,
-} from "../src/cli.ts"
+import { decideApply, EXIT_AWAITING_HUMAN, isAffirmative, parseReclassify } from "../src/cli.ts"
 
 describe("--reclassify — flag parsing (#5)", () => {
   test("model=category pairs; empty — undefined; garbage — an error", async () => {
-    expect(
-      await Effect.runPromise(parseReclassify("med.a=non-breaking, med.b=breaking")),
-    ).toEqual({ "med.a": "non-breaking", "med.b": "breaking" })
+    expect(await Effect.runPromise(parseReclassify("med.a=non-breaking, med.b=breaking"))).toEqual({
+      "med.a": "non-breaking",
+      "med.b": "breaking",
+    })
     expect(await Effect.runPromise(parseReclassify(""))).toBeUndefined()
     for (const bad of ["med.a", "med.a=indirect", "=breaking", "a=b=c"]) {
       const failure = await Effect.runPromise(Effect.flip(parseReclassify(bad)))

@@ -1,7 +1,7 @@
-import { Clock, Data, Effect, Schedule } from "effect"
+import { Clock, Data, Effect, type Schedule } from "effect"
 import { buildGraph } from "../core/graph.ts"
 import type { AnyModel } from "../core/model.ts"
-import { EngineAdapter } from "../engine/adapter.ts"
+import type { EngineAdapter } from "../engine/adapter.ts"
 import { StateStore, type RunRecord } from "../state/store.ts"
 import { applyPlan, type AppliedPlan, type ApplyError, type ApplyOptions } from "./executor.ts"
 import { envLockName, withStateLock, type LockHeldError, type LockOptions } from "./lock.ts"
@@ -78,9 +78,7 @@ export const run = (
       return yield* applyPlan(plan, graph, options)
     }).pipe(
       withStateLock(envLockName(env), options?.lockTtlMs),
-      Effect.tap((applied) =>
-        journal({ outcome: "ok", detail: JSON.stringify(applied.built) }),
-      ),
+      Effect.tap((applied) => journal({ outcome: "ok", detail: JSON.stringify(applied.built) })),
       Effect.tapError((error) => journal(classify(error))),
     )
   })

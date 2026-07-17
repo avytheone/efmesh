@@ -112,9 +112,14 @@ describe("audits (SPEC §8)", () => {
               id: Schema.NullOr(Schema.String),
               happened_at: Schema.DateTimeUtc,
             }),
-            audits: [audit.custom("no NULL id", (a) => a.sql`
+            audits: [
+              audit.custom(
+                "no NULL id",
+                (a) => a.sql`
               SELECT * FROM ${a.self} WHERE id IS NULL
-            `)],
+            `,
+              ),
+            ],
           },
           (ctx) => ctx.sql`
             SELECT id, happened_at FROM ${ctx.ref(raw)}

@@ -22,7 +22,9 @@ const withEngine = <A, E>(body: (engine: Engine) => Effect.Effect<A, E>) =>
 
 describe("error-text helpers (#13)", () => {
   test("causeText surfaces the underlying layer's own message, never swallows it", () => {
-    expect(causeText(new Error("Catalog Error: no such table"))).toBe("Catalog Error: no such table")
+    expect(causeText(new Error("Catalog Error: no such table"))).toBe(
+      "Catalog Error: no such table",
+    )
     expect(causeText("transient")).toBe("transient")
     expect(causeText({ message: "syscall EACCES" })).toBe("syscall EACCES")
     expect(causeText(new Error())).toBe("Error") // empty message falls back to the name
@@ -59,11 +61,15 @@ describe("tagged error messages name the culprit and carry the cause (#13)", () 
   })
 
   test("other errors name their culprit in the derived message", () => {
-    expect(new AuditFailure({ model: "mart.x", audit: "not_null(a)", violations: 3 }).message)
-      .toContain("mart.x")
-    expect(new SchemaMismatchError({ model: "mart.y", problems: ["column «a» missing"] }).message)
-      .toContain("mart.y")
-    expect(new EnvironmentAuditError({ env: "prod", blockingViolations: 2 }).message).toContain("prod")
+    expect(
+      new AuditFailure({ model: "mart.x", audit: "not_null(a)", violations: 3 }).message,
+    ).toContain("mart.x")
+    expect(
+      new SchemaMismatchError({ model: "mart.y", problems: ["column «a» missing"] }).message,
+    ).toContain("mart.y")
+    expect(new EnvironmentAuditError({ env: "prod", blockingViolations: 2 }).message).toContain(
+      "prod",
+    )
     expect(new StateSchemaError({ found: 3, wanted: 5 }).message).toContain("v5")
     expect(new LockHeldError({ name: "env:dev" }).message).toContain("env:dev")
     expect(new UnknownModelError({ model: "no.such" }).message).toContain("no.such")
@@ -135,9 +141,12 @@ describe("renderFailure — one screen, cause first, trace only under --log-leve
   })
 
   test("a bare defect (thrown Error) still renders a headline, not an empty line", () => {
-    const screen = renderFailure(Cause.die(new Error("invariant violated: reference outside plan")), {
-      debug: false,
-    })
+    const screen = renderFailure(
+      Cause.die(new Error("invariant violated: reference outside plan")),
+      {
+        debug: false,
+      },
+    )
     expect(screen).toContain("invariant violated")
   })
 })

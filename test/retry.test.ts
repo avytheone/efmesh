@@ -6,7 +6,7 @@ import { defineExternal, defineModel, external, kind } from "../src/core/model.t
 import { EngineAdapter, EngineError, type Engine } from "../src/engine/adapter.ts"
 import { DuckDBEngineLive } from "../src/engine/duckdb.ts"
 import { SqliteStateLive } from "../src/state/sqlite.ts"
-import { StateStore } from "../src/state/store.ts"
+import type { StateStore } from "../src/state/store.ts"
 
 const testLayer = Layer.mergeAll(DuckDBEngineLive(), SqliteStateLive())
 

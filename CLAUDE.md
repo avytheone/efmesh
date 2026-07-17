@@ -33,6 +33,13 @@ being migrated — do not add new Russian text.)
 
 ## Code style
 
+- **Formatting and lint are automated.** Biome (`biome.jsonc`) owns the
+  mechanical style — 2-space indent, double quotes, no semicolons, trailing
+  commas, 100-column width — and a lint pass tuned to the Effect idiom
+  (`noNonNullAssertion`, `useLiteralKeys`, `noExplicitAny` are off; tsc stays
+  the type authority). Do not hand-format or debate whitespace in review: run
+  `bun run check` (biome check + `tsc --noEmit`) before every commit and let it
+  fix. The bullets below are the things biome *cannot* enforce.
 - **Effect everywhere.** Effect v4, pinned to an exact beta as a
   peerDependency — never bump the pin casually; a weekly drift CI exists for
   that. Shapes are `Schema`, wiring is `Layer`, services are
@@ -71,9 +78,9 @@ class of bug this project can have:
 
 ## Testing & verification
 
-- `bun test` (all of it) and `bunx tsc --noEmit` must be green before any
-  commit. Do not pipe test output through `tail` inside `&&` chains — the
-  pipe swallows the exit code.
+- `bun test` (all of it) and `bun run check` (biome check + `tsc --noEmit`)
+  must be green before any commit. Do not pipe test output through `tail`
+  inside `&&` chains — the pipe swallows the exit code.
 - Tests that spawn subprocesses or import `effect` from temp dirs must
   create those dirs **inside the repo** (module resolution).
 - DuckDB holds a single connection: model-level concurrency is 1 on DuckDB

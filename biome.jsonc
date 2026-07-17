@@ -1,0 +1,60 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.4/schema.json",
+  // Generated lake output and local state artifacts (*.duckdb, *.sqlite,
+  // examples/**/lake/) are already in .gitignore — useIgnoreFile keeps biome
+  // off them without duplicating the list here.
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  "files": {
+    // *.svg is committed rendered output (docs/demo.svg), not code — biome's
+    // HTML/a11y linter has no business in it.
+    "includes": ["**", "!**/*.svg"]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double",
+      "semicolons": "asNeeded",
+      "trailingCommas": "all",
+      "arrowParentheses": "always"
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "style": {
+        // The codebase leans on `x.get(name)!` after an invariant/graph-order
+        // guarantee; tsc's noUncheckedIndexedAccess already forces the intent
+        // to be explicit. Banning `!` would fight the established idiom.
+        "noNonNullAssertion": "off"
+      },
+      "complexity": {
+        // Bracket access here is deliberate: it marks dynamically-typed reads
+        // (Record<string, unknown>, DuckDB rows with snake_case columns, error
+        // fields) and keeps them visually distinct from typed property access.
+        "useLiteralKeys": "off"
+      },
+      "suspicious": {
+        // Effect and generic plumbing use `any` at seams where the shape is
+        // erased on purpose; tsc (strict, exactOptionalPropertyTypes) stays the
+        // type authority, so a lint-level `any` crusade is only noise.
+        "noExplicitAny": "off"
+      }
+    }
+  },
+  "assist": {
+    "actions": {
+      "source": {
+        // Imports are grouped by origin and read top-down (effect, then core,
+        // then plan/state), not alphabetized. Auto-sorting would reshuffle
+        // ~47 files and impose an order the codebase never followed.
+        "organizeImports": "off"
+      }
+    }
+  }
+}

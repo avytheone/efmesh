@@ -41,7 +41,7 @@
     "./testing": "./src/testing/index.ts"
   },
   "scripts": {
-    "check": "tsc --noEmit",
+    "check": "biome check . && tsc --noEmit",
     "test": "bun test"
   },
   "dependencies": {
@@ -53,6 +53,7 @@
     "effect": "4.0.0-beta.98"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.4",
     "@types/bun": "latest",
     "effect": "4.0.0-beta.98",
     "typescript": "^7.0.2"

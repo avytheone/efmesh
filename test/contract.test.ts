@@ -12,8 +12,9 @@ const testLayer = Layer.mergeAll(DuckDBEngineLive(), SqliteStateLive())
 const scenario = <A, E>(body: Effect.Effect<A, E, EngineAdapter | StateStore>) =>
   Effect.runPromise(body.pipe(Effect.provide(testLayer)))
 
-const applyOne = (model: Parameters<typeof Efmesh.apply>[1] extends Iterable<infer M> ? M : never) =>
-  scenario(Effect.flip(Efmesh.apply("dev", [model])))
+const applyOne = (
+  model: Parameters<typeof Efmesh.apply>[1] extends Iterable<infer M> ? M : never,
+) => scenario(Effect.flip(Efmesh.apply("dev", [model])))
 
 describe("schema contract (SPEC §3.2)", () => {
   test("type diverged — SchemaMismatchError before building, with a clear list", async () => {

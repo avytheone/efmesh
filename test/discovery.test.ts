@@ -43,10 +43,7 @@ export const moves = defineModel(
 `,
 )
 
-write(
-  "scripts/seed.ts",
-  `export const notDiscovered = true\n`,
-)
+write("scripts/seed.ts", `export const notDiscovered = true\n`)
 
 describe("model discovery by glob (SPEC §12)", () => {
   test("collects model exports by mask, non-models and re-exports do not interfere", async () => {
@@ -55,9 +52,7 @@ describe("model discovery by glob (SPEC §12)", () => {
   })
 
   test("multiple masks are merged, a file outside the masks does not participate", async () => {
-    const models = await Effect.runPromise(
-      discoverModels(["models/*.ts", "models/med/*.ts"], root),
-    )
+    const models = await Effect.runPromise(discoverModels(["models/*.ts", "models/med/*.ts"], root))
     expect(models.map((model) => model.name.full).sort()).toEqual(["med.moves", "raw.moves"])
   })
 
@@ -74,9 +69,7 @@ export const rawMovesAgain = defineExternal({
 `,
     )
     try {
-      const conflict = await Effect.runPromise(
-        Effect.flip(discoverModels("models/**/*.ts", root)),
-      )
+      const conflict = await Effect.runPromise(Effect.flip(discoverModels("models/**/*.ts", root)))
       expect(conflict._tag).toBe("DiscoveryConflictError")
       if (conflict._tag === "DiscoveryConflictError") {
         expect(conflict.name).toBe("raw.moves")

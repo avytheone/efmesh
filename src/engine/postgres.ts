@@ -34,9 +34,7 @@ const stripLocations = (value: unknown): unknown => {
  * lifted out of the Layer so golden tests can freeze the canon independently
  * of the pool (SPEC §4: canonicalization = the fingerprint contract).
  */
-export const canonicalizePostgresSql = (
-  sqlText: string,
-): Effect.Effect<string, SqlParseError> => {
+export const canonicalizePostgresSql = (sqlText: string): Effect.Effect<string, SqlParseError> => {
   // $start/$end of the canonical render are not Postgres syntax;
   // a deterministic replacement with $1/$2 keeps the fingerprint stable
   const parameterized = sqlText.replace(/\$start\b/g, "$1").replace(/\$end\b/g, "$2")
@@ -108,8 +106,9 @@ export const PostgresEngineLive = (
               }),
             catch: (cause) => new EngineError({ sql: sqlText, cause }),
           }).pipe(
-            Effect.map((rows): ReadonlyArray<EngineColumn> =>
-              rows.map((row) => ({ name: row.name, type: row.type })),
+            Effect.map(
+              (rows): ReadonlyArray<EngineColumn> =>
+                rows.map((row) => ({ name: row.name, type: row.type })),
             ),
           ),
         canonicalize: canonicalizePostgresSql,

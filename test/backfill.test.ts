@@ -70,9 +70,7 @@ describe("backfill incrementalByTimeRange (SPEC §5.3)", () => {
         const jan4 = fromIso("2026-01-04T00:00:00Z")
         const plan1 = yield* Efmesh.plan("dev", models, { now: jan4 })
         const action = plan1.actions.find((a) => a.name === "med.events")!
-        expect(action.backfill).toEqual([
-          { start: fromIso("2026-01-01T00:00:00Z"), end: jan4 },
-        ])
+        expect(action.backfill).toEqual([{ start: fromIso("2026-01-01T00:00:00Z"), end: jan4 }])
 
         const applied1 = yield* Efmesh.apply("dev", models, { now: jan4 })
         expect(applied1.built).toEqual(["med.events"])
@@ -93,9 +91,7 @@ describe("backfill incrementalByTimeRange (SPEC §5.3)", () => {
         const plan3 = yield* Efmesh.plan("dev", models, { now: jan7 })
         const action3 = plan3.actions.find((a) => a.name === "med.events")!
         expect(action3.change).toBe("unchanged") // the model did not change — only gaps
-        expect(action3.backfill).toEqual([
-          { start: jan4, end: fromIso("2026-01-07T00:00:00Z") },
-        ])
+        expect(action3.backfill).toEqual([{ start: jan4, end: fromIso("2026-01-07T00:00:00Z") }])
         yield* Efmesh.apply("dev", models, { now: jan7 })
         expect(yield* countRows).toBe(5)
       }),
@@ -159,9 +155,7 @@ describe("backfill incrementalByTimeRange (SPEC §5.3)", () => {
         // with no model changes the plan still re-reads the tail
         const plan = yield* Efmesh.plan("dev", models, { now: jan7 })
         const action = plan.actions.find((a) => a.name === "med.events")!
-        expect(action.backfill).toEqual([
-          { start: fromIso("2026-01-06T00:00:00Z"), end: jan7 },
-        ])
+        expect(action.backfill).toEqual([{ start: fromIso("2026-01-06T00:00:00Z"), end: jan7 }])
         yield* Efmesh.apply("dev", models, { now: jan7 })
         expect(yield* countRows).toBe(6)
       }),

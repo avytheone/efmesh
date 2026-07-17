@@ -3,14 +3,9 @@ import { buildGraph } from "./core/graph.ts"
 import type { AnyModel } from "./core/model.ts"
 import { render } from "./core/sql.ts"
 import type { EngineError, SqlParseError } from "./engine/adapter.ts"
-import { EngineAdapter } from "./engine/adapter.ts"
+import type { EngineAdapter } from "./engine/adapter.ts"
 import { canonicalSql } from "./plan/fingerprint.ts"
-import {
-  applyPlan,
-  type AppliedPlan,
-  type ApplyError,
-  type ApplyOptions,
-} from "./plan/executor.ts"
+import { applyPlan, type AppliedPlan, type ApplyError, type ApplyOptions } from "./plan/executor.ts"
 import { envLockName, withStateLock, type LockHeldError, type LockOptions } from "./plan/lock.ts"
 import {
   planChanges,
@@ -25,7 +20,7 @@ import type { SeedReadError } from "./core/errors.ts"
 import { UnknownModelError } from "./core/errors.ts"
 import type { GraphError } from "./core/graph.ts"
 import type { StateError } from "./state/store.ts"
-import { StateStore } from "./state/store.ts"
+import type { StateStore } from "./state/store.ts"
 import { externalSourceRef, viewRef } from "./plan/naming.ts"
 
 /**

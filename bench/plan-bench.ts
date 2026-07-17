@@ -47,7 +47,9 @@ await Effect.runPromise(
     const engine = yield* EngineAdapter
     yield* StateStore
     yield* engine.execute(`CREATE SCHEMA src`)
-    yield* engine.execute(`CREATE TABLE src.events AS SELECT 'e' || range::TEXT AS id, range::DOUBLE AS v FROM range(1000)`)
+    yield* engine.execute(
+      `CREATE TABLE src.events AS SELECT 'e' || range::TEXT AS id, range::DOUBLE AS v FROM range(1000)`,
+    )
 
     let t = performance.now()
     const graph = yield* buildGraph(models)

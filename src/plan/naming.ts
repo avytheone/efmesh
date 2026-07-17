@@ -64,9 +64,7 @@ export const ducklakeAttachSql = (config: {
   readonly dataPath?: string
 }): string =>
   `ATTACH IF NOT EXISTS 'ducklake:sqlite:${config.catalog.replaceAll(`'`, `''`)}' AS "${ducklakeAlias}"${
-    config.dataPath !== undefined
-      ? ` (DATA_PATH '${config.dataPath.replaceAll(`'`, `''`)}')`
-      : ""
+    config.dataPath !== undefined ? ` (DATA_PATH '${config.dataPath.replaceAll(`'`, `''`)}')` : ""
   }`
 
 /** Interval partition key — filesystem-safe (no colons). */

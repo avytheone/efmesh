@@ -85,17 +85,16 @@ export const DuckDBEngineLive = (
           ),
         describe: (sqlText) =>
           query(`DESCRIBE (${sqlText})`).pipe(
-            Effect.map((rows): ReadonlyArray<EngineColumn> =>
-              rows.map((row) => ({
-                name: String(row["column_name"]),
-                type: String(row["column_type"]),
-              })),
+            Effect.map(
+              (rows): ReadonlyArray<EngineColumn> =>
+                rows.map((row) => ({
+                  name: String(row["column_name"]),
+                  type: String(row["column_type"]),
+                })),
             ),
           ),
         canonicalize: (sqlText) =>
-          query(
-            `SELECT json_serialize_sql('${sqlText.replaceAll(`'`, `''`)}') AS ast`,
-          ).pipe(
+          query(`SELECT json_serialize_sql('${sqlText.replaceAll(`'`, `''`)}') AS ast`).pipe(
             Effect.flatMap((rows) => {
               const ast = JSON.parse(String(rows[0]?.["ast"])) as {
                 readonly error: boolean

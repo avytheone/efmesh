@@ -94,7 +94,9 @@ describe("embedded (SPEC §3.1)", () => {
 
   test("renderFor inlines embedded and the external source", async () => {
     const icu = makeIcu("ICU")
-    const sql = await Effect.runPromise(Efmesh.renderFor([raw, icu, makeCount(icu)], "med.icu_count", "dev"))
+    const sql = await Effect.runPromise(
+      Efmesh.renderFor([raw, icu, makeCount(icu)], "med.icu_count", "dev"),
+    )
     expect(sql).toContain("(SELECT id, dept FROM src.moves WHERE dept = 'ICU')")
   })
 })

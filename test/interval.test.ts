@@ -17,9 +17,7 @@ const jan = (d: number) => Date.parse(`2026-01-${String(d).padStart(2, "0")}T00:
 describe("interval", () => {
   test("floorTo aligns down to the UTC grain", () => {
     expect(floorTo("day", fromIso("2026-01-05T13:45:00Z"))).toBe(jan(5))
-    expect(floorTo("hour", fromIso("2026-01-05T13:45:00Z"))).toBe(
-      fromIso("2026-01-05T13:00:00Z"),
-    )
+    expect(floorTo("hour", fromIso("2026-01-05T13:45:00Z"))).toBe(fromIso("2026-01-05T13:00:00Z"))
   })
 
   test("enumerateIntervals: an unfinished current interval does not count", () => {

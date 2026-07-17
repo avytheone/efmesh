@@ -91,9 +91,9 @@ const regclass = async (pool: SQL, table: string): Promise<boolean> => {
 /** 0 — a store with no meta table (created before versioning existed, F0–F3). */
 const readVersion = async (pool: SQL): Promise<number> => {
   if (!(await regclass(pool, "meta"))) return 0
-  const rows = (await pool.unsafe(
-    `SELECT version FROM efmesh_state.meta`,
-  )) as ReadonlyArray<{ version: number }>
+  const rows = (await pool.unsafe(`SELECT version FROM efmesh_state.meta`)) as ReadonlyArray<{
+    version: number
+  }>
   return rows[0]?.version ?? 0
 }
 
@@ -180,9 +180,7 @@ export const PostgresStateLive = (
           catch: (cause) => new StateError({ operation, cause }),
         })
 
-      const isoNow = Clock.currentTimeMillis.pipe(
-        Effect.map((ms) => new Date(ms).toISOString()),
-      )
+      const isoNow = Clock.currentTimeMillis.pipe(Effect.map((ms) => new Date(ms).toISOString()))
 
       const service: StateStoreShape = {
         upsertSnapshot: (snapshot) =>
@@ -250,24 +248,26 @@ export const PostgresStateLive = (
           ).pipe(Effect.asVoid),
 
         deleteSnapshotIfDoomed: (name, fingerprint, deadline) =>
-          attempt("deleteSnapshotIfDoomed", () =>
-            sql.begin(async (tx) => {
-              const deleted = (await tx.unsafe(
-                `DELETE FROM efmesh_state.snapshots
+          attempt(
+            "deleteSnapshotIfDoomed",
+            () =>
+              sql.begin(async (tx) => {
+                const deleted = (await tx.unsafe(
+                  `DELETE FROM efmesh_state.snapshots
                  WHERE name = $1 AND fingerprint = $2
                    AND COALESCE(orphaned_at, created_at) <= $3
                    AND NOT EXISTS (
                      SELECT 1 FROM efmesh_state.environments e WHERE e.fingerprint = $2
                    )
                  RETURNING 1`,
-                [name, fingerprint, deadline],
-              )) as ReadonlyArray<unknown>
-              if (deleted.length === 0) return false
-              await tx.unsafe(`DELETE FROM efmesh_state.intervals WHERE snapshot_fp = $1`, [
-                fingerprint,
-              ])
-              return true
-            }) as Promise<boolean>,
+                  [name, fingerprint, deadline],
+                )) as ReadonlyArray<unknown>
+                if (deleted.length === 0) return false
+                await tx.unsafe(`DELETE FROM efmesh_state.intervals WHERE snapshot_fp = $1`, [
+                  fingerprint,
+                ])
+                return true
+              }) as Promise<boolean>,
           ),
 
         getEnvironment: (env) =>

@@ -24,8 +24,7 @@ const MAX_DIVERGED = 8
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
 
-const at = (path: string, segment: string): string =>
-  path === "" ? segment : `${path}.${segment}`
+const at = (path: string, segment: string): string => (path === "" ? segment : `${path}.${segment}`)
 
 const walk = (before: unknown, after: unknown, path: string, out: Array<string>): void => {
   if (out.length >= MAX_DIVERGED) return
@@ -56,8 +55,7 @@ const walk = (before: unknown, after: unknown, path: string, out: Array<string>)
 
 /** The statement's boilerplate wrapper in the path is uninteresting — trim to the query body. */
 const trimStatement = (path: string): string =>
-  path.replace(/^statements\[0\]\.node\.?/, "").replace(/^stmts\[0\]\.stmt\.?/, "") ||
-  "(root)"
+  path.replace(/^statements\[0\]\.node\.?/, "").replace(/^stmts\[0\]\.stmt\.?/, "") || "(root)"
 
 /** Divergence paths of two canonical ASTs (JSON strings); garbage input — empty. */
 export const divergedPaths = (oldAst: string, newAst: string): ReadonlyArray<string> => {

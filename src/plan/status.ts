@@ -55,9 +55,7 @@ export const environmentStatus = (
 
     const rows = yield* store.getEnvironment(env)
     const promotedAt =
-      rows.length === 0
-        ? null
-        : rows.map((row) => row.promotedAt).reduce((a, b) => (a > b ? a : b))
+      rows.length === 0 ? null : rows.map((row) => row.promotedAt).reduce((a, b) => (a > b ? a : b))
 
     const plans = yield* store.listPlans(env)
     const lastPlan = plans.at(-1) ?? null

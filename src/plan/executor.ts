@@ -179,9 +179,7 @@ const withBatchRetry =
 
 /** For s3:// paths mkdir is not needed (and impossible) — httpfs writes directly. */
 const ensureDir = (path: string): Effect.Effect<void> =>
-  path.startsWith("s3://")
-    ? Effect.void
-    : Effect.sync(() => mkdirSync(path, { recursive: true }))
+  path.startsWith("s3://") ? Effect.void : Effect.sync(() => mkdirSync(path, { recursive: true }))
 
 /**
  * The rendered statement about to run — DEBUG only (#14): SQL is a firehose and
@@ -343,46 +341,44 @@ const backfillIntoParquet = (
     if (model.kind._tag !== "incrementalByTimeRange") return
     const kind = model.kind
     // interval = partition; flat list so progress reads "n of m" across all ranges
-    const intervals = action.backfill.flatMap((range) =>
-      intervalsWithin(range, kind.interval),
-    )
+    const intervals = action.backfill.flatMap((range) => intervalsWithin(range, kind.interval))
     const total = intervals.length
     yield* Effect.forEach(
       intervals,
       (interval, index) =>
         Effect.gen(function* () {
-        const partition = `${prefix}/interval=${intervalKey(kind.interval, interval.start)}`
-        yield* ensureDir(partition)
-        const body = render(model.fragment, {
-          resolveRef,
-          interval: { start: sqlTimestamp(interval.start), end: sqlTimestamp(interval.end) },
-        })
-        yield* Effect.logInfo(`backfill partition ${index + 1} of ${total}`).pipe(
-          Effect.annotateLogs("interval", `[${toIso(interval.start)}, ${toIso(interval.end)})`),
-        )
-        yield* logSql(body)
-        const mark = [{ startTs: toIso(interval.start), endTs: toIso(interval.end) }]
-        const markFailed = () =>
-          store.markIntervals(action.fingerprint, mark, "failed").pipe(Effect.ignore)
-        // locally COPY writes to a temp file, rename is atomic (POSIX): a kill
-        // mid-write leaves no broken partition, and a lookback recompute does
-        // not hand the view reader an unfinished file; s3 — direct write
-        // (no rename; the unfinished key is not marked done and gets overwritten)
-        const target = `${partition}/data.parquet`
-        const writePath = partition.startsWith("s3://") ? target : `${target}.tmp`
-        yield* engine
-          .execute(`COPY (${body}) TO '${writePath.replaceAll(`'`, `''`)}' (FORMAT PARQUET)`)
-          .pipe(withBatchRetry(retry), Effect.tapError(markFailed))
-        if (writePath !== target) {
-          yield* Effect.sync(() => renameSync(writePath, target))
-        }
-        const file = target.replaceAll(`'`, `''`)
-        // audit of the written partition — before marking done; failure = not done → rewrite
-        yield* runAudits(engine, model, `(SELECT * FROM read_parquet('${file}'))`).pipe(
-          Effect.tapError(markFailed),
-        )
-        yield* store.markIntervals(action.fingerprint, mark, "done")
-        yield* Metric.update(intervalsDone, 1)
+          const partition = `${prefix}/interval=${intervalKey(kind.interval, interval.start)}`
+          yield* ensureDir(partition)
+          const body = render(model.fragment, {
+            resolveRef,
+            interval: { start: sqlTimestamp(interval.start), end: sqlTimestamp(interval.end) },
+          })
+          yield* Effect.logInfo(`backfill partition ${index + 1} of ${total}`).pipe(
+            Effect.annotateLogs("interval", `[${toIso(interval.start)}, ${toIso(interval.end)})`),
+          )
+          yield* logSql(body)
+          const mark = [{ startTs: toIso(interval.start), endTs: toIso(interval.end) }]
+          const markFailed = () =>
+            store.markIntervals(action.fingerprint, mark, "failed").pipe(Effect.ignore)
+          // locally COPY writes to a temp file, rename is atomic (POSIX): a kill
+          // mid-write leaves no broken partition, and a lookback recompute does
+          // not hand the view reader an unfinished file; s3 — direct write
+          // (no rename; the unfinished key is not marked done and gets overwritten)
+          const target = `${partition}/data.parquet`
+          const writePath = partition.startsWith("s3://") ? target : `${target}.tmp`
+          yield* engine
+            .execute(`COPY (${body}) TO '${writePath.replaceAll(`'`, `''`)}' (FORMAT PARQUET)`)
+            .pipe(withBatchRetry(retry), Effect.tapError(markFailed))
+          if (writePath !== target) {
+            yield* Effect.sync(() => renameSync(writePath, target))
+          }
+          const file = target.replaceAll(`'`, `''`)
+          // audit of the written partition — before marking done; failure = not done → rewrite
+          yield* runAudits(engine, model, `(SELECT * FROM read_parquet('${file}'))`).pipe(
+            Effect.tapError(markFailed),
+          )
+          yield* store.markIntervals(action.fingerprint, mark, "done")
+          yield* Metric.update(intervalsDone, 1)
         }),
       { discard: true },
     )
@@ -454,13 +450,13 @@ export const applyPlan = (
             ? "target: parquet"
             : model.target === "ducklake"
               ? "target: ducklake"
-            : model.kind._tag === "seed"
-              ? "seed (read_csv/read_json)"
-              : model.kind._tag === "external" && model.kind.source._tag === "files"
-                ? "external over files/URL (read_*)"
-                : model.export !== undefined
-                  ? "export to an ATTACH database"
-                  : undefined
+              : model.kind._tag === "seed"
+                ? "seed (read_csv/read_json)"
+                : model.kind._tag === "external" && model.kind.source._tag === "files"
+                  ? "external over files/URL (read_*)"
+                  : model.export !== undefined
+                    ? "export to an ATTACH database"
+                    : undefined
         if (feature !== undefined) {
           return yield* new EngineFeatureError({
             model: model.name.full,
@@ -491,135 +487,168 @@ export const applyPlan = (
 
     const buildOne = (action: PlanAction): Effect.Effect<void, ApplyError> =>
       Effect.gen(function* () {
-      const model = graph.models.get(action.name)!
-      switch (model.kind._tag) {
-        case "external":
-          return
-        case "embedded": {
-          // there is no physics — but the contract and the version's audits are
-          // checked here so consumers do not carry a broken subquery into themselves
-          const body = render(model.fragment, { resolveRef })
-          yield* logSql(body)
-          yield* checkContract(engine, model, body)
-          yield* runAudits(engine, model, `(${body})`)
-          yield* store.upsertSnapshot({
-            name: action.name,
-            fingerprint: action.fingerprint,
-            physicalFp: action.physicalFingerprint,
-            canonicalAst: action.canonicalAst ?? "",
-            renderedSql: render(model.fragment, { resolveRef: (ref) => ref }),
-            kind: model.kind._tag,
-            fingerprintVersion: FINGERPRINT_VERSION,
-          })
-          break
-        }
-        case "seed": {
-          const reader = model.kind.format === "csv" ? "read_csv" : "read_json"
-          const body = `SELECT * FROM ${reader}('${model.kind.file.replaceAll(`'`, `''`)}')`
-          yield* logSql(body)
-          yield* checkContract(engine, model, body)
-          const target = tableRef(model, action.physicalFingerprint)
-          yield* engine.execute(`CREATE OR REPLACE TABLE ${target} AS ${body}`)
-          yield* runAudits(engine, model, target)
-          yield* store.upsertSnapshot({
-            name: action.name,
-            fingerprint: action.fingerprint,
-            physicalFp: action.physicalFingerprint,
-            canonicalAst: "",
-            renderedSql: body,
-            kind: model.kind._tag,
-            fingerprintVersion: FINGERPRINT_VERSION,
-          })
-          break
-        }
-        case "incrementalByUniqueKey": {
-          const body = render(model.fragment, { resolveRef })
-          yield* logSql(body)
-          yield* checkContract(engine, model, body)
-          const target = tableRef(model, action.physicalFingerprint)
-          yield* engine.execute(
-            `CREATE TABLE IF NOT EXISTS ${target} AS SELECT * FROM (${body}) q LIMIT 0`,
-          )
-          // upsert: rows with keys from the fresh query are replaced, the rest live on
-          const keys = model.kind.key.map(quoteIdent).join(", ")
-          yield* transactional(engine, [
-            `DELETE FROM ${target} WHERE (${keys}) IN (SELECT ${keys} FROM (${body}) q)`,
-            `INSERT INTO ${target} ${body}`,
-          ])
-          yield* runAudits(engine, model, target)
-          yield* store.upsertSnapshot({
-            name: action.name,
-            fingerprint: action.fingerprint,
-            physicalFp: action.physicalFingerprint,
-            canonicalAst: action.canonicalAst ?? "",
-            renderedSql: render(model.fragment, { resolveRef: (ref) => ref }),
-            kind: model.kind._tag,
-            fingerprintVersion: FINGERPRINT_VERSION,
-          })
-          break
-        }
-        case "scdType2": {
-          const scd = model.kind
-          const body = render(model.fragment, { resolveRef })
-          yield* logSql(body)
-          const managed = new Set([scd.validFrom, scd.validTo])
-          yield* checkContract(engine, model, body, managed)
-          const target = tableRef(model, action.physicalFingerprint)
-          const from = quoteIdent(scd.validFrom)
-          const to = quoteIdent(scd.validTo)
-          yield* engine.execute(
-            `CREATE TABLE IF NOT EXISTS ${target} AS
+        const model = graph.models.get(action.name)!
+        switch (model.kind._tag) {
+          case "external":
+            return
+          case "embedded": {
+            // there is no physics — but the contract and the version's audits are
+            // checked here so consumers do not carry a broken subquery into themselves
+            const body = render(model.fragment, { resolveRef })
+            yield* logSql(body)
+            yield* checkContract(engine, model, body)
+            yield* runAudits(engine, model, `(${body})`)
+            yield* store.upsertSnapshot({
+              name: action.name,
+              fingerprint: action.fingerprint,
+              physicalFp: action.physicalFingerprint,
+              canonicalAst: action.canonicalAst ?? "",
+              renderedSql: render(model.fragment, { resolveRef: (ref) => ref }),
+              kind: model.kind._tag,
+              fingerprintVersion: FINGERPRINT_VERSION,
+            })
+            break
+          }
+          case "seed": {
+            const reader = model.kind.format === "csv" ? "read_csv" : "read_json"
+            const body = `SELECT * FROM ${reader}('${model.kind.file.replaceAll(`'`, `''`)}')`
+            yield* logSql(body)
+            yield* checkContract(engine, model, body)
+            const target = tableRef(model, action.physicalFingerprint)
+            yield* engine.execute(`CREATE OR REPLACE TABLE ${target} AS ${body}`)
+            yield* runAudits(engine, model, target)
+            yield* store.upsertSnapshot({
+              name: action.name,
+              fingerprint: action.fingerprint,
+              physicalFp: action.physicalFingerprint,
+              canonicalAst: "",
+              renderedSql: body,
+              kind: model.kind._tag,
+              fingerprintVersion: FINGERPRINT_VERSION,
+            })
+            break
+          }
+          case "incrementalByUniqueKey": {
+            const body = render(model.fragment, { resolveRef })
+            yield* logSql(body)
+            yield* checkContract(engine, model, body)
+            const target = tableRef(model, action.physicalFingerprint)
+            yield* engine.execute(
+              `CREATE TABLE IF NOT EXISTS ${target} AS SELECT * FROM (${body}) q LIMIT 0`,
+            )
+            // upsert: rows with keys from the fresh query are replaced, the rest live on
+            const keys = model.kind.key.map(quoteIdent).join(", ")
+            yield* transactional(engine, [
+              `DELETE FROM ${target} WHERE (${keys}) IN (SELECT ${keys} FROM (${body}) q)`,
+              `INSERT INTO ${target} ${body}`,
+            ])
+            yield* runAudits(engine, model, target)
+            yield* store.upsertSnapshot({
+              name: action.name,
+              fingerprint: action.fingerprint,
+              physicalFp: action.physicalFingerprint,
+              canonicalAst: action.canonicalAst ?? "",
+              renderedSql: render(model.fragment, { resolveRef: (ref) => ref }),
+              kind: model.kind._tag,
+              fingerprintVersion: FINGERPRINT_VERSION,
+            })
+            break
+          }
+          case "scdType2": {
+            const scd = model.kind
+            const body = render(model.fragment, { resolveRef })
+            yield* logSql(body)
+            const managed = new Set([scd.validFrom, scd.validTo])
+            yield* checkContract(engine, model, body, managed)
+            const target = tableRef(model, action.physicalFingerprint)
+            const from = quoteIdent(scd.validFrom)
+            const to = quoteIdent(scd.validTo)
+            yield* engine.execute(
+              `CREATE TABLE IF NOT EXISTS ${target} AS
              SELECT q.*, CAST(NULL AS TIMESTAMP) AS ${from}, CAST(NULL AS TIMESTAMP) AS ${to}
              FROM (${body}) q LIMIT 0`,
-          )
-          const cols = columnNames(model)
-            .filter((column) => !managed.has(column))
-            .map(quoteIdent)
-          const tableName = quoteIdent(physicalTable(model.name, action.physicalFingerprint))
-          const ts = sqlTimestamp(nowMs)
-          const sameAsOuter = cols
-            .map((column) => `q.${column} IS NOT DISTINCT FROM ${tableName}.${column}`)
-            .join(" AND ")
-          const sameAsOpen = cols
-            .map((column) => `t.${column} IS NOT DISTINCT FROM q.${column}`)
-            .join(" AND ")
-          // SCD2 reconciliation (SPEC §3.1): an open row with no identical row
-          // in the query is closed (it changed or vanished); a query row with
-          // no identical open row is inserted as a new open version. Identical
-          // pairs are left alone — their valid_from does not jitter.
-          yield* transactional(engine, [
-            `UPDATE ${target} SET ${to} = ${ts}
+            )
+            const cols = columnNames(model)
+              .filter((column) => !managed.has(column))
+              .map(quoteIdent)
+            const tableName = quoteIdent(physicalTable(model.name, action.physicalFingerprint))
+            const ts = sqlTimestamp(nowMs)
+            const sameAsOuter = cols
+              .map((column) => `q.${column} IS NOT DISTINCT FROM ${tableName}.${column}`)
+              .join(" AND ")
+            const sameAsOpen = cols
+              .map((column) => `t.${column} IS NOT DISTINCT FROM q.${column}`)
+              .join(" AND ")
+            // SCD2 reconciliation (SPEC §3.1): an open row with no identical row
+            // in the query is closed (it changed or vanished); a query row with
+            // no identical open row is inserted as a new open version. Identical
+            // pairs are left alone — their valid_from does not jitter.
+            yield* transactional(engine, [
+              `UPDATE ${target} SET ${to} = ${ts}
              WHERE ${to} IS NULL
                AND NOT EXISTS (SELECT 1 FROM (${body}) q WHERE ${sameAsOuter})`,
-            `INSERT INTO ${target} (${cols.join(", ")}, ${from}, ${to})
+              `INSERT INTO ${target} (${cols.join(", ")}, ${from}, ${to})
              SELECT ${cols.map((column) => `q.${column}`).join(", ")}, ${ts}, NULL
              FROM (${body}) q
              WHERE NOT EXISTS (
                SELECT 1 FROM ${target} t WHERE t.${to} IS NULL AND ${sameAsOpen}
              )`,
-          ])
-          yield* runAudits(engine, model, target)
-          yield* store.upsertSnapshot({
-            name: action.name,
-            fingerprint: action.fingerprint,
-            physicalFp: action.physicalFingerprint,
-            canonicalAst: action.canonicalAst ?? "",
-            renderedSql: render(model.fragment, { resolveRef: (ref) => ref }),
-            kind: model.kind._tag,
-            fingerprintVersion: FINGERPRINT_VERSION,
-          })
-          break
-        }
-        case "view":
-        case "full": {
-          const body = render(model.fragment, { resolveRef })
-          yield* logSql(body)
-          // schema contract (SPEC §3.2): type drift is caught before building
-          yield* checkContract(engine, model, body)
-          // indirect reuse (#5): the data is identical by construction (parents
-          // non-breaking/forward-only, own body unchanged) — the rebuild is
-          // skipped, audits run against the inherited physics
-          if (model.kind._tag === "full" && action.reusedFrom !== undefined) {
+            ])
+            yield* runAudits(engine, model, target)
+            yield* store.upsertSnapshot({
+              name: action.name,
+              fingerprint: action.fingerprint,
+              physicalFp: action.physicalFingerprint,
+              canonicalAst: action.canonicalAst ?? "",
+              renderedSql: render(model.fragment, { resolveRef: (ref) => ref }),
+              kind: model.kind._tag,
+              fingerprintVersion: FINGERPRINT_VERSION,
+            })
+            break
+          }
+          case "view":
+          case "full": {
+            const body = render(model.fragment, { resolveRef })
+            yield* logSql(body)
+            // schema contract (SPEC §3.2): type drift is caught before building
+            yield* checkContract(engine, model, body)
+            // indirect reuse (#5): the data is identical by construction (parents
+            // non-breaking/forward-only, own body unchanged) — the rebuild is
+            // skipped, audits run against the inherited physics
+            if (model.kind._tag === "full" && action.reusedFrom !== undefined) {
+              yield* runAudits(engine, model, physicalFor(model, action.physicalFingerprint))
+              yield* store.upsertSnapshot({
+                name: action.name,
+                fingerprint: action.fingerprint,
+                physicalFp: action.physicalFingerprint,
+                canonicalAst: action.canonicalAst ?? "",
+                renderedSql: body,
+                kind: model.kind._tag,
+                fingerprintVersion: FINGERPRINT_VERSION,
+              })
+              break
+            }
+            if (model.kind._tag === "full" && model.target === "parquet") {
+              const prefix = parquetPrefix(lakePath!, model.name, action.physicalFingerprint)
+              yield* ensureDir(prefix)
+              yield* engine.execute(
+                `COPY (${body}) TO '${prefix.replaceAll(`'`, `''`)}/data.parquet' (FORMAT PARQUET)`,
+              )
+            } else {
+              const target = tableRef(model, action.physicalFingerprint)
+              if (model.kind._tag === "view") {
+                yield* engine.execute(`CREATE OR REPLACE VIEW ${target} AS ${body}`)
+              } else if (engine.dialect === "duckdb") {
+                yield* engine.execute(`CREATE OR REPLACE TABLE ${target} AS ${body}`)
+              } else {
+                // Postgres has no CREATE OR REPLACE TABLE — atomically via a transaction
+                yield* transactional(engine, [
+                  `DROP TABLE IF EXISTS ${target}`,
+                  `CREATE TABLE ${target} AS ${body}`,
+                ])
+              }
+            }
+            // audits of the built snapshot — before promotion (SPEC §8)
             yield* runAudits(engine, model, physicalFor(model, action.physicalFingerprint))
             yield* store.upsertSnapshot({
               name: action.name,
@@ -632,109 +661,76 @@ export const applyPlan = (
             })
             break
           }
-          if (model.kind._tag === "full" && model.target === "parquet") {
-            const prefix = parquetPrefix(lakePath!, model.name, action.physicalFingerprint)
-            yield* ensureDir(prefix)
-            yield* engine.execute(
-              `COPY (${body}) TO '${prefix.replaceAll(`'`, `''`)}/data.parquet' (FORMAT PARQUET)`,
-            )
-          } else {
-            const target = tableRef(model, action.physicalFingerprint)
-            if (model.kind._tag === "view") {
-              yield* engine.execute(`CREATE OR REPLACE VIEW ${target} AS ${body}`)
-            } else if (engine.dialect === "duckdb") {
-              yield* engine.execute(`CREATE OR REPLACE TABLE ${target} AS ${body}`)
+          case "incrementalByTimeRange": {
+            const zero = sqlTimestamp(0)
+            const emptyBody = render(model.fragment, {
+              resolveRef,
+              interval: { start: zero, end: zero },
+            })
+            yield* checkContract(engine, model, emptyBody)
+            // forward-only: the old version's done-intervals are inherited before
+            // backfill — what is done is not replayed, only the missing is recomputed
+            if (action.reusedFrom !== undefined) {
+              const inherited = (yield* store.listIntervals(action.reusedFrom))
+                .filter((record) => record.status === "done")
+                .map((record) => ({ startTs: record.startTs, endTs: record.endTs }))
+              yield* store.markIntervals(action.fingerprint, inherited, "done")
+            }
+            if (model.target === "parquet") {
+              const prefix = parquetPrefix(lakePath!, model.name, action.physicalFingerprint)
+              yield* store.upsertSnapshot({
+                name: action.name,
+                fingerprint: action.fingerprint,
+                physicalFp: action.physicalFingerprint,
+                canonicalAst: action.canonicalAst ?? "",
+                renderedSql: render(model.fragment, { resolveRef: (ref) => ref }),
+                kind: model.kind._tag,
+                fingerprintVersion: FINGERPRINT_VERSION,
+              })
+              yield* backfillIntoParquet(
+                engine,
+                store,
+                model,
+                action,
+                prefix,
+                resolveRef,
+                options?.retry,
+              )
             } else {
-              // Postgres has no CREATE OR REPLACE TABLE — atomically via a transaction
-              yield* transactional(engine, [
-                `DROP TABLE IF EXISTS ${target}`,
-                `CREATE TABLE ${target} AS ${body}`,
-              ])
+              // an empty skeleton with the query's shape; on resume it already exists
+              const target = tableRef(model, action.physicalFingerprint)
+              yield* engine.execute(
+                `CREATE TABLE IF NOT EXISTS ${target} AS SELECT * FROM (${emptyBody}) q LIMIT 0`,
+              )
+              // forward-only on a live table: columns that appeared in the query
+              // are added to the inherited physics (history gets NULL); ones that
+              // vanished from the query signal that reuse is impossible
+              if (action.change === "forward-only") {
+                yield* evolveTableForForwardOnly(engine, model, target, emptyBody)
+              }
+              yield* store.upsertSnapshot({
+                name: action.name,
+                fingerprint: action.fingerprint,
+                physicalFp: action.physicalFingerprint,
+                canonicalAst: action.canonicalAst ?? "",
+                renderedSql: render(model.fragment, { resolveRef: (ref) => ref }),
+                kind: model.kind._tag,
+                fingerprintVersion: FINGERPRINT_VERSION,
+              })
+              yield* backfillIntoTable(
+                engine,
+                store,
+                model,
+                action,
+                target,
+                resolveRef,
+                options?.concurrency ?? 4,
+                options?.retry,
+              )
             }
+            break
           }
-          // audits of the built snapshot — before promotion (SPEC §8)
-          yield* runAudits(engine, model, physicalFor(model, action.physicalFingerprint))
-          yield* store.upsertSnapshot({
-            name: action.name,
-            fingerprint: action.fingerprint,
-            physicalFp: action.physicalFingerprint,
-            canonicalAst: action.canonicalAst ?? "",
-            renderedSql: body,
-            kind: model.kind._tag,
-            fingerprintVersion: FINGERPRINT_VERSION,
-          })
-          break
         }
-        case "incrementalByTimeRange": {
-          const zero = sqlTimestamp(0)
-          const emptyBody = render(model.fragment, {
-            resolveRef,
-            interval: { start: zero, end: zero },
-          })
-          yield* checkContract(engine, model, emptyBody)
-          // forward-only: the old version's done-intervals are inherited before
-          // backfill — what is done is not replayed, only the missing is recomputed
-          if (action.reusedFrom !== undefined) {
-            const inherited = (yield* store.listIntervals(action.reusedFrom))
-              .filter((record) => record.status === "done")
-              .map((record) => ({ startTs: record.startTs, endTs: record.endTs }))
-            yield* store.markIntervals(action.fingerprint, inherited, "done")
-          }
-          if (model.target === "parquet") {
-            const prefix = parquetPrefix(lakePath!, model.name, action.physicalFingerprint)
-            yield* store.upsertSnapshot({
-              name: action.name,
-              fingerprint: action.fingerprint,
-              physicalFp: action.physicalFingerprint,
-              canonicalAst: action.canonicalAst ?? "",
-              renderedSql: render(model.fragment, { resolveRef: (ref) => ref }),
-              kind: model.kind._tag,
-              fingerprintVersion: FINGERPRINT_VERSION,
-            })
-            yield* backfillIntoParquet(
-              engine,
-              store,
-              model,
-              action,
-              prefix,
-              resolveRef,
-              options?.retry,
-            )
-          } else {
-            // an empty skeleton with the query's shape; on resume it already exists
-            const target = tableRef(model, action.physicalFingerprint)
-            yield* engine.execute(
-              `CREATE TABLE IF NOT EXISTS ${target} AS SELECT * FROM (${emptyBody}) q LIMIT 0`,
-            )
-            // forward-only on a live table: columns that appeared in the query
-            // are added to the inherited physics (history gets NULL); ones that
-            // vanished from the query signal that reuse is impossible
-            if (action.change === "forward-only") {
-              yield* evolveTableForForwardOnly(engine, model, target, emptyBody)
-            }
-            yield* store.upsertSnapshot({
-              name: action.name,
-              fingerprint: action.fingerprint,
-              physicalFp: action.physicalFingerprint,
-              canonicalAst: action.canonicalAst ?? "",
-              renderedSql: render(model.fragment, { resolveRef: (ref) => ref }),
-              kind: model.kind._tag,
-              fingerprintVersion: FINGERPRINT_VERSION,
-            })
-            yield* backfillIntoTable(
-              engine,
-              store,
-              model,
-              action,
-              target,
-              resolveRef,
-              options?.concurrency ?? 4,
-              options?.retry,
-            )
-          }
-          break
-        }
-      }
       })
 
     const runOne = (action: PlanAction): Effect.Effect<void, ApplyError> =>
@@ -752,9 +748,7 @@ export const applyPlan = (
         const startedAt = yield* Clock.currentTimeMillis
         yield* Effect.logInfo("build start")
         yield* buildOne(action).pipe(attachModel(action.name))
-        yield* Effect.logInfo(
-          `build done in ${(yield* Clock.currentTimeMillis) - startedAt} ms`,
-        )
+        yield* Effect.logInfo(`build done in ${(yield* Clock.currentTimeMillis) - startedAt} ms`)
         yield* Metric.update(snapshotsBuilt, 1)
         yield* Deferred.succeed(gates.get(action.name)!, undefined)
       }).pipe(
@@ -768,8 +762,7 @@ export const applyPlan = (
     // the earliest unfinished element always has its parents ready, so waiting
     // on gates does not eat up slots into a deadlock
     yield* Effect.forEach(working, runOne, {
-      concurrency:
-        engine.dialect === "duckdb" ? 1 : Math.max(1, options?.modelConcurrency ?? 4),
+      concurrency: engine.dialect === "duckdb" ? 1 : Math.max(1, options?.modelConcurrency ?? 4),
       discard: true,
     })
     const built = working.map((action) => action.name)
@@ -780,9 +773,7 @@ export const applyPlan = (
       if (action.change === "removed") {
         // the model name comes from the state store; the schema is recovered from the full name
         const [schema, table] = action.name.split(".") as [string, string]
-        yield* engine.execute(
-          `DROP VIEW IF EXISTS "${envSchema(plan.env, schema)}"."${table}"`,
-        )
+        yield* engine.execute(`DROP VIEW IF EXISTS "${envSchema(plan.env, schema)}"."${table}"`)
         continue
       }
       const model = graph.models.get(action.name)!

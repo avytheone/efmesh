@@ -55,10 +55,7 @@ describe("DuckDBEngine", () => {
 
   test("canonicalize: different queries differ", async () => {
     const [a, b] = await withEngine((engine) =>
-      Effect.all([
-        engine.canonicalize("SELECT a FROM t"),
-        engine.canonicalize("SELECT b FROM t"),
-      ]),
+      Effect.all([engine.canonicalize("SELECT a FROM t"), engine.canonicalize("SELECT b FROM t")]),
     )
     expect(a).not.toBe(b)
   })
@@ -70,9 +67,7 @@ describe("DuckDBEngine", () => {
   })
 
   test("canonicalize survives single quotes in literals", async () => {
-    const canon = await withEngine((engine) =>
-      engine.canonicalize("SELECT 'o''hara' AS s FROM t"),
-    )
+    const canon = await withEngine((engine) => engine.canonicalize("SELECT 'o''hara' AS s FROM t"))
     expect(canon).toContain("o'hara")
   })
 })

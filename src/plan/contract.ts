@@ -46,9 +46,7 @@ export const familyOfAst = (ast: unknown): TypeFamily => {
     case "Union": {
       // NullOr(X) and the like: the single recognized family among the members
       const families = new Set(
-        (node.types ?? [])
-          .map(familyOfAst)
-          .filter((family) => family !== "any"),
+        (node.types ?? []).map(familyOfAst).filter((family) => family !== "any"),
       )
       return families.size === 1 ? [...families][0]! : "any"
     }

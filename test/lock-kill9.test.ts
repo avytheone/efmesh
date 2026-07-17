@@ -68,7 +68,13 @@ describe("lock under kill -9 (#7)", () => {
     // another process takes env:dev with a 900 ms ttl and hangs
     const TTL = 900
     const holder = Bun.spawn(
-      ["bun", join(import.meta.dir, "helpers", "lock-holder.ts"), storePath, "env:dev", String(TTL)],
+      [
+        "bun",
+        join(import.meta.dir, "helpers", "lock-holder.ts"),
+        storePath,
+        "env:dev",
+        String(TTL),
+      ],
       { stdout: "pipe", stderr: "inherit" },
     )
     const reader = holder.stdout.getReader()
@@ -88,9 +94,7 @@ describe("lock under kill -9 (#7)", () => {
 
     // after it goes stale run reclaims the lock and works
     await Bun.sleep(Math.max(0, grabbedAt + TTL - Date.now()) + 100)
-    const tick = await scenario(
-      run("dev", [raw, events], { now: fromIso("2026-01-03T00:00:00Z") }),
-    )
+    const tick = await scenario(run("dev", [raw, events], { now: fromIso("2026-01-03T00:00:00Z") }))
     expect(tick.built).toEqual(["med.events"])
 
     // and releases it after itself: the next acquire is instant
