@@ -75,11 +75,15 @@ const sha256 = (input: string): string => {
   return hasher.digest("hex")
 }
 
+// v2 (#17): column type families joined the payload, so the DuckDB
+// fingerprints below were consciously refrozen (raw/events/daily). The
+// Postgres canon is untouched — libpg_query did not move, only the payload
+// composition — so `postgresCanonSha256` stays as it was.
 const GOLDEN = {
-  fingerprintVersion: 1,
-  raw: "31b6f1f055faff70d9d743fefe05b3656aa927b09793195f200192d8c4b911c9",
-  events: "680e885965b7157049ca8004e466a54052fa537bf2fb25650b15d0b54ff34509",
-  daily: "bcc3275ba4f4b35d6ae0e6ce4f925ce3060929c709ccc31dc3ce1a6fa5a9e1a2",
+  fingerprintVersion: 2,
+  raw: "c5c068f5efd735b65a2e92d4441270fda214a1bdc4870a224cd1a232b2658890",
+  events: "2c4c553e434dea925b383a3776d3ddd873134d38082ab41191b3b502a3402beb",
+  daily: "77fb1ae16da9e13ff65998c9253880bc348c677f91ef75adcd55590b6418cf35",
   postgresCanonSha256: "cf4706f8cec93781f29aa5d2541fc0917d7aae38a9185a9298ddca43e0b28f97",
 } as const
 

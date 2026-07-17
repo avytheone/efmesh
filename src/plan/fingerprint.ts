@@ -7,6 +7,7 @@ import { columnNames } from "../core/model.ts"
 import { render } from "../core/sql.ts"
 import type { EngineError, SqlParseError } from "../engine/adapter.ts"
 import { EngineAdapter } from "../engine/adapter.ts"
+import { familyOfAst } from "./contract.ts"
 
 /**
  * Snapshot fingerprint (SPEC §4): hash of the canonicalized AST (engine's
@@ -29,8 +30,12 @@ import { EngineAdapter } from "../engine/adapter.ts"
  * DuckDB/libpg_query upgrade means canon drift; (2) a deliberate change of
  * algorithm = increment of this constant + a migration history; the plan does
  * not compare snapshots of a different version, it honestly stops instead.
+ *
+ * v2 (#17): column TYPE families join the payload — a schema type change
+ * (e.g. Number→String) now shifts the fingerprint, making "types as the DAG
+ * contract" honest. Families come from `familyOfAst` (SPEC §4).
  */
-export const FINGERPRINT_VERSION = 1
+export const FINGERPRINT_VERSION = 2
 
 const sha256 = (input: string): string => {
   const hasher = new Bun.CryptoHasher("sha256")
@@ -116,6 +121,20 @@ type FingerprintableModel = Parameters<typeof columnNames>[0] & {
 }
 
 /**
+ * Column type families in schema order (#17, SPEC §4). Reuses `familyOfAst`
+ * (the same map the DESCRIBE contract check uses): a type change that crosses
+ * a family boundary (Number→String) shifts the fingerprint, so the plan stops
+ * lying about "unchanged" when the physical shape actually moved. Family
+ * granularity is deliberate — an annotation swap within one family (both
+ * numeric) does not churn physics; catching sub-family narrowing (Int vs
+ * Double) is DESCRIBE territory, left to the contract check (§3.2).
+ */
+const columnFamilies = (model: FingerprintableModel): ReadonlyArray<string> =>
+  (Object.values(model.schema.fields) as ReadonlyArray<{ readonly ast: unknown }>).map((field) =>
+    familyOfAst(field.ast),
+  )
+
+/**
  * Fingerprint of a single model from a ready AST and parent signatures
  * (`name=fingerprint`, sorted). The planner needs it to check the
  * "version shifted by parents ONLY" case (#5): a recompute with the old
@@ -133,6 +152,8 @@ export const modelFingerprint = (
       kind: yield* kindPayload(model, model.kind),
       grain: model.grain,
       columns: columnNames(model),
+      // types are the DAG contract (#17): families aligned to `columns`
+      columnFamilies: columnFamilies(model),
       // a change of materialization target = new physics, consumers re-read it
       target: model.target,
       parents,

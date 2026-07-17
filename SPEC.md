@@ -181,7 +181,19 @@ A snapshot's fingerprint = a hash of:
    parsed into an AST, the AST is normalized (keyword case, whitespace, order of
    unordered elements) and deparsed back. Reformatting the query
    does not change the fingerprint;
-2. metadata affecting the data: `kind`, `grain`, `timeColumn`, `schema`;
+2. metadata affecting the data: `kind`, `grain`, `timeColumn`, and the
+   declared `schema` — both column **names** and column **type families**
+   (#17). The family of each column comes from `familyOfAst` (the same map the
+   DESCRIBE contract check uses, §3.2): `text` / `numeric` / `boolean` /
+   `temporal` / `any`. A type change that crosses a family boundary
+   (`Number`→`String`) shifts the fingerprint, so "types as the DAG contract"
+   is honest — the plan no longer reports `unchanged` when the physical shape
+   moved. **Mechanic (a), chosen over revalidating via DESCRIBE:** hashing the
+   declared family is cheap, deterministic and reuses existing machinery; the
+   price is coarseness — an annotation swap that stays within one family
+   (`Int` vs `Double`, both `numeric`) does not rebuild, and sub-family drift
+   is caught by the DESCRIBE contract check at build time, not by the
+   fingerprint;
 3. the fingerprints of direct dependencies (transitivity: changing a parent
    changes the child's version — if the change is breaking, see §5.2).
 
@@ -204,6 +216,15 @@ grounds for a decision, not for updating the hashes; (2) a snapshot carries
 of the algorithm = an increment of `FINGERPRINT_VERSION` + a migration history — a plan,
 on encountering a snapshot of another version, honestly stops
 (`FingerprintVersionError`), rather than showing "everything breaking".
+
+`FINGERPRINT_VERSION` is **2** (bumped from 1 for #17, which folded column type
+families into the payload). Migration is by the same honest-halt path: an
+environment whose snapshots were fingerprinted under v1 will not silently
+re-diff against v2 fingerprints — the first changed model raises
+`FingerprintVersionError` (model named, found vs wanted), and the operator
+re-plans and re-applies to rebuild physics under the v2 fingerprints. There are
+no persisted v1 stores in the wild (zero users), so the re-fingerprint costs
+nobody.
 
 ---
 
