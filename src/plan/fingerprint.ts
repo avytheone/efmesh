@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs"
 import { Effect } from "effect"
-import { SeedReadError } from "../core/errors.ts"
+import { SeedReadError, UnknownModelError } from "../core/errors.ts"
 import type { ModelGraph } from "../core/graph.ts"
 import type { ModelKind } from "../core/model.ts"
 import { columnNames } from "../core/model.ts"
@@ -43,15 +43,25 @@ const sha256 = (input: string): string => {
   return hasher.digest("hex")
 }
 
-/** Canonical render: refs are logical names, bounds are $start/$end placeholders. */
-export const canonicalSql = (graph: ModelGraph, name: string): string => {
-  const model = graph.models.get(name)
-  // invariant: callers pass a name already known to the graph (the facade
-  // guards user input with UnknownModelError before reaching here)
-  if (model === undefined)
-    throw new Error(`invariant violated: model «${name}» is not in the graph`)
-  return render(model.fragment, { resolveRef: (ref) => ref })
-}
+/**
+ * Canonical render: refs are logical names, bounds are $start/$end placeholders.
+ *
+ * The library surface is Effects with tagged errors (SPEC §10), so an unknown
+ * name fails through the error channel rather than throwing. Callers that pass
+ * a name straight from `graph.order` (fingerprintGraph, lineage) know the model
+ * exists and discharge the impossible failure with `Effect.orDie`; the facade
+ * (`Efmesh.render`) lets it surface as a real `UnknownModelError`.
+ */
+export const canonicalSql = (
+  graph: ModelGraph,
+  name: string,
+): Effect.Effect<string, UnknownModelError> =>
+  Effect.suspend(() => {
+    const model = graph.models.get(name)
+    return model === undefined
+      ? new UnknownModelError({ model: name })
+      : Effect.succeed(render(model.fragment, { resolveRef: (ref) => ref }))
+  })
 
 /** Part of kind that affects data. For seed — hash of the file contents: editing the data = a new version. */
 const kindPayload = (
@@ -189,7 +199,7 @@ export const fingerprintGraph = (
       const ast =
         model.kind._tag === "external" || model.kind._tag === "seed"
           ? null
-          : yield* canonicalize(canonicalSql(graph, name))
+          : yield* canonicalize(yield* Effect.orDie(canonicalSql(graph, name)))
       const parents = [...model.deps]
         .sort()
         .map((dep) => `${dep}=${versions.get(dep)!.fingerprint}`)

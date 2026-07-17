@@ -16,6 +16,12 @@ the first version gathers them in full.
   bumps to **2**: an environment whose snapshots were fingerprinted under v1
   halts with `FingerprintVersionError` (model named) on the first changed model
   — re-plan and re-apply to rebuild physics under the v2 fingerprints.
+- Library polish (#22): the canonical renderer (`canonicalSql`, behind
+  `Efmesh.render`) now fails an unknown model through the Effect error channel
+  with `UnknownModelError` instead of a bare `throw`, keeping the library
+  surface all-Effects (SPEC §10). The public API whitelist in `src/index.ts` is
+  frozen by a golden test — an accidental export or removal now fails CI, the way
+  the fingerprint golden freezes canonicalization.
 
 ## [0.2.2] — 2026-07-17
 
