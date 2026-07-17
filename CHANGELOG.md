@@ -5,6 +5,20 @@ versioning — [SemVer](https://semver.org/).
 Internal development history was tracked in phases F0–F6 (SPEC.md §13);
 the first version gathers them in full.
 
+## [Unreleased]
+
+- AI-agent onboarding (#15). A root `llms.txt` (the [llmstxt.org](https://llmstxt.org)
+  convention) maps the repo for an evaluating AI agent: what efmesh is and is
+  NOT, what is a contract (fingerprints, `STATE_VERSION`, `--json` shapes, exit
+  codes 0/1/2) versus a hint, where things live, and how to run it. Shipped with
+  the package (`files`).
+- README links are now absolute `github.com` URLs so they resolve on the npm
+  package page (the demo image, SPEC/CHANGELOG/CONTRIBUTING/LICENSE, the hospital
+  example, the Russian mirror); the stale Status block is corrected (0.2.1, 182
+  tests, current roadmap). Applied to `README.ru.md` in sync.
+- `apply`/`run` `--help` now state their exit-2 semantics ("awaiting a human"),
+  and `--yes` explains it is required in a non-TTY when the plan has changes.
+
 ## [0.2.1] — 2026-07-16
 
 Theme: hygiene for the first stranger — the whole surface is English,
