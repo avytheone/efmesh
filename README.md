@@ -168,12 +168,12 @@ export default defineConfig({
 | `efmesh status <env>` | what is going on: last plan, interval lag, recent run ticks |
 | `efmesh audit <env>` | audit the environment's view layer — catches after-the-fact degradation |
 | `efmesh diff <envA> <envB>` | how two environments differ; `--data` compares the actual data |
-| `efmesh render <model> [--env]` | the final SQL of a model |
-| `efmesh lineage <model[.col]>` | column lineage down to the raw sources |
+| `efmesh render <model> [--env] [--json]` | the final SQL of a model |
+| `efmesh lineage <model[.col]> [--json]` | column lineage down to the raw sources |
 | `efmesh graph [--html]` | the model DAG as text or a page |
-| `efmesh janitor [--ttl 7]` | remove orphaned physical storage older than ttl |
-| `efmesh migrate` | bring the state-store schema up to the current version |
-| `efmesh schedule <env>` | register `run <env>` in the OS scheduler via `Bun.cron` |
+| `efmesh janitor [--ttl 7] [--json]` | remove orphaned physical storage older than ttl |
+| `efmesh migrate [--json]` | bring the state-store schema up to the current version |
+| `efmesh schedule <env>` | register `run <env>` in the OS scheduler via `Bun.cron` (`--list [--json]`) |
 
 `apply`/`run` flags: `--jobs N` — DAG concurrency (always 1 on DuckDB — single connection), `--retries N` — retries for transient batch failures (exponential backoff), `--yes`/`-y` — skip confirmation, `--forward-only <model>,…` — reuse physical storage and history.
 
@@ -183,9 +183,11 @@ non-breaking parent lets unchanged descendants reuse their previous physical
 tables instead of rebuilding (scdType2 keeps its row history); an override
 that plainly contradicts the AST (dropped columns) is refused.
 
-`plan`, `audit` and `status` take `--json` — a stable machine-readable shape
-(a contract under semver) for CI and bots; exit codes are unchanged, stdout
-stays pure JSON.
+Every reporting command speaks `--json` — `plan`, `audit`, `status`, `diff`,
+`janitor`, `migrate`, `lineage`, `render` and `schedule --list` — a stable
+machine-readable shape (a contract under semver) for CI and bots; exit codes
+are unchanged, stdout stays pure JSON (logs go to stderr). Each shape is a JSON
+object, so new top-level fields stay additive.
 
 `plan --explain` adds the reasoning to every change: which canonical-AST
 nodes diverged (`where_clause`, `select_list[2] (added)`, …) and why the
@@ -209,7 +211,21 @@ emits user-unit files instead (`Persistent=true` catches up). Overlapping
 ticks are safe by construction: `run` takes the env lock and exits `2` when
 changes await a human.
 
-Exit codes: `0` — success, `1` — error, `2` — "awaiting a human": the plan needs confirmation in a non-TTY (add `--yes`), or `run` hit unapplied changes. In a non-TTY, `apply` with changes and no `--yes` refuses — efmesh will not silently roll out a plan nobody has seen.
+### Exit codes
+
+The single contract for headless callers (CI, cron, agents); changing it is a
+SemVer event. Referenced from the CLI's own `--help` and by every command:
+
+| Code | Meaning | When |
+|---|---|---|
+| `0` | success | the command did its job |
+| `1` | error | any failure — bad config, an engine/state error, a blocking audit violation |
+| `2` | awaiting a human | not a failure: `apply` has changes but no `--yes` in a non-TTY, or `run` met unapplied structural changes |
+
+Nothing ever blocks waiting for input without announcing it: the only prompt is
+`apply`'s confirmation, and it appears solely at an interactive TTY — a non-TTY
+`apply` with changes refuses with code `2` instead of hanging. efmesh will not
+silently roll out a plan nobody has seen.
 
 ## Logging
 

@@ -555,15 +555,29 @@ efmesh plan <env> [--forward-only <model>,…] [--reclassify m=cat,…] [--expla
 efmesh apply <env> [--yes] [--jobs N] [--retries N] [--forward-only …] [--reclassify …]  — plan + confirmation + application
 efmesh run  <env> [--jobs N] [--retries N]  — a scheduler tick
 efmesh audit <env> [--model a,b] [--json] — audits of the environment's view layer, changing nothing
-efmesh render <model> [--env]   — show the final SQL (for debugging)
+efmesh render <model> [--env] [--json]   — show the final SQL (for debugging)
 efmesh diff <envA> <envB> [--data [--model a,b] [--sample P] [--json]] — how the environments differ
 efmesh status <env> [--json]    — last plan, interval lag, recent run ticks
-efmesh lineage <model[.column]>
+efmesh lineage <model[.column]> [--json]
 efmesh graph [--html]           — the model DAG
-efmesh janitor [--ttl 7]        — cleanup of orphaned physical tables
-efmesh migrate                  — catch the state store schema up to the current version
-efmesh schedule <env> [--cron '@hourly'] [--remove] [--list] [--print-systemd]
+efmesh janitor [--ttl 7] [--json]  — cleanup of orphaned physical tables
+efmesh migrate [--json]         — catch the state store schema up to the current version
+efmesh schedule <env> [--cron '@hourly'] [--remove] [--list [--json]] [--print-systemd]
 ```
+
+**Headless contract (0.3.0, #16).** efmesh is operated non-interactively by
+agents, so every reporting command exposes `--json` — `plan`, `audit`,
+`status`, `diff`, `janitor`, `migrate`, `lineage`, `render` and
+`schedule --list`. Each shape is a stable JSON **object** (never a bare array
+or string), so a future `apiVersion` (#20) is a purely additive change;
+intervals are ISO UTC, and `--json` stdout stays byte-clean (logs go to
+stderr). The shapes and the exit codes are one frozen contract (a SemVer
+event to change): `0` = ok, `1` = error, `2` = awaiting a human — the plan
+needs confirmation in a non-TTY (add `--yes`), or `run` met unapplied changes.
+No command ever blocks on input silently: the only prompt is `apply`'s
+confirmation, shown solely at an interactive TTY; a non-TTY `apply` with
+changes refuses with `2` rather than hanging. The full exit-code table lives
+once in the README (§ Exit codes) and the CLI's own `--help`.
 
 `schedule` (0.2.0, #10) registers the `run` tick in the OS scheduler via
 `Bun.cron` (>= 1.3.11; `engines.bun` pins it): crontab on Linux, launchd on
