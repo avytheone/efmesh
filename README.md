@@ -206,7 +206,8 @@ both emit their payload even on exit 2 (a non-TTY `apply` that needs `--yes`,
 or a `run` blocked by structural changes), so a bot always reads *why* nothing
 ran. `status --json` returns `lastPlan.summary` and each `ticks[].detail` as
 structured objects, not JSON encoded inside a string. Each shape is a JSON
-object, so new top-level fields stay additive.
+object carrying a top-level `apiVersion` (currently `1`) — a single integer a
+reader pins on, bumped only when a field breaks; new fields stay additive.
 
 `plan --explain` adds the reasoning to every change: which canonical-AST
 nodes diverged (`where_clause`, `select_list[2] (added)`, …) and why the

@@ -7,6 +7,15 @@ the first version gathers them in full.
 
 ## [Unreleased]
 
+- `apiVersion` on every `--json` payload (#20). Each shape now carries a
+  top-level `apiVersion` integer (currently `1`) — a single field a CI job or
+  agent pins on to know the field names it can trust. It is stamped in one
+  place (a `withApiVersion` wrapper inside `printJson`, through which every
+  `--json` command already prints), so no command can ship an unversioned
+  payload; a bump is a breaking SemVer event, additive fields never bump it.
+  Shipped alongside a one-time breaking-review pass over the whole `--json`
+  surface at this freeze (see the BREAKING `status` note below); `audit`/`diff`
+  still echo their reports directly and were reviewed and left as-is.
 - `--json` on `apply`, `run` and `graph` (#28) — the last commands an agent
   drives that had no machine-readable output. `apply --json` returns `{env,
   applied, plan, built, promoted}` with the plan nested in the frozen plan

@@ -193,4 +193,27 @@ export const restateToJson = (plan: RestatePlan): unknown => ({
   })),
 })
 
-export const printJson = (payload: unknown) => Console.log(JSON.stringify(payload, null, 2))
+/**
+ * The wire-contract version stamped on EVERY `--json` payload (#20): a single
+ * top-level integer a reader pins on to know the field names it can trust.
+ * Bumped only on a breaking shape change — the same SemVer event that changing
+ * a field would be. Additive fields do NOT bump it (that is the whole reason
+ * every shape is an object). It is applied in exactly ONE place — `withApiVersion`
+ * inside `printJson`, through which every `--json` command already prints — so
+ * no transformer can ship a payload that forgets it.
+ */
+export const API_VERSION = 1
+
+/**
+ * Stamp `apiVersion` onto a payload, kept first so it reads at the top. Every
+ * transformer returns an object; the guard only defends the (unreached) case of
+ * a bare value so a future careless caller degrades to `{apiVersion, value}`
+ * instead of a silently un-versioned scalar.
+ */
+export const withApiVersion = (payload: unknown): Record<string, unknown> =>
+  typeof payload === "object" && payload !== null && !Array.isArray(payload)
+    ? { apiVersion: API_VERSION, ...(payload as Record<string, unknown>) }
+    : { apiVersion: API_VERSION, value: payload }
+
+export const printJson = (payload: unknown) =>
+  Console.log(JSON.stringify(withApiVersion(payload), null, 2))

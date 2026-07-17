@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { Effect } from "effect"
 import {
+  API_VERSION,
   applyToJson,
   decideApply,
   EXIT_AWAITING_HUMAN,
@@ -10,10 +11,13 @@ import {
   lineageToJson,
   migrateToJson,
   parseReclassify,
+  planToJson,
   renderToJson,
+  restateToJson,
   runToJson,
   scheduleListToJson,
   statusToJson,
+  withApiVersion,
 } from "../src/cli.ts"
 
 describe("--reclassify — flag parsing (#5)", () => {
@@ -316,5 +320,51 @@ describe("apply/run/status/graph --json — the shape contract (#28)", () => {
         { name: "med.b", kind: "view", deps: ["med.a"] },
       ],
     })
+  })
+})
+
+describe("apiVersion — one wrapper stamps every --json payload (#20)", () => {
+  const plan = { env: "dev", hasChanges: false, actions: [] } as never
+  const restate = {
+    env: "dev",
+    model: "med.a",
+    from: 0,
+    to: 0,
+    interval: "day",
+    dryRun: true,
+    targets: [],
+  } as never
+
+  test("withApiVersion prepends apiVersion and preserves every field", () => {
+    expect(withApiVersion({ env: "dev", hasChanges: false })).toEqual({
+      apiVersion: API_VERSION,
+      env: "dev",
+      hasChanges: false,
+    })
+  })
+
+  test("it rides on top of the actual transformers — plan/apply/run/status/janitor/restate", () => {
+    for (const payload of [
+      planToJson(plan),
+      applyToJson({ env: "dev", applied: true, plan, built: [], promoted: true }),
+      runToJson({ env: "dev", outcome: "ok", processed: [] }),
+      statusToJson({
+        env: "dev",
+        storeVersion: 5,
+        models: 0,
+        promotedAt: null,
+        lastPlan: null,
+        lag: [],
+        ticks: [],
+      } as never),
+      janitorToJson({ removed: [], kept: [] } as never),
+      restateToJson(restate),
+    ]) {
+      expect((withApiVersion(payload) as { apiVersion: number }).apiVersion).toBe(API_VERSION)
+    }
+  })
+
+  test("API_VERSION is the frozen integer 1 (a bump is a breaking SemVer event)", () => {
+    expect(API_VERSION).toBe(1)
   })
 })

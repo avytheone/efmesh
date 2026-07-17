@@ -36,7 +36,8 @@ beta the release expects (a mismatch surfaces at install/typecheck time).
 efmesh migrate --json
 ```
 
-Shape (contract): `{ "from": <int>, "to": <int>, "backup"?: "<path>" }`
+Shape (contract): `{ "apiVersion": 1, "from": <int>, "to": <int>, "backup"?: "<path>" }`
+— like every `--json` payload it carries the top-level `apiVersion` (currently `1`).
 
 - `from === to` → the store was already current; no-op. Exit `0`.
 - `from < to` → migrated `from` → `to`. For a SQLite store, `backup` names the

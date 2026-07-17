@@ -68,20 +68,37 @@ Headless (CI, cron, agent) **must** pass `--yes`, or a plan with changes exits
 `2` (awaiting a human) rather than applying something nobody saw:
 
 ```
-efmesh apply <env> --yes
+efmesh apply <env> --yes --json
 ```
 
 `apply` re-plans and applies under one cross-process lock, so exactly the plan
-you previewed is what lands. Exit codes:
+you previewed is what lands. `apply --json` reports the outcome directly (shape,
+carrying `apiVersion`):
+
+```json
+{
+  "apiVersion": 1,
+  "env": "dev",
+  "applied": true,
+  "plan": { "env": "dev", "hasChanges": true, "actions": [ … ] },
+  "built": ["mart.daily_revenue"],
+  "promoted": true
+}
+```
+
+- `applied` — did the apply run at all. `built` — models whose physics was built
+  or backfilled. `promoted` — the view layer was swapped. `plan` is the same
+  `plan --json` shape, so you read apply and plan the same way.
+- On exit `2` (a refused non-TTY plan) the payload is still emitted with
+  `applied: false`, `built: []`, `promoted: false`, and `plan` showing what
+  *would* apply — read it to see why nothing ran.
+
+Exit codes:
 
 - `0` — applied (or a no-op view-swap).
 - `2` — the plan had changes and no `--yes` in a non-TTY. This is the guard, not
   a bug: re-run with `--yes` only after you have reviewed the `plan --json`.
 - `1` — a real error (bad config, engine/state error, a guard-rail refusal).
-
-> Note: `apply` has no `--json` on its result — confirm the outcome with
-> `efmesh status <env> --json` (check `lastPlan` and the newest `ticks[0]`)
-> and the exit code.
 
 ## `--reclassify` — when appropriate, when FORBIDDEN
 

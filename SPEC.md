@@ -615,9 +615,12 @@ efmesh schedule <env> [--cron '@hourly'] [--remove] [--list [--json]] [--print-s
 by agents, so every command with something to report exposes `--json` —
 `plan`, `apply`, `run`, `audit`, `status`, `diff`, `graph`, `janitor`,
 `migrate`, `lineage`, `render` and `schedule --list`. Each shape is a stable
-JSON **object** (never a bare array or string), so a future `apiVersion` (#20)
-is a purely additive change; intervals are ISO UTC, and `--json` stdout stays
-byte-clean (logs go to stderr). `apply --json` reports `{env, applied, plan,
+JSON **object** (never a bare array or string) carrying a top-level
+`apiVersion` (#20, currently **1**) — a single integer, stamped in one place
+(`withApiVersion` inside `printJson`, through which every `--json` command
+prints, so none can forget it) and bumped only on a breaking shape change;
+additive fields never bump it. Intervals are ISO UTC, and `--json` stdout
+stays byte-clean (logs go to stderr). `apply --json` reports `{env, applied, plan,
 built, promoted}` (the plan rides the plan shape; `applied:false` with exit 2
 when a non-TTY refuses), `run --json` reports `{env, outcome, processed,
 blockedBy?}`, `graph --json` reports `{models:[{name, kind, deps}]}` in
@@ -633,6 +636,20 @@ No command ever blocks on input silently: the only prompt is `apply`'s
 confirmation, shown solely at an interactive TTY; a non-TTY `apply` with
 changes refuses with `2` rather than hanging. The full exit-code table lives
 once in the README (§ Exit codes) and the CLI's own `--help`.
+
+The frozen field contract for the commands added in this cluster (#28), each
+also carrying `apiVersion`: `plan → {env, hasChanges, actions[]}`; `apply →
+{env, applied, plan, built[], promoted}` (plan in the plan shape); `run →
+{env, outcome: "ok"|"awaiting-human", processed[], blockedBy?}`; `graph →
+{models:[{name, kind, deps[]}]}`; `status → {env, storeVersion, models,
+promotedAt, lastPlan:{appliedAt, appliedBy, summary}|null, lag[], ticks[]}`
+with each `ticks[].detail` the structured `TickDetail` (§7). The **one-time
+breaking review** at this `apiVersion: 1` freeze: `status` dropped the store's
+internal row `id` and the redundant per-row `env` from its nested plan/tick
+records; the tick `detail` and plan `summary` stopped being JSON-inside-a-string.
+`audit --json` and `diff --json` still echo their report objects directly
+(no transformer) — reviewed and left as-is; tightening them behind a transformer
+(as janitor/migrate already are) is a follow-up, not a silent break here.
 
 **Tick detail + `status --check` (0.3.0, #19).** The tick journal's `detail`
 is one structured shape, stored JSON-encoded in the existing text column (no

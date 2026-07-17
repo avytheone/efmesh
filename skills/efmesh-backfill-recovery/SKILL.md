@@ -32,15 +32,23 @@ Read `lag[]` (one entry per `incrementalByTimeRange` model):
   is not `done` and is therefore still wanted.
 - `doneUpTo` — the end of the last `done` interval; `null` means nothing computed.
 
-Also read `ticks[]`: the freshest tick's `outcome` and `detail` tell you whether
-the last attempt was `ok`, `error` (real failure — `detail` is the error tag),
-`awaiting-human` (structural change pending), or `lock-held` (contended).
+Also read `ticks[]`: the freshest tick's `outcome` and structured `detail` tell
+you whether the last attempt was `ok` (`detail`: `{ "built": [...] }`), `error`
+(a real failure — `detail`: `{ "error": "<tag>", "model"?, "interval"?,
+"message"? }`, naming the model and interval it died on), `awaiting-human`
+(`{ "blockedBy": [...] }`, a structural change pending), or `lock-held`
+(`{ "lock": "…" }`, contended). `detail` is a structured object now, not text.
 
 ## Step 2 — rerun
 
 ```
-efmesh run <env>
+efmesh run <env> --json
 ```
+
+`run --json` reports the tick's outcome (carrying `apiVersion`): `{ "env": …,
+"outcome": "ok", "processed": ["model", …] }` when it advanced intervals, or
+`{ "env": …, "outcome": "awaiting-human", "processed": [], "blockedBy":
+["model: category", …] }` on exit 2. `processed` is the models it caught up.
 
 `run` semantics:
 
@@ -71,11 +79,13 @@ tick), not something `run` can retry away. Fix the root cause (bad source data,
 a model bug), which is a `breaking` change applied via **efmesh-safe-apply**
 (a full backfill recomputes the poisoned history).
 
-> A dedicated `restate` command to force-recompute a specific interval range
-> (independent of the version diff) is **planned but does not exist yet**
-> (tracked in issue #21). Do not attempt to invoke `efmesh restate` — it is not
-> a command. Until it ships, recovery is: retry via `run` for transient
-> failures, or a `breaking` re-apply for a logic/data fix.
+> To force-recompute a specific past interval range independent of the version
+> diff (e.g. corrected source data for a window that is already `done`), use
+> `efmesh restate <env> --model <m> --from <t> --to <t>` (#21). It clears the
+> range's interval bookkeeping for the model and its descendants so the next
+> `run` recomputes them; `--dry-run --json` previews the targets and intervals
+> without mutating the store. Use it when the data is wrong but the model logic
+> is unchanged; use a `breaking` re-apply when the logic itself changed.
 
 ## Guard rails
 
