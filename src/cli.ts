@@ -26,9 +26,9 @@ import {
   systemdUnits,
 } from "./plan/schedule.ts"
 import { renderGraphHtml } from "./plan/graph-html.ts"
-import { formatLineage, lineage, LineageError } from "./plan/lineage.ts"
+import { formatLineage, lineage, LineageError, type LineageNode } from "./plan/lineage.ts"
 import { environmentStatus } from "./plan/status.ts"
-import { janitor } from "./plan/janitor.ts"
+import { janitor, type JanitorReport } from "./plan/janitor.ts"
 import { fp8 } from "./plan/naming.ts"
 import { envLockName, withStateLock } from "./plan/lock.ts"
 import { applyPlan } from "./plan/executor.ts"
@@ -36,6 +36,7 @@ import { run } from "./plan/run.ts"
 import { planChanges, ReclassifyError, type Plan } from "./plan/planner.ts"
 import { migratePostgresState } from "./state/postgres.ts"
 import { migrateSqliteState, SqliteStateLive } from "./state/sqlite.ts"
+import type { MigrationReport } from "./state/store.ts"
 
 export class ConfigLoadError extends Data.TaggedError("ConfigLoadError")<{
   readonly path: string
@@ -256,6 +257,43 @@ export const planToJson = (plan: Plan): unknown => ({
   })),
 })
 
+/**
+ * JSON shapes for the operate-me-headless commands (#16) — CONTRACTs for CI
+ * and agents, on the same footing as planToJson: shape changes are package
+ * semver events. Each is an OBJECT (never a bare array or string) so a future
+ * top-level `apiVersion` (#20) is a purely additive change. Reports already
+ * shaped as a clean contract (janitor, migrate) are passed through their own
+ * transformer so an internal field added to the report later cannot silently
+ * leak into the wire shape.
+ */
+export const janitorToJson = (report: JanitorReport): unknown => ({
+  removed: report.removed,
+  kept: report.kept,
+})
+
+export const migrateToJson = (report: MigrationReport): unknown => ({
+  from: report.from,
+  to: report.to,
+  // backup is SQLite-only — omitted (not null) when absent, additive when present
+  ...(report.backup !== undefined ? { backup: report.backup } : {}),
+})
+
+/** Rendered SQL wrapped in an object; env is null when rendering logical names. */
+export const renderToJson = (model: string, env: string, sql: string): unknown => ({
+  model,
+  env: env === "" ? null : env,
+  sql,
+})
+
+/** One lineage tree per requested column (LineageNode is already wire-clean). */
+export const lineageToJson = (
+  model: string,
+  trees: ReadonlyArray<LineageNode>,
+): unknown => ({ model, lineage: trees })
+
+/** OS-scheduler entries as an object so the list can gain sibling fields later. */
+export const scheduleListToJson = (entries: ReadonlyArray<string>): unknown => ({ entries })
+
 const printJson = (payload: unknown) => Console.log(JSON.stringify(payload, null, 2))
 
 const formatRange = (range: { readonly start: number; readonly end: number }): string =>
@@ -398,16 +436,17 @@ const renderCommand = Command.make(
       Flag.withDefault(""),
       Flag.withDescription("render against an environment's view layer instead of logical names"),
     ),
+    json: jsonFlag,
   },
-  ({ config, env, model }) =>
+  ({ config, env, json, model }) =>
     Effect.gen(function* () {
       const loaded = yield* loadConfig(config)
       const sql = env === ""
         ? yield* Efmesh.render(loaded.models, model)
         : yield* Efmesh.renderFor(loaded.models, model, env)
-      yield* Console.log(sql.trim())
+      yield* json ? printJson(renderToJson(model, env, sql.trim())) : Console.log(sql.trim())
     }),
-).pipe(Command.withDescription("show a model's final SQL"))
+).pipe(Command.withDescription("show a model's final SQL (--json wraps it as { model, env, sql })"))
 
 const runCommand = Command.make(
   "run",
@@ -579,11 +618,16 @@ const scheduleCommand = Command.make(
         "print systemd user units instead of cron (Persistent=true catches up misses; a lifeline without a cron daemon)",
       ),
     ),
+    json: jsonFlag,
   },
-  ({ config, cron, env, list, printSystemd, remove }) =>
+  ({ config, cron, env, json, list, printSystemd, remove }) =>
     Effect.gen(function* () {
       if (list) {
         const entries = yield* listSchedules()
+        if (json) {
+          yield* printJson(scheduleListToJson(entries))
+          return
+        }
         if (entries.length === 0) yield* Console.log("no efmesh entries in the OS scheduler")
         for (const entry of entries) yield* Console.log(`  ${entry}`)
         return
@@ -631,7 +675,7 @@ const scheduleCommand = Command.make(
     ),
 ).pipe(
   Command.withDescription(
-    "register run <env> in the OS scheduler (Bun.cron: crontab/launchd/Task Scheduler)",
+    "register run <env> in the OS scheduler (Bun.cron: crontab/launchd/Task Scheduler); --list [--json]",
   ),
 )
 
@@ -643,8 +687,9 @@ const janitorCommand = Command.make(
       Flag.withDefault("7"),
       Flag.withDescription("how many days orphaned physics lives before removal"),
     ),
+    json: jsonFlag,
   },
-  ({ config, ttl }) =>
+  ({ config, json, ttl }) =>
     Effect.gen(function* () {
       const loaded = yield* loadConfig(config)
       const report = yield* janitor({
@@ -652,6 +697,10 @@ const janitorCommand = Command.make(
         ...(loaded.lake !== undefined ? { lakePath: loaded.lake.path } : {}),
         ...(loaded.ducklake !== undefined ? { ducklake: loaded.ducklake } : {}),
       }).pipe(Effect.provide(configLayers(loaded)))
+      if (json) {
+        yield* printJson(janitorToJson(report))
+        return
+      }
       yield* Console.log(
         report.removed.length > 0
           ? `removed: ${report.removed.join(", ")}`
@@ -661,7 +710,7 @@ const janitorCommand = Command.make(
         yield* Console.log(`orphaned but younger than ttl: ${report.kept.join(", ")}`)
       }
     }),
-).pipe(Command.withDescription("remove physics no environment references"))
+).pipe(Command.withDescription("remove physics no environment references (--json for CI)"))
 
 const statusCommand = Command.make(
   "status",
@@ -768,13 +817,17 @@ const auditCommand = Command.make(
 
 const migrateCommand = Command.make(
   "migrate",
-  { config: configFlag },
-  ({ config }) =>
+  { config: configFlag, json: jsonFlag },
+  ({ config, json }) =>
     Effect.gen(function* () {
       const loaded = yield* loadConfig(config)
       const report = yield* (loaded.state?.url !== undefined
         ? migratePostgresState({ url: loaded.state.url })
         : migrateSqliteState({ path: loaded.state?.path ?? "efmesh.state.sqlite" }))
+      if (json) {
+        yield* printJson(migrateToJson(report))
+        return
+      }
       yield* Console.log(
         report.from === report.to
           ? `state store already at version ${report.to}`
@@ -784,7 +837,11 @@ const migrateCommand = Command.make(
         yield* Console.log(`backup of the old store: ${report.backup}`)
       }
     }),
-).pipe(Command.withDescription("bring the state store schema up to the current version"))
+).pipe(
+  Command.withDescription(
+    "bring the state store schema up to the current version (--json emits { from, to, backup? })",
+  ),
+)
 
 const graphCommand = Command.make(
   "graph",
@@ -814,8 +871,8 @@ const graphCommand = Command.make(
 
 const lineageCommand = Command.make(
   "lineage",
-  { target: Argument.string("model[.column]"), config: configFlag },
-  ({ config, target }) =>
+  { target: Argument.string("model[.column]"), config: configFlag, json: jsonFlag },
+  ({ config, json, target }) =>
     Effect.gen(function* () {
       const loaded = yield* loadConfig(config)
       const segments = target.split(".")
@@ -833,14 +890,22 @@ const lineageCommand = Command.make(
       }
       const columns =
         segments.length >= 3 ? [segments.slice(2).join(".")] : Object.keys(model.schema.fields)
+      const trees: Array<LineageNode> = []
       for (const column of columns) {
         const tree = yield* lineage(graph, modelName, column).pipe(
           Effect.provide(configLayers(loaded)),
         )
-        for (const line of formatLineage(tree)) yield* Console.log(line)
+        if (json) {
+          trees.push(tree)
+        } else {
+          for (const line of formatLineage(tree)) yield* Console.log(line)
+        }
       }
+      if (json) yield* printJson(lineageToJson(modelName, trees))
     }),
-).pipe(Command.withDescription("column lineage down to raw columns (best-effort)"))
+).pipe(
+  Command.withDescription("column lineage down to raw columns, best-effort (--json emits the tree)"),
+)
 
 /**
  * Actionable next step for a failure, when one exists — the recipe the
@@ -919,7 +984,16 @@ export const wantsTrace = (argv: ReadonlyArray<string>): boolean => {
 }
 
 export const rootCommand = Command.make("efmesh").pipe(
-  Command.withDescription("sqlmesh on bun, typescript and Effect"),
+  // exit codes are a frozen contract — the full table lives once in the README
+  // ("Exit codes"); the three values are restated here so headless callers see
+  // them without leaving the terminal, but the canonical documentation is there
+  Command.withDescription(
+    "sqlmesh on bun, typescript and Effect\n\n" +
+      "Exit codes: 0 = ok, 1 = error, 2 = awaiting a human (non-TTY apply without --yes, " +
+      "or run hitting unapplied changes). Full table: README § Exit codes.\n" +
+      "plan/apply/audit/status/diff/janitor/migrate/lineage/render/schedule --list take --json " +
+      "(stable shapes for CI and agents).",
+  ),
   Command.withSubcommands([
     initCommand,
     planCommand,
