@@ -268,6 +268,31 @@ state:  { url: "postgres://…" },  // schema efmesh_state
 
 Backfill runs batches in parallel (connection pool); independent DAG branches build concurrently. DuckDB federation (seeds, parquet, external files, export, ducklake) fails honestly on Postgres with `EngineFeatureError` — no silent degradation.
 
+### Support tiers
+
+Two engines, two levels of coverage — stated plainly so you can judge the risk before you adopt.
+
+| Tier | Engine | State store | What the test suite exercises |
+|---|---|---|---|
+| **1** | DuckDB | SQLite (or Postgres) | Everything: all model kinds and targets, the parquet/DuckLake lake, seeds and `external` federation, audits, the janitor, `--forward-only` / `--reclassify`, `testModel`, and golden fingerprint freezing. |
+| **2** | Postgres | Postgres schema `efmesh_state` | State store (snapshots, promote/orphaning, intervals, ttl lock, `migrate`), libpg_query canonicalization, `describe`, and e2e `full` / `view` / `incrementalByTimeRange` backfill, `incrementalByUniqueKey` upsert and `scdType2` — with parallel batches and DAG concurrency. |
+
+**Not covered by tests on Postgres**, without hiding it:
+
+- **Structurally unavailable** — the DuckDB-federation surface: `target: "parquet"`, `target: "ducklake"`, CSV/JSON seeds, and `external` file/parquet/URL sources. These raise `EngineFeatureError` on Postgres by design; the suite asserts they *fail honestly*, never that they work.
+- **Works, but proven only on DuckDB** — audits (`notNull` / `unique` / `accepted`), the janitor, `--forward-only` / `--reclassify`, and `testModel` (which always runs on in-memory DuckDB, whatever your project engine).
+
+## Non-goals
+
+Decided, not deferred — the ready answer to "why not just…":
+
+- **A Node runtime.** efmesh is Bun-first to the core — `Bun.SQL`, `Bun.cron`, `bun test`, single-file config loading. Node would mean a second runtime matrix maintained for an audience we are not chasing; the target is TypeScript teams already on Bun.
+- **Multi-dialect SQL (transpilation).** sqlglot's killer feature, and we admit reproducing it in TypeScript is unrealistic. Dialect is a property of the *project*, not the model: you write for your engine (DuckDB or Postgres), and a `ref` typo stays a compile error either way.
+- **Cloud data warehouses** (Snowflake / BigQuery / Redshift). The whole thesis is small data lakes — DuckDB-class data, gigabytes to a terabyte on one machine. Cloud DWH is dbt/sqlmesh's home turf and carries the weight (adapters, infra) we deliberately shed.
+- **A third engine.** Each engine costs a full adapter *and* a canonicalization backend, and multiplies the test matrix. We would rather keep two engines honest — DuckDB tier 1, Postgres tier 2 — than three shallow.
+
+The architectural non-goals (heavy ingest, general orchestration, BI) live in [SPEC.md](https://github.com/avytheone/efmesh/blob/main/SPEC.md) §1.
+
 ## Status
 
 **0.2.2** (beta). The core is built and exercised on a live example: phases F0–F6 ([SPEC.md §13](https://github.com/avytheone/efmesh/blob/main/SPEC.md), [CHANGELOG](https://github.com/avytheone/efmesh/blob/main/CHANGELOG.md)), 187 tests including a live Postgres cluster and golden tests freezing fingerprint stability. Effect v4 is a beta dependency: pinned exactly (peerDependencies); a weekly CI job tracks drift against fresh betas.
