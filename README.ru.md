@@ -273,6 +273,31 @@ state:  { url: "postgres://…" },  // схема efmesh_state
 
 Бэкфилл гонит батчи параллельно (пул соединений), независимые ветки DAG строятся одновременно. DuckDB-федерация (seed, parquet, external-файлы, export, ducklake) на Postgres честно падает `EngineFeatureError` — без тихой деградации.
 
+### Уровни поддержки
+
+Два движка, два уровня покрытия — говорим прямо, чтобы риск был виден до внедрения.
+
+| Уровень | Движок | State store | Что прогоняет тест-сьют |
+|---|---|---|---|
+| **1** | DuckDB | SQLite (или Postgres) | Всё: все kind'ы и target'ы моделей, озеро parquet/DuckLake, seed'ы и `external`-федерация, аудиты, janitor, `--forward-only` / `--reclassify`, `testModel`, golden-заморозка fingerprint. |
+| **2** | Postgres | схема `efmesh_state` в Postgres | State store (снапшоты, promote/сиротение, интервалы, ttl-лок, `migrate`), канонизация через libpg_query, `describe`, e2e `full` / `view` / `incrementalByTimeRange`-бэкфилл, upsert `incrementalByUniqueKey` и `scdType2` — с параллельными батчами и concurrency DAG. |
+
+**Не покрыто тестами на Postgres**, без утаивания:
+
+- **Структурно недоступно** — поверхность DuckDB-федерации: `target: "parquet"`, `target: "ducklake"`, CSV/JSON-seed'ы и `external`-источники (файлы/parquet/URL). На Postgres они по дизайну падают `EngineFeatureError`; сьют проверяет, что они падают *честно*, а не что работают.
+- **Работает, но доказано только на DuckDB** — аудиты (`notNull` / `unique` / `accepted`), janitor, `--forward-only` / `--reclassify` и `testModel` (всегда исполняется на in-memory DuckDB, каким бы ни был движок проекта).
+
+## Не-цели
+
+Решено, а не отложено — готовый ответ на «а почему не просто…»:
+
+- **Node-рантайм.** efmesh Bun-first до основания — `Bun.SQL`, `Bun.cron`, `bun test`, загрузка конфига одним файлом. Node означал бы вторую рантайм-матрицу ради аудитории, за которой мы не гонимся; цель — TypeScript-команды, уже сидящие на Bun.
+- **Мульти-диалект SQL (транспиляция).** Киллер-фича sqlglot, и мы честно признаём: воспроизвести её на TypeScript нереально. Диалект — свойство *проекта*, а не модели: вы пишете под свой движок (DuckDB или Postgres), и опечатка в `ref` всё равно остаётся ошибкой компиляции.
+- **Облачные хранилища** (Snowflake / BigQuery / Redshift). Весь тезис — маленькие озёра данных, класса DuckDB, гигабайты–терабайт на одной машине. Облачные DWH — вотчина dbt/sqlmesh, несущая тот вес (адаптеры, инфраструктура), который мы сознательно сбросили.
+- **Третий движок.** Каждый движок стоит полного адаптера *и* бэкенда канонизации и множит тест-матрицу. Мы лучше удержим два движка честными — DuckDB уровень 1, Postgres уровень 2 — чем три поверхностных.
+
+Архитектурные не-цели (тяжёлый ingest, общая оркестрация, BI) — в [SPEC.md](https://github.com/avytheone/efmesh/blob/main/SPEC.md) §1.
+
 ## Статус
 
 **0.2.2** (beta). Ядро построено и прогнано на живом примере: фазы F0–F6 (см. [SPEC.md §13](https://github.com/avytheone/efmesh/blob/main/SPEC.md) и [CHANGELOG](https://github.com/avytheone/efmesh/blob/main/CHANGELOG.md)), 187 тестов, включая живой Postgres-кластер и golden-тесты стабильности fingerprint. Effect v4 — beta-зависимость: пинована точно (peerDependencies), дрейф свежих бет ловит еженедельный CI.

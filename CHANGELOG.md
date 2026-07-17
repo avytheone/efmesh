@@ -7,6 +7,17 @@ the first version gathers them in full.
 
 ## [Unreleased]
 
+- Showcase honesty in the README (#23): a support-tiers table (DuckDB tier 1,
+  Postgres tier 2) that names, without hiding it, what the Postgres test suite
+  does *not* cover — the DuckDB-federation surface that fails by design, and the
+  paths proven only on DuckDB. Recorded **non-goals** with their reasons (Node
+  runtime, multi-dialect, cloud DWH, a third engine) so the first evaluator has
+  an answer. A "what to back up" note in the hospital example (state store + lake,
+  backed up together — there is no backup command). Both READMEs kept in sync.
+- Store-backup hygiene: leaked SQLite store backups under `examples/hospital`
+  are removed from git and `*.sqlite.backup-v*` is now ignored. The hospital
+  example runs via `bunx efmesh`, as a real project would.
+
 ## [0.2.2] — 2026-07-17
 
 Theme: the repo an AI agent can develop and operate — skills, full

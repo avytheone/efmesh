@@ -23,13 +23,16 @@ config) — [efmesh.config.ts](./efmesh.config.ts) does not list them.
 ## Running
 
 ```sh
-bun seed.ts                                # raw data: lake/raw/moves.parquet
-bun ../../src/bin.ts plan dev              # what would be done
-bun ../../src/bin.ts apply dev             # physical tables + backfill + views
-bun ../../src/bin.ts audit dev             # audit the view layer
-bun ../../src/bin.ts apply prod --yes      # promotion: view swap, no recompute
-bun ../../src/bin.ts run dev               # cron tick: catch up on intervals
+bun seed.ts                    # raw data: lake/raw/moves.parquet
+bunx efmesh plan dev           # what would be done
+bunx efmesh apply dev          # physical tables + backfill + views
+bunx efmesh audit dev          # audit the view layer
+bunx efmesh apply prod --yes   # promotion: view swap, no recompute
+bunx efmesh run dev            # cron tick: catch up on intervals
 ```
+
+With efmesh installed as a dependency (`bun add @avytheone/efmesh`), `bunx
+efmesh` resolves to the package binary — the same command a real project runs.
 
 Things worth playing with: change an expression in `med.stays` and look at
 `plan` (breaking + cascade), append a column to the end of a SELECT
@@ -38,3 +41,11 @@ collect old physical storage with the `janitor`.
 
 `efmesh.duckdb`, `efmesh.state.sqlite`, `ducklake.sqlite` and `lake/` are
 created at runtime and stay out of git.
+
+**What to back up.** There is no backup command — that is your job. Two things
+hold all the state: the **state store** (`efmesh.state.sqlite`, or your
+`efmesh_state` Postgres schema) and the **lake/physics** (`lake/`, the
+`efmesh.duckdb` file, the `ducklake.sqlite` catalog). Back them up *together* so
+snapshots and their data stay consistent. `efmesh migrate` takes its own file
+backup of a SQLite store before a schema change, but that is not a substitute
+for your own backups.
