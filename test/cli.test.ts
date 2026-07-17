@@ -28,6 +28,7 @@ describe("plan confirmation (F4)", () => {
   })
 
   test("empty, null (EOF) and everything else — refusal", () => {
+    // cyrillic-ok: Cyrillic answers are deliberate non-affirmative inputs
     for (const answer of [null, "", " ", "n", "no", "д", "да", "ok", "apply"]) {
       expect(isAffirmative(answer)).toBe(false)
     }

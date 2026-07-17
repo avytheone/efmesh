@@ -74,6 +74,16 @@ class of bug this project can have:
 - `bun test` (all of it) and `bunx tsc --noEmit` must be green before any
   commit. Do not pipe test output through `tail` inside `&&` chains — the
   pipe swallows the exit code.
+- Git hooks (lefthook, `lefthook.yml`) are the mechanical source of truth
+  for "what green means" and install themselves via the `prepare` script on
+  `bun install` (or `bunx lefthook install`). **pre-commit** runs
+  `tsc --noEmit`, biome on the staged files, and the Cyrillic gate
+  (`scripts/no-cyrillic.ts`: src/ and test/ are English-only, opt out a
+  deliberate non-ASCII fixture with a `cyrillic-ok` marker on or above the
+  line). **pre-push** runs the full `bun test`. Hooks skip when `$CI` is set
+  (CI runs the same checks) and honour `LEFTHOOK=0`. The hooks are a
+  backstop, not a substitute for judgement — the constraints below and the
+  contract sections above are yours to uphold; hooks cannot.
 - Tests that spawn subprocesses or import `effect` from temp dirs must
   create those dirs **inside the repo** (module resolution).
 - DuckDB holds a single connection: model-level concurrency is 1 on DuckDB
