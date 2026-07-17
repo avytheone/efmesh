@@ -4,11 +4,11 @@
 
 [![ci](https://github.com/avytheone/efmesh/actions/workflows/ci.yml/badge.svg)](https://github.com/avytheone/efmesh/actions/workflows/ci.yml) ![status](https://img.shields.io/badge/status-beta-orange) ![npm](https://img.shields.io/npm/v/%40avytheone%2Fefmesh) ![license](https://img.shields.io/badge/license-MIT-green) ![runtime](https://img.shields.io/badge/runtime-bun-black) ![effect](https://img.shields.io/badge/effect-v4-5C4EE5)
 
-*Русская версия: [README.ru.md](./README.ru.md).*
+*Русская версия: [README.ru.md](https://github.com/avytheone/efmesh/blob/main/README.ru.md).*
 
 Models are plain TypeScript modules: SQL bodies, imports as dependencies, Effect Schema as the data shape. efmesh fingerprints every model by its canonical AST, keeps versions as snapshots, computes a plan as the diff between your project and an environment, and applies exactly that plan: physical tables are rebuilt only where something actually changed, while environments (dev/prod/…) are virtual views over shared physical storage — promoting to prod costs zero recomputation.
 
-<p align="center"><img src="docs/demo.svg" alt="efmesh demo: a ref typo is a compile error; a plan rebuilds exactly the changed branch; promotion is a view swap" width="840"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/avytheone/efmesh/main/docs/demo.svg" alt="efmesh demo: a ref typo is a compile error; a plan rebuilds exactly the changed branch; promotion is a view swap" width="840"></p>
 
 ```ts
 import { Schema } from "effect"
@@ -92,7 +92,7 @@ bunx efmesh apply prod --yes     # promotion: view swap, no recomputation
 bunx efmesh run prod             # cron tick: catch up on new intervals
 ```
 
-Live example: [examples/hospital](./examples/hospital/) — patient movements across hospital departments, every model kind and target.
+Live example: [examples/hospital](https://github.com/avytheone/efmesh/tree/main/examples/hospital) — patient movements across hospital departments, every model kind and target.
 
 ## How it works
 
@@ -110,7 +110,7 @@ models (TS modules)  ──►  DAG + fingerprints over canonical ASTs
 - **Virtual layer** — views `<env>__<schema>.<table>` (prod is just `<schema>.<table>`) pointing at physical storage. An environment is a set of pointers; promotion and rollback are view swaps.
 - **The interval ledger** is the single source of truth about what has been computed: an interrupted backfill resumes where it stopped; recomputing an interval is a transactional DELETE+INSERT of the range — no duplicates.
 
-Full architecture, invariants and decisions: [SPEC.md](./SPEC.md).
+Full architecture, invariants and decisions: [SPEC.md](https://github.com/avytheone/efmesh/blob/main/SPEC.md).
 
 ## Data quality
 
@@ -175,7 +175,7 @@ export default defineConfig({
 | `efmesh migrate [--json]` | bring the state-store schema up to the current version |
 | `efmesh schedule <env>` | register `run <env>` in the OS scheduler via `Bun.cron` (`--list [--json]`) |
 
-`apply`/`run` flags: `--jobs N` — DAG concurrency (always 1 on DuckDB — single connection), `--retries N` — retries for transient batch failures (exponential backoff), `--yes`/`-y` — skip confirmation, `--forward-only <model>,…` — reuse physical storage and history.
+`apply`/`run` share `--jobs N` — DAG concurrency (always 1 on DuckDB — single connection) — and `--retries N` — retries for transient batch failures (exponential backoff). `apply` also takes `--yes`/`-y` — skip confirmation (required in a non-TTY when the plan has changes) — and `--forward-only <model>,…` — reuse physical storage and history.
 
 `plan`/`apply` take `--reclassify <model>=breaking|non-breaking[,…]` — the
 operator's verdict on top of `--explain`, journaled with `applied_by`. A
@@ -270,17 +270,18 @@ Backfill runs batches in parallel (connection pool); independent DAG branches bu
 
 ## Status
 
-**0.1.0-beta.1.** The core is built and exercised on a live example: phases F0–F6 ([SPEC.md §13](./SPEC.md), [CHANGELOG](./CHANGELOG.md)), 138 tests including a live Postgres cluster and golden tests freezing fingerprint stability. Effect v4 is a beta dependency: pinned exactly (peerDependencies); a weekly CI job tracks drift against fresh betas.
+**0.2.1** (beta). The core is built and exercised on a live example: phases F0–F6 ([SPEC.md §13](https://github.com/avytheone/efmesh/blob/main/SPEC.md), [CHANGELOG](https://github.com/avytheone/efmesh/blob/main/CHANGELOG.md)), 187 tests including a live Postgres cluster and golden tests freezing fingerprint stability. Effect v4 is a beta dependency: pinned exactly (peerDependencies); a weekly CI job tracks drift against fresh betas.
 
-Next up: categorization override in the plan dialog, non-time-based intervals. Known limitation: a single `bun build --compile` binary builds, but standalone Bun executables can't resolve the `"efmesh"` import from a runtime-loaded config — distribution is via the package (SPEC §10).
+Next up: making efmesh legible to an evaluating AI agent — broader `--json` coverage and an agent-oriented `llms.txt` map (milestone 0.3.0). Known limitation: a single `bun build --compile` binary builds, but standalone Bun executables can't resolve the `"efmesh"` import from a runtime-loaded config — distribution is via the package (SPEC §10).
 
 ## Documentation
 
-- [SPEC.md](./SPEC.md) — the architecture spec: decisions, invariants, open questions;
-- [CHANGELOG.md](./CHANGELOG.md) — release history;
-- [examples/hospital](./examples/hospital/) — a live example with every model kind;
-- [CONTRIBUTING.md](./CONTRIBUTING.md) — build, test and PR guide.
+- [SPEC.md](https://github.com/avytheone/efmesh/blob/main/SPEC.md) — the architecture spec: decisions, invariants, open questions;
+- [CHANGELOG.md](https://github.com/avytheone/efmesh/blob/main/CHANGELOG.md) — release history;
+- [examples/hospital](https://github.com/avytheone/efmesh/tree/main/examples/hospital) — a live example with every model kind;
+- [CONTRIBUTING.md](https://github.com/avytheone/efmesh/blob/main/CONTRIBUTING.md) — build, test and PR guide;
+- [llms.txt](https://github.com/avytheone/efmesh/blob/main/llms.txt) — a machine-oriented map of the repo for an evaluating AI agent.
 
 ## License
 
-[MIT](./LICENSE) © Alexey Yakimanskiy
+[MIT](https://github.com/avytheone/efmesh/blob/main/LICENSE) © Alexey Yakimanskiy

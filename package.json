@@ -26,7 +26,8 @@
     "src",
     "SPEC.md",
     "CHANGELOG.md",
-    "README.ru.md"
+    "README.ru.md",
+    "llms.txt"
   ],
   "type": "module",
   "module": "src/index.ts",

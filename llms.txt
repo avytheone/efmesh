@@ -1,0 +1,34 @@
+# efmesh
+
+> A data-transformation framework in the spirit of sqlmesh, on TypeScript + Bun + Effect v4. Models are plain TypeScript modules (SQL bodies, imports as dependencies, Effect Schema as the data shape); versions are snapshots keyed by fingerprints of canonical SQL ASTs; environments are virtual views over shared physical storage; a plan is the diff between the project and an environment.
+
+Scope, stated honestly so an evaluation does not mislead itself:
+
+- **It is** the sqlmesh *core* for **DuckDB-class small data lakes** — gigabytes to a terabyte on one machine (DuckDB or Postgres). Snapshots, AST fingerprints, plans-as-diffs, virtual environments, interval-based incrementals, a parquet/DuckLake lake.
+- **It is NOT** a distributed-warehouse tool. No cloud engines (Snowflake/BigQuery are out of scope), no multi-dialect (you write your engine's dialect), no web UI, no package ecosystem, no Node runtime (Bun-only), not 1.0-stable (0.2.x on beta Effect v4).
+- **Runtime:** Bun (`engines.bun >= 1.3.11`). **License:** MIT.
+
+## Contracts (versioned; do not break silently)
+
+- **`--json` shapes and exit codes** — a contract for CI and agents. Exit `0` = ok, `1` = error, `2` = "awaiting a human" (a plan with changes needs `--yes` in a non-TTY, or `run` hit unapplied structural changes). Exit 2 is not a failure. `--json` stdout is byte-clean; logs go to stderr.
+- **`FINGERPRINT_VERSION`** ([src/plan/fingerprint.ts](https://github.com/avytheone/efmesh/blob/main/src/plan/fingerprint.ts)) — the fingerprint algorithm over the canonical AST. Frozen by golden tests. Reformatting SQL never triggers a rebuild.
+- **`STATE_VERSION`** ([src/state/store.ts](https://github.com/avytheone/efmesh/blob/main/src/state/store.ts)) — the state-store schema. A fresh store bootstraps; an old one refuses to open until `efmesh migrate` (SQLite backup taken first).
+- Everything else in the CLI (help text, plan reasoning, AST paths in `--explain`) is a HINT, not a contract: it may change between releases.
+
+## Where things live
+
+- [README.md](https://github.com/avytheone/efmesh/blob/main/README.md): the shopwindow — why efmesh, who it is (and isn't) for, quickstart, CLI table, performance ([README.ru.md](https://github.com/avytheone/efmesh/blob/main/README.ru.md) is the Russian mirror).
+- [SPEC.md](https://github.com/avytheone/efmesh/blob/main/SPEC.md): the architecture contract — decisions and invariants. §13 is the build history (phases F0–F6), §14 the open questions with verdicts.
+- [src/index.ts](https://github.com/avytheone/efmesh/blob/main/src/index.ts): the public API — a deliberate whitelist (no `export *`). What is here is a semver commitment; internals are not exported. `Efmesh.plan/apply/render`, `run`, `janitor`, plus schemas, layers and error types.
+- [examples/hospital](https://github.com/avytheone/efmesh/tree/main/examples/hospital): a live, runnable example — patient movements across hospital departments, exercising every model kind and materialization target.
+- [CHANGELOG.md](https://github.com/avytheone/efmesh/blob/main/CHANGELOG.md): release history (Keep a Changelog, SemVer).
+- [CONTRIBUTING.md](https://github.com/avytheone/efmesh/blob/main/CONTRIBUTING.md): build, test and PR guide.
+
+## Running it (for an agent operating efmesh)
+
+- Install: `bun add -d @avytheone/efmesh`; scaffold: `bunx efmesh init my-warehouse && cd my-warehouse` (writes config, example models, a seed).
+- Lifecycle: `plan <env>` (diff, changes nothing) → `apply <env>` (build physics, backfill, swap views) → `run <env>` (idempotent scheduler tick, new intervals only). Promotion to prod is `apply prod --yes` — a view swap, zero recomputation.
+- `run` only advances existing versions; structural changes go through `plan`/`apply`. Read `efmesh status <env>` for the tick journal, lag, and last plan.
+- Prefer `--json` on `plan`/`audit`/`status`/`diff` — stable shapes. In a non-TTY, `apply` with changes needs `--yes` or it refuses with exit 2. `run` exits 2 when unapplied changes await a human.
+- Never edit the state store by hand — `efmesh migrate` and the CLI are the only writers.
+- Read a command before docs: `efmesh <command> --help` states what it does and its flags.
