@@ -270,7 +270,7 @@ Backfill runs batches in parallel (connection pool); independent DAG branches bu
 
 ## Status
 
-**0.2.1** (beta). The core is built and exercised on a live example: phases F0–F6 ([SPEC.md §13](https://github.com/avytheone/efmesh/blob/main/SPEC.md), [CHANGELOG](https://github.com/avytheone/efmesh/blob/main/CHANGELOG.md)), 187 tests including a live Postgres cluster and golden tests freezing fingerprint stability. Effect v4 is a beta dependency: pinned exactly (peerDependencies); a weekly CI job tracks drift against fresh betas.
+**0.2.2** (beta). The core is built and exercised on a live example: phases F0–F6 ([SPEC.md §13](https://github.com/avytheone/efmesh/blob/main/SPEC.md), [CHANGELOG](https://github.com/avytheone/efmesh/blob/main/CHANGELOG.md)), 187 tests including a live Postgres cluster and golden tests freezing fingerprint stability. Effect v4 is a beta dependency: pinned exactly (peerDependencies); a weekly CI job tracks drift against fresh betas.
 
 Next up: making efmesh legible to an evaluating AI agent — broader `--json` coverage and an agent-oriented `llms.txt` map (milestone 0.3.0). Known limitation: a single `bun build --compile` binary builds, but standalone Bun executables can't resolve the `"efmesh"` import from a runtime-loaded config — distribution is via the package (SPEC §10).
 

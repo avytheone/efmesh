@@ -7,6 +7,11 @@ the first version gathers them in full.
 
 ## [Unreleased]
 
+## [0.2.2] — 2026-07-17
+
+Theme: the repo an AI agent can develop and operate — skills, full
+machine-readable CLI coverage, mechanical guard rails.
+
 - In-repo agent skills (#26) under `.claude/skills/` make the CLAUDE.md culture
   executable: `release`, `store-migration`, `fingerprint-change`,
   `add-model-kind` and `issue-workflow` — each a checklist of the exact commands

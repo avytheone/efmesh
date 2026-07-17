@@ -1,6 +1,6 @@
 {
   "name": "@avytheone/efmesh",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "sqlmesh-like data transformation framework on TypeScript, Bun and Effect",
   "license": "MIT",
   "author": "Alexey Yakimanskiy",
