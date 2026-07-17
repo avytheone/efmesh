@@ -40,11 +40,7 @@ describe("efmesh init (SPEC §12, F4)", () => {
           { now: Date.parse("2026-01-04T00:00:00Z") },
         ).pipe(Effect.provide(Layer.mergeAll(DuckDBEngineLive(), SqliteStateLive()))),
       )
-      expect(applied.built).toEqual([
-        "raw.events",
-        "mart.daily_revenue",
-        "mart.region_revenue",
-      ])
+      expect(applied.built).toEqual(["raw.events", "mart.daily_revenue", "mart.region_revenue"])
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

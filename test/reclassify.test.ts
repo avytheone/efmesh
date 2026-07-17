@@ -133,9 +133,7 @@ describe("indirect physical reuse (#5)", () => {
           { id: "p2", f: "2026-03-01 00:00:00", valid_to: null },
         ])
         // the new version's snapshot points at the old version's physical table
-        expect(yield* physicalFpOf("med.dim", dim.fingerprint)).toBe(
-          oldDim.physicalFingerprint,
-        )
+        expect(yield* physicalFpOf("med.dim", dim.fingerprint)).toBe(oldDim.physicalFingerprint)
       }),
     )
   })

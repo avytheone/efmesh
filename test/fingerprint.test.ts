@@ -9,9 +9,7 @@ const fingerprintsOf = (models: ReadonlyArray<AnyModel>) =>
   Effect.runPromise(
     buildGraph(models).pipe(
       Effect.flatMap(fingerprintGraph),
-      Effect.map(
-        (versions) => new Map([...versions].map(([name, v]) => [name, v.fingerprint])),
-      ),
+      Effect.map((versions) => new Map([...versions].map(([name, v]) => [name, v.fingerprint]))),
       Effect.provide(DuckDBEngineLive()),
     ),
   )
@@ -72,7 +70,8 @@ describe("fingerprint over the canonical AST (SPEC §4)", () => {
           kind: kind.incrementalByTimeRange({ timeColumn, start: "2026-01-01", batchSize }),
           schema,
         },
-        (ctx) => ctx.sql`SELECT case_id, dept FROM src.raw WHERE ts >= ${ctx.start} AND ts < ${ctx.end}`,
+        (ctx) =>
+          ctx.sql`SELECT case_id, dept FROM src.raw WHERE ts >= ${ctx.start} AND ts < ${ctx.end}`,
       )
     const base = await fingerprintsOf([incremental("case_id", 30)])
     const otherColumn = await fingerprintsOf([incremental("dept", 30)])

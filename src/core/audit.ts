@@ -38,9 +38,7 @@ const SELF: SelfValue = { _tag: "SelfValue" }
 
 /** Builders are typed by the model's columns via the Fields type parameter. */
 export const audit = {
-  notNull: <Fields extends Schema.Struct.Fields>(
-    column: Extract<keyof Fields, string>,
-  ): Audit => ({
+  notNull: <Fields extends Schema.Struct.Fields>(column: Extract<keyof Fields, string>): Audit => ({
     name: `not_null(${column})`,
     blocking: true,
     fragment: sql`SELECT * FROM ${SELF} WHERE ${idents(column)} IS NULL`,

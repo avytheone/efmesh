@@ -122,9 +122,7 @@ describe("forward-only (SPEC §5.2)", () => {
 
         // same physical table: history with NULL, new day with a value
         const table = `"_efmesh"."med__events__${fp8(fpV1)}"`
-        const rows = yield* engine.query(
-          `SELECT id, amount FROM ${table} ORDER BY happened_at`,
-        )
+        const rows = yield* engine.query(`SELECT id, amount FROM ${table} ORDER BY happened_at`)
         expect(rows).toEqual([
           { id: "e1", amount: null },
           { id: "e2", amount: null },

@@ -44,8 +44,9 @@ const staysV2 = defineModel(
  */
 const testLayer = Layer.mergeAll(DuckDBEngineLive(), SqliteStateLive())
 
-const scenario = <A, E>(body: Effect.Effect<A, E, EngineAdapter | import("../src/state/store.ts").StateStore>) =>
-  Effect.runPromise(body.pipe(Effect.provide(testLayer)))
+const scenario = <A, E>(
+  body: Effect.Effect<A, E, EngineAdapter | import("../src/state/store.ts").StateStore>,
+) => Effect.runPromise(body.pipe(Effect.provide(testLayer)))
 
 describe("F0: the stop condition SPEC §13", () => {
   test("plan→apply→change→plan→apply; prod is not recomputed", async () => {

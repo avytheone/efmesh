@@ -32,7 +32,14 @@ export { discoverModels, DiscoveryConflictError, DiscoveryError } from "./discov
 
 // — facade and operations: plain Effects for embedding (SPEC §10) —
 export { Efmesh } from "./efmesh.ts"
-export { run, daemon, Runner, RunBlockedByChangesError, type RunError, type RunOptions } from "./plan/run.ts"
+export {
+  run,
+  daemon,
+  Runner,
+  RunBlockedByChangesError,
+  type RunError,
+  type RunOptions,
+} from "./plan/run.ts"
 export { janitor, type JanitorOptions, type JanitorReport } from "./plan/janitor.ts"
 export {
   auditEnvironment,

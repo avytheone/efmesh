@@ -183,7 +183,10 @@ export const planChanges = (
     for (const flagged of forwardOnly) {
       const model = graph.models.get(flagged)
       if (model === undefined) {
-        return yield* new ForwardOnlyError({ model: flagged, reason: "model is not in the project" })
+        return yield* new ForwardOnlyError({
+          model: flagged,
+          reason: "model is not in the project",
+        })
       }
       if (model.kind._tag !== "incrementalByTimeRange") {
         return yield* new ForwardOnlyError({
@@ -259,8 +262,7 @@ export const planChanges = (
                 }
               : {
                   diverged: [],
-                  reason:
-                    "own AST did not change — metadata diverged (kind/grain/columns/target)",
+                  reason: "own AST did not change — metadata diverged (kind/grain/columns/target)",
                 }
         } else {
           change = categorizeAstChange(oldAst, ast)
@@ -377,8 +379,7 @@ export const planChanges = (
         // coverage is keyed to the fingerprint: a new version = empty ledger =
         // full backfill; forward-only inherits the done-intervals of the old
         // version — only what was missing is recomputed
-        const inherited =
-          reusedFrom === undefined ? [] : yield* store.listIntervals(reusedFrom)
+        const inherited = reusedFrom === undefined ? [] : yield* store.listIntervals(reusedFrom)
         const doneByStart = new Map<number, Interval>()
         for (const record of [...(yield* store.listIntervals(fingerprint)), ...inherited]) {
           if (record.status !== "done") continue
@@ -409,8 +410,7 @@ export const planChanges = (
         build: !alreadyBuilt,
         backfill,
         // every apply reconciles the query with the physics: upsert / SCD versioning
-        refresh:
-          model.kind._tag === "incrementalByUniqueKey" || model.kind._tag === "scdType2",
+        refresh: model.kind._tag === "incrementalByUniqueKey" || model.kind._tag === "scdType2",
       })
     }
     for (const [name, fingerprint] of current) {

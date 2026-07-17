@@ -15,7 +15,11 @@ export interface EnvDiff {
   readonly onlyInA: ReadonlyArray<string>
   readonly onlyInB: ReadonlyArray<string>
   /** Differing versions: name + fp8 of both sides. */
-  readonly different: ReadonlyArray<{ readonly name: string; readonly a: string; readonly b: string }>
+  readonly different: ReadonlyArray<{
+    readonly name: string
+    readonly a: string
+    readonly b: string
+  }>
   readonly same: ReadonlyArray<string>
 }
 
@@ -170,12 +174,8 @@ export const dataDiffEnvironments = (
       const refA = viewRef(envA, model.name)
       const refB = viewRef(envB, model.name)
 
-      const rowsA = asCount(
-        (yield* engine.query(`SELECT count(*) AS n FROM ${refA}`))[0]?.["n"],
-      )
-      const rowsB = asCount(
-        (yield* engine.query(`SELECT count(*) AS n FROM ${refB}`))[0]?.["n"],
-      )
+      const rowsA = asCount((yield* engine.query(`SELECT count(*) AS n FROM ${refA}`))[0]?.["n"])
+      const rowsB = asCount((yield* engine.query(`SELECT count(*) AS n FROM ${refB}`))[0]?.["n"])
 
       // actual columns of both sides: environments may point at different
       // model versions — only common ones are compared, schema drift is recorded

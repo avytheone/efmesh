@@ -90,9 +90,7 @@ describe("the janitor↔apply race (F6)", () => {
         yield* store.upsertSnapshot({ ...base, fingerprint: "f1", physicalFp: "f1" })
         yield* store.deleteSnapshot("med.a", "f1") // "the janitor got there first"
         return yield* Effect.flip(
-          store.promote("dev", [
-            { name: "med.a", fingerprint: "f1", requireSnapshot: true },
-          ]),
+          store.promote("dev", [{ name: "med.a", fingerprint: "f1", requireSnapshot: true }]),
         )
       }),
     )

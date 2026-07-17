@@ -51,9 +51,7 @@ export interface Engine {
    * An adapter primitive rather than BEGIN/COMMIT via execute: on a connection
    * pool (Postgres) separate calls would scatter across different connections.
    */
-  readonly transaction: (
-    statements: ReadonlyArray<string>,
-  ) => Effect.Effect<void, EngineError>
+  readonly transaction: (statements: ReadonlyArray<string>) => Effect.Effect<void, EngineError>
   /** Names and types of a query's columns without executing it (schema contract, SPEC §3.2). */
   readonly describe: (sql: string) => Effect.Effect<ReadonlyArray<EngineColumn>, EngineError>
   /**

@@ -35,7 +35,10 @@ const isModel = (value: unknown): value is AnyModel =>
   (value as { _tag?: unknown })._tag === "Model" &&
   typeof (value as { name?: { full?: unknown } }).name?.full === "string"
 
-const scanPattern = (pattern: string, root: string): Effect.Effect<ReadonlyArray<string>, DiscoveryError> =>
+const scanPattern = (
+  pattern: string,
+  root: string,
+): Effect.Effect<ReadonlyArray<string>, DiscoveryError> =>
   Effect.tryPromise({
     try: async () => {
       const found: Array<string> = []

@@ -68,7 +68,14 @@ describe("diff --data (#6)", () => {
         const cleanReport = yield* dataDiffEnvironments("dev", "prod", models)
         expect(cleanReport.models.map((m) => m.model)).toEqual(["med.keyless", "med.visits"])
         const cleanVisits = cleanReport.models.find((m) => m.model === "med.visits")!
-        expect(cleanVisits).toMatchObject({ rowsA: 3, rowsB: 3, onlyInA: 0, onlyInB: 0, matched: 3, columns: [] })
+        expect(cleanVisits).toMatchObject({
+          rowsA: 3,
+          rowsB: 3,
+          onlyInA: 0,
+          onlyInB: 0,
+          matched: 3,
+          columns: [],
+        })
 
         // drift: the prod view is switched by hand to an edited copy —
         // this is what a divergence of environments pointing at different versions looks like

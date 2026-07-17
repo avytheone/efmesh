@@ -55,9 +55,7 @@ export const missingIntervals = (
 }
 
 /** Adjacent intervals merge into contiguous ranges (input must be sorted). */
-export const mergeIntervals = (
-  intervals: ReadonlyArray<Interval>,
-): ReadonlyArray<Interval> => {
+export const mergeIntervals = (intervals: ReadonlyArray<Interval>): ReadonlyArray<Interval> => {
   const merged: Array<Interval> = []
   for (const interval of intervals) {
     const last = merged[merged.length - 1]
@@ -91,10 +89,7 @@ export const splitIntoBatches = (
 }
 
 /** Grain intervals within a range (for marking each one done after a batch). */
-export const intervalsWithin = (
-  range: Interval,
-  unit: IntervalUnit,
-): ReadonlyArray<Interval> => {
+export const intervalsWithin = (range: Interval, unit: IntervalUnit): ReadonlyArray<Interval> => {
   const step = unitMillis[unit]
   const intervals: Array<Interval> = []
   for (let start = range.start; start < range.end; start += step) {

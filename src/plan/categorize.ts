@@ -18,9 +18,7 @@ export const topSelect = (
     }
     const node = ast.statements?.[0]?.node
     if (node === undefined || !Array.isArray(node["select_list"])) return null
-    const list = (node["select_list"] as ReadonlyArray<unknown>).map((item) =>
-      JSON.stringify(item),
-    )
+    const list = (node["select_list"] as ReadonlyArray<unknown>).map((item) => JSON.stringify(item))
     const { select_list: _list, ...rest } = node
     return { list, rest: JSON.stringify(rest) }
   } catch {

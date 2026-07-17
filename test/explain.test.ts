@@ -78,9 +78,7 @@ describe("plan --explain (#4)", () => {
     const action = (await actionsAfter([src], [reworked])).get("med.src")!
     expect(action.change).toBe("breaking")
     expect(action.explain?.reason).toContain("not only at its tail")
-    expect(
-      action.explain?.diverged.some((path) => path.startsWith("select_list[0]")),
-    ).toBe(true)
+    expect(action.explain?.diverged.some((path) => path.startsWith("select_list[0]"))).toBe(true)
   })
 
   test("dropping a column: breaking with a reason about the removal", async () => {
@@ -110,9 +108,7 @@ describe("plan --explain (#4)", () => {
     const action = (await actionsAfter([src], [filtered])).get("med.src")!
     expect(action.change).toBe("breaking")
     expect(action.explain?.reason).toContain("outside the SELECT list")
-    expect(
-      action.explain?.diverged.some((path) => path.includes("where_clause")),
-    ).toBe(true)
+    expect(action.explain?.diverged.some((path) => path.includes("where_clause"))).toBe(true)
   })
 
   test("a child with an untouched body: indirect with cascadeFrom pointing at the parent", async () => {

@@ -2,12 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { Effect, Layer, Schema } from "effect"
 import { Efmesh } from "../src/efmesh.ts"
 import { fromIso } from "../src/core/interval.ts"
-import {
-  defineExternal,
-  defineSqlModel,
-  external,
-  kind,
-} from "../src/core/model.ts"
+import { defineExternal, defineSqlModel, external, kind } from "../src/core/model.ts"
 import { EngineAdapter } from "../src/engine/adapter.ts"
 import { DuckDBEngineLive } from "../src/engine/duckdb.ts"
 import { SqliteStateLive } from "../src/state/sqlite.ts"

@@ -105,9 +105,7 @@ describe("detailed execution log (#14)", () => {
     }
     // lifecycle start/finish are info too
     expect(entries.some((e) => e.level === "Info" && e.message === "build start")).toBe(true)
-    expect(
-      entries.some((e) => e.level === "Info" && e.message.startsWith("build done")),
-    ).toBe(true)
+    expect(entries.some((e) => e.level === "Info" && e.message.startsWith("build done"))).toBe(true)
   })
 
   test("rendered SQL is emitted at debug, never at info", async () => {

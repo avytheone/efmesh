@@ -27,7 +27,11 @@ describe("external models (SPEC §3.1, §9.3)", () => {
           `CREATE TABLE src.raw_moves AS SELECT * FROM (VALUES ('c1','ICU'), ('c2','therapy')) t(case_id, dept)`,
         )
 
-        const raw = defineExternal({ name: "src.moves", source: external.table("src.raw_moves"), schema })
+        const raw = defineExternal({
+          name: "src.moves",
+          source: external.table("src.raw_moves"),
+          schema,
+        })
         const stays = defineModel(
           { name: "med.stays", kind: kind.full(), schema },
           (ctx) => ctx.sql`SELECT ${ctx.cols(raw, "case_id", "dept")} FROM ${ctx.ref(raw)}`,

@@ -58,9 +58,7 @@ describe.skipIf(!hasPostgres)("Postgres adapter (SPEC §9.1, F3)", () => {
         yield* store.markIntervals("f2", [jan1], "failed")
         yield* store.markIntervals("f2", [jan1], "done")
         const ledger = yield* store.listIntervals("f2")
-        expect(ledger.map((i) => [i.startTs, i.status])).toEqual([
-          ["2026-01-01T00:00:00Z", "done"],
-        ])
+        expect(ledger.map((i) => [i.startTs, i.status])).toEqual([["2026-01-01T00:00:00Z", "done"]])
 
         expect(yield* store.acquireLock("run:dev", 60_000)).toBe(true)
         expect(yield* store.acquireLock("run:dev", 60_000)).toBe(false)

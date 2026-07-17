@@ -86,9 +86,10 @@ export const kind = {
     batchSize: options.batchSize ?? 30,
     lookback: options.lookback ?? 0,
   }),
-  incrementalByUniqueKey: (options: {
-    readonly key: ReadonlyArray<string>
-  }): ModelKind => ({ _tag: "incrementalByUniqueKey", key: options.key }),
+  incrementalByUniqueKey: (options: { readonly key: ReadonlyArray<string> }): ModelKind => ({
+    _tag: "incrementalByUniqueKey",
+    key: options.key,
+  }),
   scdType2: (options: {
     readonly key: ReadonlyArray<string>
     readonly validFrom?: string
@@ -270,7 +271,7 @@ const validateKindConfig = <Fields extends Schema.Struct.Fields>(
   if (config.kind._tag === "incrementalByUniqueKey" && config.target === "parquet") {
     throw new ModelDefinitionError({
       model: name.full,
-      reason: "key upsert into parquet files is impossible — use target: \"table\"",
+      reason: 'key upsert into parquet files is impossible — use target: "table"',
     })
   }
   if (config.kind._tag === "incrementalByTimeRange") {
@@ -359,8 +360,7 @@ export const defineModel = <const Fields extends Schema.Struct.Fields>(
   return assembleModel(name, config, body(ctx), refs)
 }
 
-export interface SqlModelConfig<Fields extends Schema.Struct.Fields>
-  extends ModelConfig<Fields> {
+export interface SqlModelConfig<Fields extends Schema.Struct.Fields> extends ModelConfig<Fields> {
   /** Path to the .sql body file: `@ref(schema.table)`, `@start`, `@end`. */
   readonly file: string
   /**

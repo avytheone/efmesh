@@ -116,9 +116,7 @@ describe("state store schema version + migrate (SPEC §6, F4)", () => {
     expect(existsSync(`${path}.backup-v0`)).toBe(true)
     // the backup holds the pre-version layout: the efmesh version can be rolled back
     const backup = new Database(`${path}.backup-v0`)
-    expect(
-      backup.query(`SELECT 1 FROM sqlite_master WHERE name = 'meta'`).get(),
-    ).toBeNull()
+    expect(backup.query(`SELECT 1 FROM sqlite_master WHERE name = 'meta'`).get()).toBeNull()
     backup.close()
 
     // a repeated migrate on a current store does not spawn a backup

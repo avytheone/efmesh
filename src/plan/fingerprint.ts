@@ -43,7 +43,8 @@ export const canonicalSql = (graph: ModelGraph, name: string): string => {
   const model = graph.models.get(name)
   // invariant: callers pass a name already known to the graph (the facade
   // guards user input with UnknownModelError before reaching here)
-  if (model === undefined) throw new Error(`invariant violated: model «${name}» is not in the graph`)
+  if (model === undefined)
+    throw new Error(`invariant violated: model «${name}» is not in the graph`)
   return render(model.fragment, { resolveRef: (ref) => ref })
 }
 
@@ -81,8 +82,7 @@ const kindPayload = (
           file: kind.file,
           contentHash: sha256(readFileSync(kind.file, "utf8")),
         }),
-        catch: (cause) =>
-          new SeedReadError({ model: model.name.full, file: kind.file, cause }),
+        catch: (cause) => new SeedReadError({ model: model.name.full, file: kind.file, cause }),
       })
   }
 }

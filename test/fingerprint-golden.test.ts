@@ -85,8 +85,7 @@ const GOLDEN = {
 
 const fingerprints = (models: Parameters<typeof buildGraph>[0]) =>
   Effect.runPromise(
-    buildGraph(models)
-      .pipe(Effect.flatMap(fingerprintGraph), Effect.provide(DuckDBEngineLive())),
+    buildGraph(models).pipe(Effect.flatMap(fingerprintGraph), Effect.provide(DuckDBEngineLive())),
   )
 
 describe("golden fingerprints — canonicalization as a contract (SPEC §4)", () => {
@@ -164,9 +163,7 @@ describe("canonicalization cache (#8)", () => {
         expect(callsAfterFirst).toBeGreaterThan(0)
         expect(calls).toBe(callsAfterFirst) // all from cache
         return { first, second }
-      }).pipe(
-        Effect.provide(Layer.mergeAll(DuckDBEngineLive(), SqliteStateLive())),
-      ),
+      }).pipe(Effect.provide(Layer.mergeAll(DuckDBEngineLive(), SqliteStateLive()))),
     )
     expect(second.actions.map((a) => a.fingerprint)).toEqual(
       first.actions.map((a) => a.fingerprint),

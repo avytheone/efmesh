@@ -140,8 +140,7 @@ export const lineage = (
 
 /** Flat printout of the lineage tree for the CLI. */
 export const formatLineage = (node: LineageNode, indent = ""): ReadonlyArray<string> => {
-  const marker =
-    node.kind === "external" || node.kind === "seed" ? `  [${node.kind}]` : ""
+  const marker = node.kind === "external" || node.kind === "seed" ? `  [${node.kind}]` : ""
   const line = `${indent}${node.model}.${node.column}${marker}`
   return [line, ...node.sources.flatMap((source) => formatLineage(source, `${indent}  `))]
 }

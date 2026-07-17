@@ -12,19 +12,10 @@ import { DuckDBEngineLive } from "./engine/duckdb.ts"
 import { PostgresEngineLive } from "./engine/postgres.ts"
 import { PostgresStateLive } from "./state/postgres.ts"
 import { auditEnvironment, EnvironmentAuditError } from "./plan/audit-run.ts"
-import {
-  dataDiffEnvironments,
-  diffEnvironments,
-  type DataDiffReport,
-} from "./plan/diff.ts"
+import { dataDiffEnvironments, diffEnvironments, type DataDiffReport } from "./plan/diff.ts"
 import { EngineAdapter } from "./engine/adapter.ts"
 import { ducklakeAttachSql } from "./plan/naming.ts"
-import {
-  listSchedules,
-  registerSchedule,
-  removeSchedule,
-  systemdUnits,
-} from "./plan/schedule.ts"
+import { listSchedules, registerSchedule, removeSchedule, systemdUnits } from "./plan/schedule.ts"
 import { renderGraphHtml } from "./plan/graph-html.ts"
 import { formatLineage, lineage, LineageError } from "./plan/lineage.ts"
 import { environmentStatus } from "./plan/status.ts"
@@ -78,7 +69,10 @@ const loadConfig = (
       if (seen.has(model)) continue
       const already = names.get(model.name.full)
       if (already !== undefined) {
-        return yield* new DiscoveryConflictError({ name: model.name.full, files: [already, "discovery"] })
+        return yield* new DiscoveryConflictError({
+          name: model.name.full,
+          files: [already, "discovery"],
+        })
       }
       names.set(model.name.full, "discovery")
       merged.push(model)
@@ -131,9 +125,7 @@ const reclassifyFlag = Flag.string("reclassify").pipe(
 
 const jobsFlag = Flag.string("jobs").pipe(
   Flag.withDefault(""),
-  Flag.withDescription(
-    "how many models to build at once (DAG concurrency; always 1 on DuckDB)",
-  ),
+  Flag.withDescription("how many models to build at once (DAG concurrency; always 1 on DuckDB)"),
 )
 
 const parseJobs = (value: string): number | undefined => {
@@ -166,7 +158,10 @@ const parseForwardOnly = (value: string): ReadonlyArray<string> | undefined => {
 /** `model=breaking|non-breaking[,…]` → record for PlanOptions.reclassify (#5). */
 export const parseReclassify = (
   value: string,
-): Effect.Effect<Readonly<Record<string, "breaking" | "non-breaking">> | undefined, ReclassifyError> =>
+): Effect.Effect<
+  Readonly<Record<string, "breaking" | "non-breaking">> | undefined,
+  ReclassifyError
+> =>
   Effect.gen(function* () {
     const entries = value
       .split(",")
@@ -241,9 +236,7 @@ export const planToJson = (plan: Plan): unknown => ({
     name: action.name,
     change: action.change,
     // operator override (#5) and physical reuse — additive contract fields
-    ...(action.reclassifiedFrom !== undefined
-      ? { reclassifiedFrom: action.reclassifiedFrom }
-      : {}),
+    ...(action.reclassifiedFrom !== undefined ? { reclassifiedFrom: action.reclassifiedFrom } : {}),
     ...(action.reusedFrom !== undefined ? { reusedFrom: action.reusedFrom } : {}),
     fingerprint: action.fingerprint,
     build: action.build,
@@ -267,13 +260,9 @@ const printPlan = (plan: Plan, explain = false) =>
     for (const action of plan.actions) {
       const mark = CHANGE_MARK[action.change] ?? "?"
       const overridden =
-        action.reclassifiedFrom !== undefined
-          ? `  [override: was ${action.reclassifiedFrom}]`
-          : ""
+        action.reclassifiedFrom !== undefined ? `  [override: was ${action.reclassifiedFrom}]` : ""
       const reused =
-        action.change === "indirect" && action.reusedFrom !== undefined
-          ? "  [physics reused]"
-          : ""
+        action.change === "indirect" && action.reusedFrom !== undefined ? "  [physics reused]" : ""
       const build = action.build ? "  [build]" : ""
       const backfill =
         action.backfill.length > 0
@@ -365,10 +354,7 @@ const applyCommand = Command.make(
           })
           return
         }
-        if (
-          decision === "ask" &&
-          !isAffirmative(globalThis.prompt("apply the plan? [y/N]"))
-        ) {
+        if (decision === "ask" && !isAffirmative(globalThis.prompt("apply the plan? [y/N]"))) {
           yield* Console.log("apply cancelled")
           return
         }
@@ -402,9 +388,10 @@ const renderCommand = Command.make(
   ({ config, env, model }) =>
     Effect.gen(function* () {
       const loaded = yield* loadConfig(config)
-      const sql = env === ""
-        ? yield* Efmesh.render(loaded.models, model)
-        : yield* Efmesh.renderFor(loaded.models, model, env)
+      const sql =
+        env === ""
+          ? yield* Efmesh.render(loaded.models, model)
+          : yield* Efmesh.renderFor(loaded.models, model, env)
       yield* Console.log(sql.trim())
     }),
 ).pipe(Command.withDescription("show a model's final SQL"))
@@ -441,9 +428,7 @@ const runCommand = Command.make(
       )
       if (applied === undefined) return
       yield* Console.log(
-        applied.built.length > 0
-          ? `processed: ${applied.built.join(", ")}`
-          : "no new intervals",
+        applied.built.length > 0 ? `processed: ${applied.built.join(", ")}` : "no new intervals",
       )
     }),
 ).pipe(
@@ -539,9 +524,7 @@ const diffCommand = Command.make(
         yield* json ? printJson(report) : printDataDiff(report)
         return
       }
-      const diff = yield* diffEnvironments(envA, envB).pipe(
-        Effect.provide(configLayers(loaded)),
-      )
+      const diff = yield* diffEnvironments(envA, envB).pipe(Effect.provide(configLayers(loaded)))
       if (json) {
         yield* printJson(diff)
         return
@@ -709,9 +692,7 @@ const statusCommand = Command.make(
         }
       }
     }),
-).pipe(
-  Command.withDescription("what is happening in an environment: promotion, lag, run ticks"),
-)
+).pipe(Command.withDescription("what is happening in an environment: promotion, lag, run ticks"))
 
 const auditCommand = Command.make(
   "audit",
@@ -762,28 +743,23 @@ const auditCommand = Command.make(
       }
       yield* Console.log(`blocking audits of environment "${env}" are clean`)
     }),
-).pipe(
-  Command.withDescription("run audits over an environment's view layer, changing nothing"),
-)
+).pipe(Command.withDescription("run audits over an environment's view layer, changing nothing"))
 
-const migrateCommand = Command.make(
-  "migrate",
-  { config: configFlag },
-  ({ config }) =>
-    Effect.gen(function* () {
-      const loaded = yield* loadConfig(config)
-      const report = yield* (loaded.state?.url !== undefined
-        ? migratePostgresState({ url: loaded.state.url })
-        : migrateSqliteState({ path: loaded.state?.path ?? "efmesh.state.sqlite" }))
-      yield* Console.log(
-        report.from === report.to
-          ? `state store already at version ${report.to}`
-          : `state store: version ${report.from} → ${report.to}`,
-      )
-      if (report.backup !== undefined) {
-        yield* Console.log(`backup of the old store: ${report.backup}`)
-      }
-    }),
+const migrateCommand = Command.make("migrate", { config: configFlag }, ({ config }) =>
+  Effect.gen(function* () {
+    const loaded = yield* loadConfig(config)
+    const report = yield* loaded.state?.url !== undefined
+      ? migratePostgresState({ url: loaded.state.url })
+      : migrateSqliteState({ path: loaded.state?.path ?? "efmesh.state.sqlite" })
+    yield* Console.log(
+      report.from === report.to
+        ? `state store already at version ${report.to}`
+        : `state store: version ${report.from} → ${report.to}`,
+    )
+    if (report.backup !== undefined) {
+      yield* Console.log(`backup of the old store: ${report.backup}`)
+    }
+  }),
 ).pipe(Command.withDescription("bring the state store schema up to the current version"))
 
 const graphCommand = Command.make(
@@ -857,8 +833,7 @@ const FAILURE_HINTS: Readonly<Record<string, (error: Record<string, unknown>) =>
   DucklakeNotConfiguredError: () => "add `ducklake: { catalog: … }` to efmesh.config.ts",
   AttachNotConfiguredError: (error) =>
     `add «${String(error["attach"])}» to \`attach\` in efmesh.config.ts`,
-  ConfigLoadError: () =>
-    "check the --config path and that it default-exports defineConfig({ … })",
+  ConfigLoadError: () => "check the --config path and that it default-exports defineConfig({ … })",
   RunBlockedByChangesError: (error) => `run \`efmesh apply ${String(error["env"])}\``,
 }
 

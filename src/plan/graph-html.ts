@@ -18,7 +18,11 @@ const KIND_COLOR: Record<string, string> = {
 }
 
 const escapeHtml = (text: string): string =>
-  text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll(`"`, "&quot;")
+  text
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll(`"`, "&quot;")
 
 const NODE_W = 210
 const NODE_H = 46
@@ -79,8 +83,7 @@ export const renderGraphHtml = (graph: ModelGraph): string => {
     const model = graph.models.get(name)!
     const { x, y } = position.get(name)!
     const color = KIND_COLOR[model.kind._tag] ?? "#666"
-    const title =
-      model.description !== undefined ? `${name} — ${model.description}` : name
+    const title = model.description !== undefined ? `${name} — ${model.description}` : name
     return `<g class="node" data-name="${escapeHtml(name)}" transform="translate(${x}, ${y})">
       <title>${escapeHtml(title)}</title>
       <rect width="${NODE_W}" height="${NODE_H}" rx="8"/>

@@ -78,9 +78,7 @@ export const run = (
       return yield* applyPlan(plan, graph, options)
     }).pipe(
       withStateLock(envLockName(env), options?.lockTtlMs),
-      Effect.tap((applied) =>
-        journal({ outcome: "ok", detail: JSON.stringify(applied.built) }),
-      ),
+      Effect.tap((applied) => journal({ outcome: "ok", detail: JSON.stringify(applied.built) })),
       Effect.tapError((error) => journal(classify(error))),
     )
   })
