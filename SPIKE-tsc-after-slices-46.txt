@@ -1,0 +1,480 @@
+src/bin.ts:2:22 - error TS2305: Module '"@effect/platform-bun"' has no exported member 'BunServices'.
+
+2 import { BunRuntime, BunServices } from "@effect/platform-bun"
+                       ~~~~~~~~~~~
+
+src/bin.ts:15:28 - error TS2339: Property 'layer' does not exist on type 'typeof import("/home/avy/repos/pharos-labs/repos/pharos-experimental/efmesh/.claude/worktrees/agent-ac02dd7322c1dfb94/node_modules/effect/dist/dts/Logger")'.
+
+15 const loggerLayer = Logger.layer([
+                              ~~~~~
+
+src/bin.ts:17:14 - error TS2339: Property 'consolePretty' does not exist on type 'typeof import("/home/avy/repos/pharos-labs/repos/pharos-experimental/efmesh/.claude/worktrees/agent-ac02dd7322c1dfb94/node_modules/effect/dist/dts/Logger")'.
+
+17     ? Logger.consolePretty({ stderr: true })
+                ~~~~~~~~~~~~~
+
+src/bin.ts:18:38 - error TS2339: Property 'formatLogFmt' does not exist on type 'typeof import("/home/avy/repos/pharos-labs/repos/pharos-experimental/efmesh/.claude/worktrees/agent-ac02dd7322c1dfb94/node_modules/effect/dist/dts/Logger")'.
+
+18     : Logger.withConsoleError(Logger.formatLogFmt),
+                                        ~~~~~~~~~~~~
+
+src/bin.ts:32:10 - error TS2339: Property 'hasFails' does not exist on type 'typeof import("/home/avy/repos/pharos-labs/repos/pharos-experimental/efmesh/.claude/worktrees/agent-ac02dd7322c1dfb94/node_modules/effect/dist/dts/Cause")'.
+
+32   !Cause.hasFails(cause) && Cause.interruptors(cause).size > 0
+            ~~~~~~~~
+
+src/bin.ts:32:55 - error TS2339: Property 'size' does not exist on type 'HashSet<FiberId>'.
+
+32   !Cause.hasFails(cause) && Cause.interruptors(cause).size > 0
+                                                         ~~~~
+
+src/bin.ts:36:10 - error TS2551: Property 'catchCause' does not exist on type 'typeof import("/home/avy/repos/pharos-labs/repos/pharos-experimental/efmesh/.claude/worktrees/agent-ac02dd7322c1dfb94/node_modules/effect/dist/dts/Effect")'. Did you mean 'matchCause'?
+
+36   Effect.catchCause((cause) =>
+            ~~~~~~~~~~
+
+  node_modules/effect/dist/dts/Effect.d.ts:21783:22 - 'matchCause' is declared here.
+    21783 export declare const matchCause: {
+                               ~~~~~~~~~~
+
+src/bin.ts:36:22 - error TS7006: Parameter 'cause' implicitly has an 'any' type.
+
+36   Effect.catchCause((cause) =>
+                        ~~~~~
+
+src/bin.ts:47:3 - error TS2345: Argument of type '<A, E, R>(self: Effect<A, E, R>) => Effect<A, any, any>' is not assignable to parameter of type '(_: Effect<unknown, any, any>) => Effect<unknown, unknown, never>'.
+  Type 'Effect<unknown, any, any>' is not assignable to type 'Effect<unknown, unknown, never>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+    Type 'any' is not assignable to type 'never'.
+
+47   Effect.provide(BunServices.layer),
+     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+src/cli/commands/audit.ts:20:5 - error TS2739: Type 'Effect<undefined, AuditTargetError | ConfigLoadError | DiscoveryConflictError | DiscoveryError | ... 4 more ... | GraphError, never>' is missing the following properties from type 'Effect<void, unknown, unknown>': toJSON, [NodeInspectSymbol], [TypeId]
+
+ 20     Effect.gen(function* () {
+        ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 21       const loaded = yield* loadConfig(config)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 55       yield* Console.log(`blocking audits of environment "${env}" are clean`)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 56     }),
+    ~~~~~~
+
+  ../../../node_modules/effect/dist/unstable/cli/Command.d.ts:619:107 - The expected type comes from the return type of this signature.
+    619     <Name extends string, const Config extends Command.Config, R, E>(name: Name, config: Config, handler: (config: Command.Config.Infer<Config>) => Effect.Effect<void, E, R>): Command<Name, Command.Config.Infer<Config>, {}, E, Exclude<R, BuiltInSettingContext>>;
+                                                                                                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+src/cli/commands/diff.ts:35:5 - error TS2739: Type 'Effect<void, ConfigLoadError | DataDiffError | DiscoveryConflictError | DiscoveryError | EngineError | StateError | StateSchemaError | GraphError, never>' is missing the following properties from type 'Effect<void, unknown, unknown>': toJSON, [NodeInspectSymbol], [TypeId]
+
+ 35     Effect.gen(function* () {
+        ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 36       const loaded = yield* loadConfig(config)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 72       }
+    ~~~~~~~
+ 73     }),
+    ~~~~~~
+
+  ../../../node_modules/effect/dist/unstable/cli/Command.d.ts:619:107 - The expected type comes from the return type of this signature.
+    619     <Name extends string, const Config extends Command.Config, R, E>(name: Name, config: Config, handler: (config: Command.Config.Infer<Config>) => Effect.Effect<void, E, R>): Command<Name, Command.Config.Infer<Config>, {}, E, Exclude<R, BuiltInSettingContext>>;
+                                                                                                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+src/cli/commands/graph.ts:19:5 - error TS2739: Type 'Effect<void, ConfigLoadError | DiscoveryConflictError | DiscoveryError | GraphError, never>' is missing the following properties from type 'Effect<void, unknown, unknown>': toJSON, [NodeInspectSymbol], [TypeId]
+
+ 19     Effect.gen(function* () {
+        ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 20       const loaded = yield* loadConfig(config)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 31       }
+    ~~~~~~~
+ 32     }),
+    ~~~~~~
+
+  ../../../node_modules/effect/dist/unstable/cli/Command.d.ts:619:107 - The expected type comes from the return type of this signature.
+    619     <Name extends string, const Config extends Command.Config, R, E>(name: Name, config: Config, handler: (config: Command.Config.Infer<Config>) => Effect.Effect<void, E, R>): Command<Name, Command.Config.Infer<Config>, {}, E, Exclude<R, BuiltInSettingContext>>;
+                                                                                                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+src/cli/commands/init.ts:9:5 - error TS2739: Type 'Effect<void, InitError, never>' is missing the following properties from type 'Effect<void, unknown, unknown>': toJSON, [NodeInspectSymbol], [TypeId]
+
+  9     Effect.gen(function* () {
+        ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 10       const created = yield* scaffold(dir)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 12       yield* Console.log("next: bunx efmesh plan dev && bunx efmesh apply dev")
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 13     }),
+    ~~~~~~
+
+  ../../../node_modules/effect/dist/unstable/cli/Command.d.ts:619:107 - The expected type comes from the return type of this signature.
+    619     <Name extends string, const Config extends Command.Config, R, E>(name: Name, config: Config, handler: (config: Command.Config.Infer<Config>) => Effect.Effect<void, E, R>): Command<Name, Command.Config.Infer<Config>, {}, E, Exclude<R, BuiltInSettingContext>>;
+                                                                                                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+src/cli/commands/janitor.ts:19:5 - error TS2739: Type 'Effect<void, ConfigLoadError | DiscoveryConflictError | DiscoveryError | EngineError | LockHeldError | StateError | StateSchemaError, never>' is missing the following properties from type 'Effect<void, unknown, unknown>': toJSON, [NodeInspectSymbol], [TypeId]
+
+ 19     Effect.gen(function* () {
+        ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 20       const loaded = yield* loadConfig(config)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 37       }
+    ~~~~~~~
+ 38     }),
+    ~~~~~~
+
+  ../../../node_modules/effect/dist/unstable/cli/Command.d.ts:619:107 - The expected type comes from the return type of this signature.
+    619     <Name extends string, const Config extends Command.Config, R, E>(name: Name, config: Config, handler: (config: Command.Config.Infer<Config>) => Effect.Effect<void, E, R>): Command<Name, Command.Config.Infer<Config>, {}, E, Exclude<R, BuiltInSettingContext>>;
+                                                                                                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+src/cli/commands/lineage.ts:13:5 - error TS2739: Type 'Effect<undefined, ConfigLoadError | DiscoveryConflictError | DiscoveryError | EngineError | LineageError | SqlParseError | StateError | StateSchemaError | GraphError, never>' is missing the following properties from type 'Effect<void, unknown, unknown>': toJSON, [NodeInspectSymbol], [TypeId]
+
+ 13     Effect.gen(function* () {
+        ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 14       const loaded = yield* loadConfig(config)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 41       if (json) yield* printJson(lineageToJson(modelName, trees))
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 42     }),
+    ~~~~~~
+
+  ../../../node_modules/effect/dist/unstable/cli/Command.d.ts:619:107 - The expected type comes from the return type of this signature.
+    619     <Name extends string, const Config extends Command.Config, R, E>(name: Name, config: Config, handler: (config: Command.Config.Infer<Config>) => Effect.Effect<void, E, R>): Command<Name, Command.Config.Infer<Config>, {}, E, Exclude<R, BuiltInSettingContext>>;
+                                                                                                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+src/cli/commands/migrate.ts:13:5 - error TS2739: Type 'Effect<void, ConfigLoadError | DiscoveryConflictError | DiscoveryError | StateError, never>' is missing the following properties from type 'Effect<void, unknown, unknown>': toJSON, [NodeInspectSymbol], [TypeId]
+
+ 13     Effect.gen(function* () {
+        ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 14       const loaded = yield* loadConfig(config)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 29       }
+    ~~~~~~~
+ 30     }),
+    ~~~~~~
+
+  ../../../node_modules/effect/dist/unstable/cli/Command.d.ts:619:107 - The expected type comes from the return type of this signature.
+    619     <Name extends string, const Config extends Command.Config, R, E>(name: Name, config: Config, handler: (config: Command.Config.Infer<Config>) => Effect.Effect<void, E, R>): Command<Name, Command.Config.Infer<Config>, {}, E, Exclude<R, BuiltInSettingContext>>;
+                                                                                                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+src/cli/commands/plan-apply.ts:40:5 - error TS2739: Type 'Effect<void, ConfigLoadError | DiscoveryConflictError | DiscoveryError | EngineError | FingerprintVersionError | ... 7 more ... | GraphError, never>' is missing the following properties from type 'Effect<void, unknown, unknown>': toJSON, [NodeInspectSymbol], [TypeId]
+
+ 40     Effect.gen(function* () {
+        ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 41       const loaded = yield* loadConfig(config)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 48       yield* json ? printJson(planToJson(plan)) : printPlan(plan, explain)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 49     }),
+    ~~~~~~
+
+  ../../../node_modules/effect/dist/unstable/cli/Command.d.ts:619:107 - The expected type comes from the return type of this signature.
+    619     <Name extends string, const Config extends Command.Config, R, E>(name: Name, config: Config, handler: (config: Command.Config.Infer<Config>) => Effect.Effect<void, E, R>): Command<Name, Command.Config.Infer<Config>, {}, E, Exclude<R, BuiltInSettingContext>>;
+                                                                                                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+src/cli/commands/plan-apply.ts:64:5 - error TS2739: Type 'Effect<void, AttachNotConfiguredError | AuditFailure | ConfigLoadError | DagCycleError | DiscoveryConflictError | ... 16 more ... | UnknownDependencyError, never>' is missing the following properties from type 'Effect<void, unknown, unknown>': toJSON, [NodeInspectSymbol], [TypeId]
+
+ 64     Effect.gen(function* () {
+        ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 65       const loaded = yield* loadConfig(config)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+108       }).pipe(withStateLock(envLockName(env)), Effect.provide(configLayers(loaded)))
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+109     }),
+    ~~~~~~
+
+  ../../../node_modules/effect/dist/unstable/cli/Command.d.ts:619:107 - The expected type comes from the return type of this signature.
+    619     <Name extends string, const Config extends Command.Config, R, E>(name: Name, config: Config, handler: (config: Command.Config.Infer<Config>) => Effect.Effect<void, E, R>): Command<Name, Command.Config.Infer<Config>, {}, E, Exclude<R, BuiltInSettingContext>>;
+                                                                                                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+src/cli/commands/render.ts:20:5 - error TS2739: Type 'Effect<void, ConfigLoadError | DiscoveryConflictError | DiscoveryError | UnknownModelError | GraphError, never>' is missing the following properties from type 'Effect<void, unknown, unknown>': toJSON, [NodeInspectSymbol], [TypeId]
+
+ 20     Effect.gen(function* () {
+        ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 21       const loaded = yield* loadConfig(config)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 26       yield* json ? printJson(renderToJson(model, env, sql.trim())) : Console.log(sql.trim())
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 27     }),
+    ~~~~~~
+
+  ../../../node_modules/effect/dist/unstable/cli/Command.d.ts:619:107 - The expected type comes from the return type of this signature.
+    619     <Name extends string, const Config extends Command.Config, R, E>(name: Name, config: Config, handler: (config: Command.Config.Infer<Config>) => Effect.Effect<void, E, R>): Command<Name, Command.Config.Infer<Config>, {}, E, Exclude<R, BuiltInSettingContext>>;
+                                                                                                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+src/cli/commands/run.ts:18:5 - error TS2739: Type 'Effect<void, ConfigLoadError | DiscoveryConflictError | DiscoveryError | LockHeldError | StateSchemaError | ApplyError, never>' is missing the following properties from type 'Effect<void, unknown, unknown>': toJSON, [NodeInspectSymbol], [TypeId]
+
+ 18     Effect.gen(function* () {
+        ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 19       const loaded = yield* loadConfig(config)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 47       )
+    ~~~~~~~
+ 48     }),
+    ~~~~~~
+
+  ../../../node_modules/effect/dist/unstable/cli/Command.d.ts:619:107 - The expected type comes from the return type of this signature.
+    619     <Name extends string, const Config extends Command.Config, R, E>(name: Name, config: Config, handler: (config: Command.Config.Infer<Config>) => Effect.Effect<void, E, R>): Command<Name, Command.Config.Infer<Config>, {}, E, Exclude<R, BuiltInSettingContext>>;
+                                                                                                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+src/cli/commands/schedule.ts:36:5 - error TS2739: Type 'Effect<void, never, never>' is missing the following properties from type 'Effect<void, unknown, unknown>': toJSON, [NodeInspectSymbol], [TypeId]
+
+ 36     Effect.gen(function* () {
+        ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 37       if (list) {
+    ~~~~~~~~~~~~~~~~~
+... 
+ 86       ),
+    ~~~~~~~~
+ 87     ),
+    ~~~~~
+
+  ../../../node_modules/effect/dist/unstable/cli/Command.d.ts:619:107 - The expected type comes from the return type of this signature.
+    619     <Name extends string, const Config extends Command.Config, R, E>(name: Name, config: Config, handler: (config: Command.Config.Infer<Config>) => Effect.Effect<void, E, R>): Command<Name, Command.Config.Infer<Config>, {}, E, Exclude<R, BuiltInSettingContext>>;
+                                                                                                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+src/cli/commands/status.ts:12:5 - error TS2739: Type 'Effect<void, ConfigLoadError | DiscoveryConflictError | DiscoveryError | EngineError | StateError | StateSchemaError | GraphError, never>' is missing the following properties from type 'Effect<void, unknown, unknown>': toJSON, [NodeInspectSymbol], [TypeId]
+
+ 12     Effect.gen(function* () {
+        ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 13       const loaded = yield* loadConfig(config)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 52       }
+    ~~~~~~~
+ 53     }),
+    ~~~~~~
+
+  ../../../node_modules/effect/dist/unstable/cli/Command.d.ts:619:107 - The expected type comes from the return type of this signature.
+    619     <Name extends string, const Config extends Command.Config, R, E>(name: Name, config: Config, handler: (config: Command.Config.Infer<Config>) => Effect.Effect<void, E, R>): Command<Name, Command.Config.Infer<Config>, {}, E, Exclude<R, BuiltInSettingContext>>;
+                                                                                                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+src/plan/run.ts:49:3 - error TS2375: Type 'Effect<AppliedPlan, unknown, unknown>' is not assignable to type 'Effect<AppliedPlan, RunError, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'RunError'.
+
+ 49   Effect.gen(function* () {
+      ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 50     const store = yield* StateStore
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 83     )
+    ~~~~~
+ 84   })
+    ~~~~
+
+src/plan/run.ts:66:16 - error TS2551: Property 'catchCause' does not exist on type 'typeof import("/home/avy/repos/pharos-labs/repos/pharos-experimental/efmesh/.claude/worktrees/agent-ac02dd7322c1dfb94/node_modules/effect/dist/dts/Effect")'. Did you mean 'matchCause'?
+
+66         Effect.catchCause((cause) => Effect.logWarning("tick journal is unavailable", cause)),
+                  ~~~~~~~~~~
+
+  node_modules/effect/dist/dts/Effect.d.ts:21783:22 - 'matchCause' is declared here.
+    21783 export declare const matchCause: {
+                               ~~~~~~~~~~
+
+src/plan/run.ts:66:28 - error TS7006: Parameter 'cause' implicitly has an 'any' type.
+
+66         Effect.catchCause((cause) => Effect.logWarning("tick journal is unavailable", cause)),
+                              ~~~~~
+
+src/plan/run.ts:82:51 - error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'RunError'.
+
+82       Effect.tapError((error) => journal(classify(error))),
+                                                     ~~~~~
+
+src/plan/run.ts:97:3 - error TS2375: Type 'Effect<never, unknown, unknown>' is not assignable to type 'Effect<never, never, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'never'.
+
+ 97   run(env, models, options).pipe(
+      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 98     Effect.tap((applied) =>
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+111     Effect.andThen(Effect.never),
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+112   )
+    ~~~
+
+src/plan/run.ts:107:12 - error TS2551: Property 'catchCause' does not exist on type 'typeof import("/home/avy/repos/pharos-labs/repos/pharos-experimental/efmesh/.claude/worktrees/agent-ac02dd7322c1dfb94/node_modules/effect/dist/dts/Effect")'. Did you mean 'matchCause'?
+
+107     Effect.catchCause((cause) => Effect.logError("tick failed", cause)),
+               ~~~~~~~~~~
+
+  node_modules/effect/dist/dts/Effect.d.ts:21783:22 - 'matchCause' is declared here.
+    21783 export declare const matchCause: {
+                               ~~~~~~~~~~
+
+src/plan/run.ts:107:24 - error TS7006: Parameter 'cause' implicitly has an 'any' type.
+
+107     Effect.catchCause((cause) => Effect.logError("tick failed", cause)),
+                           ~~~~~
+
+test/forward-only.test.ts:36:7 - error TS2322: Type 'Struct<{ id: typeof String$; happened_at: typeof DateTimeUtc; }> | Struct<{ id: typeof String$; happened_at: typeof DateTimeUtc; amount: NullOr<typeof Number$>; }> | Struct<...>' is not assignable to type 'Struct<{ happened_at: typeof DateTimeUtc; }>'.
+  Type 'Struct<{ id: typeof String$; happened_at: typeof DateTimeUtc; }>' is not assignable to type 'Struct<{ happened_at: typeof DateTimeUtc; }>'.
+    Types of property 'annotations' are incompatible.
+      Type '(annotations: Schema<{ readonly id: string; readonly happened_at: Utc; }, readonly []>) => Struct<{ id: typeof String$; happened_at: typeof DateTimeUtc; }>' is not assignable to type '(annotations: Schema<{ readonly happened_at: Utc; }, readonly []>) => Struct<{ happened_at: typeof DateTimeUtc; }>'.
+        Types of parameters 'annotations' and 'annotations' are incompatible.
+          Type 'Schema<{ readonly happened_at: Utc; }, readonly []>' is not assignable to type 'Schema<{ readonly id: string; readonly happened_at: Utc; }, readonly []>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+            The types returned by 'arbitrary(...)' are incompatible between these types.
+              Type 'LazyArbitrary<{ readonly happened_at: Utc; }>' is not assignable to type 'LazyArbitrary<{ readonly id: string; readonly happened_at: Utc; }>'.
+                Property 'id' is missing in type '{ readonly happened_at: Utc; }' but required in type '{ readonly id: string; readonly happened_at: Utc; }'.
+
+36       schema:
+         ~~~~~~
+
+  test/forward-only.test.ts:38:29 - 'id' is declared here.
+    38           ? Schema.Struct({ id: Schema.String, happened_at: Schema.DateTimeUtc })
+                                   ~~~~~~~~~~~~~~~~~
+
+  src/core/model.ts:146:12 - The expected type comes from property 'schema' which is declared here on type 'ModelConfig<{ happened_at: typeof DateTimeUtc; }>'
+    146   readonly schema: Schema.Struct<Fields>
+                   ~~~~~~
+
+test/logging.test.ts:5:33 - error TS2305: Module '"effect"' has no exported member 'References'.
+
+5 import { Effect, Layer, Logger, References, Schema } from "effect"
+                                  ~~~~~~~~~~
+
+test/logging.test.ts:32:33 - error TS2551: Property 'fiber' does not exist on type 'Options<unknown>'. Did you mean 'fiberId'?
+
+32     const annotations = options.fiber.getRef(References.CurrentLogAnnotations)
+                                   ~~~~~
+
+  node_modules/effect/dist/dts/Logger.d.ts:55:18 - 'fiberId' is declared here.
+    55         readonly fiberId: FiberId.FiberId;
+                        ~~~~~~~
+
+test/logging.test.ts:38:24 - error TS2339: Property 'layer' does not exist on type 'typeof import("/home/avy/repos/pharos-labs/repos/pharos-experimental/efmesh/.claude/worktrees/agent-ac02dd7322c1dfb94/node_modules/effect/dist/dts/Logger")'.
+
+38   const layer = Logger.layer([logger]).pipe(
+                          ~~~~~
+
+test/logging.test.ts:82:43 - error TS2345: Argument of type 'string' is not assignable to parameter of type 'LogLevel'.
+
+82     const { entries, layer } = collecting("Info")
+                                             ~~~~~~
+
+test/logging.test.ts:84:7 - error TS2379: Argument of type 'Effect<void, any, any>' is not assignable to parameter of type 'Effect<void, any, never>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'any' is not assignable to type 'never'.
+
+ 84       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 85         yield* seedSource
+    ~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 87         yield* Efmesh.apply("dev", [raw, daily], { now: fromIso("2026-01-04T00:00:00Z") })
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 88       }).pipe(Effect.provide(engineState), Effect.provide(layer)),
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+test/logging.test.ts:92:14 - error TS2367: This comparison appears to be unintentional because the types 'LogLevel' and 'string' have no overlap.
+
+92       (e) => e.level === "Info" && e.message.startsWith("backfill batch"),
+                ~~~~~~~~~~~~~~~~~~
+
+test/logging.test.ts:107:32 - error TS2367: This comparison appears to be unintentional because the types 'LogLevel' and 'string' have no overlap.
+
+107     expect(entries.some((e) => e.level === "Info" && e.message === "build start")).toBe(true)
+                                   ~~~~~~~~~~~~~~~~~~
+
+test/logging.test.ts:108:32 - error TS2367: This comparison appears to be unintentional because the types 'LogLevel' and 'string' have no overlap.
+
+108     expect(entries.some((e) => e.level === "Info" && e.message.startsWith("build done"))).toBe(true)
+                                   ~~~~~~~~~~~~~~~~~~
+
+test/logging.test.ts:113:29 - error TS2345: Argument of type 'string' is not assignable to parameter of type 'LogLevel'.
+
+113     const info = collecting("Info")
+                                ~~~~~~
+
+test/logging.test.ts:115:7 - error TS2379: Argument of type 'Effect<void, any, any>' is not assignable to parameter of type 'Effect<void, any, never>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'any' is not assignable to type 'never'.
+
+115       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+116         yield* seedSource
+    ~~~~~~~~~~~~~~~~~~~~~~~~~
+117         yield* Efmesh.apply("dev", [raw, daily], { now: fromIso("2026-01-04T00:00:00Z") })
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+118       }).pipe(Effect.provide(engineState), Effect.provide(info.layer)),
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+test/logging.test.ts:123:30 - error TS2345: Argument of type 'string' is not assignable to parameter of type 'LogLevel'.
+
+123     const debug = collecting("Debug")
+                                 ~~~~~~~
+
+test/logging.test.ts:125:7 - error TS2379: Argument of type 'Effect<void, any, any>' is not assignable to parameter of type 'Effect<void, any, never>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'any' is not assignable to type 'never'.
+
+125       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+126         yield* seedSource
+    ~~~~~~~~~~~~~~~~~~~~~~~~~
+127         yield* Efmesh.apply("dev", [raw, daily], { now: fromIso("2026-01-04T00:00:00Z") })
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+128       }).pipe(Effect.provide(engineState), Effect.provide(debug.layer)),
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+test/logging.test.ts:133:31 - error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Argument of type 'string' is not assignable to parameter of type 'LogLevel'.
+
+133       expect(line.level).toBe("Debug")
+                                  ~~~~~~~
+
+  node_modules/bun-types/test.d.ts:977:5 - The last overload is declared here.
+    977     toBe<X = T>(expected: NoInfer<X>): void;
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+test/logging.test.ts:139:43 - error TS2345: Argument of type 'string' is not assignable to parameter of type 'LogLevel'.
+
+139     const { entries, layer } = collecting("Info")
+                                              ~~~~~~
+
+test/logging.test.ts:141:7 - error TS2379: Argument of type 'Effect<void, any, any>' is not assignable to parameter of type 'Effect<void, any, never>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'any' is not assignable to type 'never'.
+
+141       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+142         const warned = defineModel(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+151         yield* Efmesh.apply("dev", [warned])
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+152       }).pipe(Effect.provide(engineState), Effect.provide(layer)),
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+test/logging.test.ts:154:45 - error TS2367: This comparison appears to be unintentional because the types 'LogLevel' and 'string' have no overlap.
+
+154     const warnLines = entries.filter((e) => e.level === "Warn")
+                                                ~~~~~~~~~~~~~~~~~~
+
+
+Found 46 errors in 16 files.
+
+Errors  Files
+     9  src/bin.ts:2
+     1  src/cli/commands/audit.ts:20
+     1  src/cli/commands/diff.ts:35
+     1  src/cli/commands/graph.ts:19
+     1  src/cli/commands/init.ts:9
+     1  src/cli/commands/janitor.ts:19
+     1  src/cli/commands/lineage.ts:13
+     1  src/cli/commands/migrate.ts:13
+     2  src/cli/commands/plan-apply.ts:40
+     1  src/cli/commands/render.ts:20
+     1  src/cli/commands/run.ts:18
+     1  src/cli/commands/schedule.ts:36
+     1  src/cli/commands/status.ts:12
+     7  src/plan/run.ts:49
+     1  test/forward-only.test.ts:36
+    16  test/logging.test.ts:5
+

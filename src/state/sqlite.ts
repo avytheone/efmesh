@@ -141,7 +141,7 @@ export const migrateSqliteState = (
 export const SqliteStateLive = (
   options?: SqliteStateOptions,
 ): Layer.Layer<StateStore, StateError | StateSchemaError> =>
-  Layer.effect(
+  Layer.scoped(
     StateStore,
     Effect.gen(function* () {
       const db = yield* Effect.acquireRelease(

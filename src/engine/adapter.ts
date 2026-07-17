@@ -62,6 +62,4 @@ export interface Engine {
   readonly canonicalize: (sql: string) => Effect.Effect<string, EngineError | SqlParseError>
 }
 
-export class EngineAdapter extends Context.Service<EngineAdapter, Engine>()(
-  "efmesh/EngineAdapter",
-) {}
+export class EngineAdapter extends Context.Tag("efmesh/EngineAdapter")<EngineAdapter, Engine>() {}

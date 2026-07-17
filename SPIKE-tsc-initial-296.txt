@@ -1,0 +1,2462 @@
+src/bin.ts:2:22 - error TS2305: Module '"@effect/platform-bun"' has no exported member 'BunServices'.
+
+2 import { BunRuntime, BunServices } from "@effect/platform-bun"
+                       ~~~~~~~~~~~
+
+src/bin.ts:15:28 - error TS2339: Property 'layer' does not exist on type 'typeof import("/home/avy/repos/pharos-labs/repos/pharos-experimental/efmesh/.claude/worktrees/agent-ac02dd7322c1dfb94/node_modules/effect/dist/dts/Logger")'.
+
+15 const loggerLayer = Logger.layer([
+                              ~~~~~
+
+src/bin.ts:17:14 - error TS2339: Property 'consolePretty' does not exist on type 'typeof import("/home/avy/repos/pharos-labs/repos/pharos-experimental/efmesh/.claude/worktrees/agent-ac02dd7322c1dfb94/node_modules/effect/dist/dts/Logger")'.
+
+17     ? Logger.consolePretty({ stderr: true })
+                ~~~~~~~~~~~~~
+
+src/bin.ts:18:38 - error TS2339: Property 'formatLogFmt' does not exist on type 'typeof import("/home/avy/repos/pharos-labs/repos/pharos-experimental/efmesh/.claude/worktrees/agent-ac02dd7322c1dfb94/node_modules/effect/dist/dts/Logger")'.
+
+18     : Logger.withConsoleError(Logger.formatLogFmt),
+                                        ~~~~~~~~~~~~
+
+src/bin.ts:32:10 - error TS2339: Property 'hasFails' does not exist on type 'typeof import("/home/avy/repos/pharos-labs/repos/pharos-experimental/efmesh/.claude/worktrees/agent-ac02dd7322c1dfb94/node_modules/effect/dist/dts/Cause")'.
+
+32   !Cause.hasFails(cause) && Cause.interruptors(cause).size > 0
+            ~~~~~~~~
+
+src/bin.ts:32:55 - error TS2339: Property 'size' does not exist on type 'HashSet<FiberId>'.
+
+32   !Cause.hasFails(cause) && Cause.interruptors(cause).size > 0
+                                                         ~~~~
+
+src/bin.ts:36:10 - error TS2551: Property 'catchCause' does not exist on type 'typeof import("/home/avy/repos/pharos-labs/repos/pharos-experimental/efmesh/.claude/worktrees/agent-ac02dd7322c1dfb94/node_modules/effect/dist/dts/Effect")'. Did you mean 'matchCause'?
+
+36   Effect.catchCause((cause) =>
+            ~~~~~~~~~~
+
+  node_modules/effect/dist/dts/Effect.d.ts:21783:22 - 'matchCause' is declared here.
+    21783 export declare const matchCause: {
+                               ~~~~~~~~~~
+
+src/bin.ts:36:22 - error TS7006: Parameter 'cause' implicitly has an 'any' type.
+
+36   Effect.catchCause((cause) =>
+                        ~~~~~
+
+src/bin.ts:47:3 - error TS2345: Argument of type '<A, E, R>(self: Effect<A, E, R>) => Effect<A, any, any>' is not assignable to parameter of type '(_: Effect<unknown, any, any>) => Effect<unknown, unknown, never>'.
+  Type 'Effect<unknown, any, any>' is not assignable to type 'Effect<unknown, unknown, never>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+    Type 'any' is not assignable to type 'never'.
+
+47   Effect.provide(BunServices.layer),
+     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+src/cli/commands/audit.ts:20:5 - error TS2739: Type 'Effect<undefined, AuditTargetError | ConfigLoadError | DiscoveryConflictError | DiscoveryError | ... 4 more ... | GraphError, never>' is missing the following properties from type 'Effect<void, unknown, unknown>': toJSON, [NodeInspectSymbol], [TypeId]
+
+ 20     Effect.gen(function* () {
+        ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 21       const loaded = yield* loadConfig(config)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 55       yield* Console.log(`blocking audits of environment "${env}" are clean`)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 56     }),
+    ~~~~~~
+
+  ../../../node_modules/effect/dist/unstable/cli/Command.d.ts:619:107 - The expected type comes from the return type of this signature.
+    619     <Name extends string, const Config extends Command.Config, R, E>(name: Name, config: Config, handler: (config: Command.Config.Infer<Config>) => Effect.Effect<void, E, R>): Command<Name, Command.Config.Infer<Config>, {}, E, Exclude<R, BuiltInSettingContext>>;
+                                                                                                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+src/cli/commands/diff.ts:35:5 - error TS2739: Type 'import("/home/avy/repos/pharos-labs/repos/pharos-experimental/efmesh/.claude/worktrees/agent-ac02dd7322c1dfb94/node_modules/effect/dist/dts/Effect").Effect<void, unknown, unknown>' is missing the following properties from type 'import("/home/avy/repos/pharos-labs/repos/pharos-experimental/efmesh/node_modules/effect/dist/Effect").Effect<void, unknown, unknown>': toJSON, [NodeInspectSymbol], [TypeId]
+
+ 35     Effect.gen(function* () {
+        ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 36       const loaded = yield* loadConfig(config)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 72       }
+    ~~~~~~~
+ 73     }),
+    ~~~~~~
+
+  ../../../node_modules/effect/dist/unstable/cli/Command.d.ts:619:107 - The expected type comes from the return type of this signature.
+    619     <Name extends string, const Config extends Command.Config, R, E>(name: Name, config: Config, handler: (config: Command.Config.Infer<Config>) => Effect.Effect<void, E, R>): Command<Name, Command.Config.Infer<Config>, {}, E, Exclude<R, BuiltInSettingContext>>;
+                                                                                                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+src/cli/commands/diff.ts:49:35 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+49             const engine = yield* EngineAdapter
+                                     ~~~~~~~~~~~~~
+
+src/cli/commands/graph.ts:19:5 - error TS2739: Type 'Effect<void, ConfigLoadError | DiscoveryConflictError | DiscoveryError | GraphError, never>' is missing the following properties from type 'Effect<void, unknown, unknown>': toJSON, [NodeInspectSymbol], [TypeId]
+
+ 19     Effect.gen(function* () {
+        ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 20       const loaded = yield* loadConfig(config)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 31       }
+    ~~~~~~~
+ 32     }),
+    ~~~~~~
+
+  ../../../node_modules/effect/dist/unstable/cli/Command.d.ts:619:107 - The expected type comes from the return type of this signature.
+    619     <Name extends string, const Config extends Command.Config, R, E>(name: Name, config: Config, handler: (config: Command.Config.Infer<Config>) => Effect.Effect<void, E, R>): Command<Name, Command.Config.Infer<Config>, {}, E, Exclude<R, BuiltInSettingContext>>;
+                                                                                                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+src/cli/commands/init.ts:9:5 - error TS2739: Type 'Effect<void, InitError, never>' is missing the following properties from type 'Effect<void, unknown, unknown>': toJSON, [NodeInspectSymbol], [TypeId]
+
+  9     Effect.gen(function* () {
+        ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 10       const created = yield* scaffold(dir)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 12       yield* Console.log("next: bunx efmesh plan dev && bunx efmesh apply dev")
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 13     }),
+    ~~~~~~
+
+  ../../../node_modules/effect/dist/unstable/cli/Command.d.ts:619:107 - The expected type comes from the return type of this signature.
+    619     <Name extends string, const Config extends Command.Config, R, E>(name: Name, config: Config, handler: (config: Command.Config.Infer<Config>) => Effect.Effect<void, E, R>): Command<Name, Command.Config.Infer<Config>, {}, E, Exclude<R, BuiltInSettingContext>>;
+                                                                                                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+src/cli/commands/janitor.ts:19:5 - error TS2739: Type 'Effect<void, ConfigLoadError | DiscoveryConflictError | DiscoveryError | EngineError | LockHeldError | StateError | StateSchemaError, never>' is missing the following properties from type 'Effect<void, unknown, unknown>': toJSON, [NodeInspectSymbol], [TypeId]
+
+ 19     Effect.gen(function* () {
+        ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 20       const loaded = yield* loadConfig(config)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 37       }
+    ~~~~~~~
+ 38     }),
+    ~~~~~~
+
+  ../../../node_modules/effect/dist/unstable/cli/Command.d.ts:619:107 - The expected type comes from the return type of this signature.
+    619     <Name extends string, const Config extends Command.Config, R, E>(name: Name, config: Config, handler: (config: Command.Config.Infer<Config>) => Effect.Effect<void, E, R>): Command<Name, Command.Config.Infer<Config>, {}, E, Exclude<R, BuiltInSettingContext>>;
+                                                                                                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+src/cli/commands/lineage.ts:13:5 - error TS2739: Type 'Effect<undefined, ConfigLoadError | DiscoveryConflictError | DiscoveryError | EngineError | LineageError | SqlParseError | StateError | StateSchemaError | GraphError, never>' is missing the following properties from type 'Effect<void, unknown, unknown>': toJSON, [NodeInspectSymbol], [TypeId]
+
+ 13     Effect.gen(function* () {
+        ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 14       const loaded = yield* loadConfig(config)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 41       if (json) yield* printJson(lineageToJson(modelName, trees))
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 42     }),
+    ~~~~~~
+
+  ../../../node_modules/effect/dist/unstable/cli/Command.d.ts:619:107 - The expected type comes from the return type of this signature.
+    619     <Name extends string, const Config extends Command.Config, R, E>(name: Name, config: Config, handler: (config: Command.Config.Infer<Config>) => Effect.Effect<void, E, R>): Command<Name, Command.Config.Infer<Config>, {}, E, Exclude<R, BuiltInSettingContext>>;
+                                                                                                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+src/cli/commands/migrate.ts:13:5 - error TS2739: Type 'Effect<void, ConfigLoadError | DiscoveryConflictError | DiscoveryError | StateError, never>' is missing the following properties from type 'Effect<void, unknown, unknown>': toJSON, [NodeInspectSymbol], [TypeId]
+
+ 13     Effect.gen(function* () {
+        ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 14       const loaded = yield* loadConfig(config)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 29       }
+    ~~~~~~~
+ 30     }),
+    ~~~~~~
+
+  ../../../node_modules/effect/dist/unstable/cli/Command.d.ts:619:107 - The expected type comes from the return type of this signature.
+    619     <Name extends string, const Config extends Command.Config, R, E>(name: Name, config: Config, handler: (config: Command.Config.Infer<Config>) => Effect.Effect<void, E, R>): Command<Name, Command.Config.Infer<Config>, {}, E, Exclude<R, BuiltInSettingContext>>;
+                                                                                                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+src/cli/commands/plan-apply.ts:40:5 - error TS2739: Type 'Effect<void, ConfigLoadError | DiscoveryConflictError | DiscoveryError | EngineError | FingerprintVersionError | ... 7 more ... | GraphError, never>' is missing the following properties from type 'Effect<void, unknown, unknown>': toJSON, [NodeInspectSymbol], [TypeId]
+
+ 40     Effect.gen(function* () {
+        ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 41       const loaded = yield* loadConfig(config)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 48       yield* json ? printJson(planToJson(plan)) : printPlan(plan, explain)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 49     }),
+    ~~~~~~
+
+  ../../../node_modules/effect/dist/unstable/cli/Command.d.ts:619:107 - The expected type comes from the return type of this signature.
+    619     <Name extends string, const Config extends Command.Config, R, E>(name: Name, config: Config, handler: (config: Command.Config.Infer<Config>) => Effect.Effect<void, E, R>): Command<Name, Command.Config.Infer<Config>, {}, E, Exclude<R, BuiltInSettingContext>>;
+                                                                                                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+src/cli/commands/plan-apply.ts:64:5 - error TS2739: Type 'Effect<void, AttachNotConfiguredError | AuditFailure | ConfigLoadError | DagCycleError | DiscoveryConflictError | ... 16 more ... | UnknownDependencyError, never>' is missing the following properties from type 'Effect<void, unknown, unknown>': toJSON, [NodeInspectSymbol], [TypeId]
+
+ 64     Effect.gen(function* () {
+        ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 65       const loaded = yield* loadConfig(config)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+108       }).pipe(withStateLock(envLockName(env)), Effect.provide(configLayers(loaded)))
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+109     }),
+    ~~~~~~
+
+  ../../../node_modules/effect/dist/unstable/cli/Command.d.ts:619:107 - The expected type comes from the return type of this signature.
+    619     <Name extends string, const Config extends Command.Config, R, E>(name: Name, config: Config, handler: (config: Command.Config.Infer<Config>) => Effect.Effect<void, E, R>): Command<Name, Command.Config.Infer<Config>, {}, E, Exclude<R, BuiltInSettingContext>>;
+                                                                                                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+src/cli/commands/render.ts:20:5 - error TS2739: Type 'Effect<void, ConfigLoadError | DiscoveryConflictError | DiscoveryError | UnknownModelError | GraphError, never>' is missing the following properties from type 'Effect<void, unknown, unknown>': toJSON, [NodeInspectSymbol], [TypeId]
+
+ 20     Effect.gen(function* () {
+        ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 21       const loaded = yield* loadConfig(config)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 26       yield* json ? printJson(renderToJson(model, env, sql.trim())) : Console.log(sql.trim())
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 27     }),
+    ~~~~~~
+
+  ../../../node_modules/effect/dist/unstable/cli/Command.d.ts:619:107 - The expected type comes from the return type of this signature.
+    619     <Name extends string, const Config extends Command.Config, R, E>(name: Name, config: Config, handler: (config: Command.Config.Infer<Config>) => Effect.Effect<void, E, R>): Command<Name, Command.Config.Infer<Config>, {}, E, Exclude<R, BuiltInSettingContext>>;
+                                                                                                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+src/cli/commands/run.ts:18:5 - error TS2739: Type 'Effect<void, ConfigLoadError | DiscoveryConflictError | DiscoveryError | LockHeldError | StateSchemaError | ApplyError, never>' is missing the following properties from type 'Effect<void, unknown, unknown>': toJSON, [NodeInspectSymbol], [TypeId]
+
+ 18     Effect.gen(function* () {
+        ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 19       const loaded = yield* loadConfig(config)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 47       )
+    ~~~~~~~
+ 48     }),
+    ~~~~~~
+
+  ../../../node_modules/effect/dist/unstable/cli/Command.d.ts:619:107 - The expected type comes from the return type of this signature.
+    619     <Name extends string, const Config extends Command.Config, R, E>(name: Name, config: Config, handler: (config: Command.Config.Infer<Config>) => Effect.Effect<void, E, R>): Command<Name, Command.Config.Infer<Config>, {}, E, Exclude<R, BuiltInSettingContext>>;
+                                                                                                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+src/cli/commands/schedule.ts:36:5 - error TS2739: Type 'Effect<void, never, never>' is missing the following properties from type 'Effect<void, unknown, unknown>': toJSON, [NodeInspectSymbol], [TypeId]
+
+ 36     Effect.gen(function* () {
+        ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 37       if (list) {
+    ~~~~~~~~~~~~~~~~~
+... 
+ 86       ),
+    ~~~~~~~~
+ 87     ),
+    ~~~~~
+
+  ../../../node_modules/effect/dist/unstable/cli/Command.d.ts:619:107 - The expected type comes from the return type of this signature.
+    619     <Name extends string, const Config extends Command.Config, R, E>(name: Name, config: Config, handler: (config: Command.Config.Infer<Config>) => Effect.Effect<void, E, R>): Command<Name, Command.Config.Infer<Config>, {}, E, Exclude<R, BuiltInSettingContext>>;
+                                                                                                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+src/cli/commands/status.ts:12:5 - error TS2739: Type 'Effect<void, ConfigLoadError | DiscoveryConflictError | DiscoveryError | EngineError | StateError | StateSchemaError | GraphError, never>' is missing the following properties from type 'Effect<void, unknown, unknown>': toJSON, [NodeInspectSymbol], [TypeId]
+
+ 12     Effect.gen(function* () {
+        ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 13       const loaded = yield* loadConfig(config)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 52       }
+    ~~~~~~~
+ 53     }),
+    ~~~~~~
+
+  ../../../node_modules/effect/dist/unstable/cli/Command.d.ts:619:107 - The expected type comes from the return type of this signature.
+    619     <Name extends string, const Config extends Command.Config, R, E>(name: Name, config: Config, handler: (config: Command.Config.Infer<Config>) => Effect.Effect<void, E, R>): Command<Name, Command.Config.Infer<Config>, {}, E, Exclude<R, BuiltInSettingContext>>;
+                                                                                                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+src/engine/adapter.ts:65:44 - error TS2339: Property 'Service' does not exist on type 'typeof import("/home/avy/repos/pharos-labs/repos/pharos-experimental/efmesh/.claude/worktrees/agent-ac02dd7322c1dfb94/node_modules/effect/dist/dts/Context")'.
+
+65 export class EngineAdapter extends Context.Service<EngineAdapter, Engine>()(
+                                              ~~~~~~~
+
+src/engine/duckdb.ts:2:25 - error TS2724: '"effect"' has no exported member named 'Semaphore'. Did you mean 'TSemaphore'?
+
+2 import { Effect, Layer, Semaphore } from "effect"
+                          ~~~~~~~~~
+
+src/engine/duckdb.ts:32:3 - error TS2322: Type 'Layer<EngineAdapter, unknown, unknown>' is not assignable to type 'Layer<EngineAdapter, EngineError, never>'.
+  Type 'unknown' is not assignable to type 'EngineError'.
+
+ 32   Layer.effect(
+      ~~~~~~~~~~~~~
+ 33     EngineAdapter,
+    ~~~~~~~~~~~~~~~~~~
+... 
+115     }),
+    ~~~~~~~
+116   )
+    ~~~
+
+src/engine/duckdb.ts:33:5 - error TS2740: Type 'typeof EngineAdapter' is missing the following properties from type 'Tag<EngineAdapter, unknown>': _op, Service, Identifier, [TagTypeId], and 12 more.
+
+33     EngineAdapter,
+       ~~~~~~~~~~~~~
+
+src/engine/postgres.ts:61:3 - error TS2322: Type 'Layer<EngineAdapter, EngineError, Scope>' is not assignable to type 'Layer<EngineAdapter, EngineError, never>'.
+  Type 'Scope' is not assignable to type 'never'.
+
+ 61   Layer.effect(
+      ~~~~~~~~~~~~~
+ 62     EngineAdapter,
+    ~~~~~~~~~~~~~~~~~~
+... 
+117     }),
+    ~~~~~~~
+118   )
+    ~~~
+
+src/engine/postgres.ts:62:5 - error TS2740: Type 'typeof EngineAdapter' is missing the following properties from type 'Tag<EngineAdapter, unknown>': _op, Service, Identifier, [TagTypeId], and 12 more.
+
+62     EngineAdapter,
+       ~~~~~~~~~~~~~
+
+src/plan/audit-run.ts:74:3 - error TS2375: Type 'Effect<{ results: AuditRunResult[]; blockingViolations: number; }, unknown, unknown>' is not assignable to type 'Effect<AuditRunReport, AuditTargetError | EngineError | GraphError, EngineAdapter>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'AuditTargetError | EngineError | GraphError'.
+
+ 74   Effect.gen(function* () {
+      ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 75     const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+108     }
+    ~~~~~
+109   }).pipe(Effect.withSpan("efmesh.audit", { attributes: { env } }))
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+src/plan/audit-run.ts:75:27 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+75     const engine = yield* EngineAdapter
+                             ~~~~~~~~~~~~~
+
+src/plan/diff.ts:30:3 - error TS2375: Type 'Effect<{ onlyInA: string[]; onlyInB: unknown[]; different: { name: string; a: string; b: string; }[]; same: string[]; }, unknown, unknown>' is not assignable to type 'Effect<EnvDiff, StateError, StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type '{ onlyInA: string[]; onlyInB: unknown[]; different: { name: string; a: string; b: string; }[]; same: string[]; }' is not assignable to type 'EnvDiff'.
+    Types of property 'onlyInB' are incompatible.
+      Type 'unknown[]' is not assignable to type 'readonly string[]'.
+        Type 'unknown' is not assignable to type 'string'.
+
+ 30   Effect.gen(function* () {
+      ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 31     const store = yield* StateStore
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 46     return { onlyInA, onlyInB, different, same }
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 47   })
+    ~~~~
+
+src/plan/diff.ts:31:26 - error TS2488: Type 'typeof StateStore' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+31     const store = yield* StateStore
+                            ~~~~~~~~~~
+
+src/plan/diff.ts:32:64 - error TS7006: Parameter 'r' implicitly has an 'any' type.
+
+32     const a = new Map((yield* store.getEnvironment(envA)).map((r) => [r.name, r.fingerprint]))
+                                                                  ~
+
+src/plan/diff.ts:33:64 - error TS7006: Parameter 'r' implicitly has an 'any' type.
+
+33     const b = new Map((yield* store.getEnvironment(envB)).map((r) => [r.name, r.fingerprint]))
+                                                                  ~
+
+src/plan/diff.ts:40:43 - error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'string'.
+
+40       if (fpB === undefined) onlyInA.push(name)
+                                             ~~~~
+
+src/plan/diff.ts:41:39 - error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'string'.
+
+41       else if (fpA === fpB) same.push(name)
+                                         ~~~~
+
+src/plan/diff.ts:42:29 - error TS2322: Type 'unknown' is not assignable to type 'string'.
+
+42       else different.push({ name, a: fpA.slice(0, 8), b: fpB.slice(0, 8) })
+                               ~~~~
+
+  src/plan/diff.ts:36:30 - The expected type comes from property 'name' which is declared here on type '{ name: string; a: string; b: string; }'
+    36     const different: Array<{ name: string; a: string; b: string }> = []
+                                    ~~~~
+
+src/plan/diff.ts:42:38 - error TS18046: 'fpA' is of type 'unknown'.
+
+42       else different.push({ name, a: fpA.slice(0, 8), b: fpB.slice(0, 8) })
+                                        ~~~
+
+src/plan/diff.ts:42:58 - error TS18047: 'fpB' is possibly 'null'.
+
+42       else different.push({ name, a: fpA.slice(0, 8), b: fpB.slice(0, 8) })
+                                                            ~~~
+
+src/plan/diff.ts:42:62 - error TS2339: Property 'slice' does not exist on type '{}'.
+
+42       else different.push({ name, a: fpA.slice(0, 8), b: fpB.slice(0, 8) })
+                                                                ~~~~~
+
+src/plan/diff.ts:148:3 - error TS2375: Type 'Effect<{ envA: string; envB: string; models: ModelDataDiff[]; }, unknown, unknown>' is not assignable to type 'Effect<DataDiffReport, DataDiffError | EngineError | StateError | GraphError, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'DataDiffError | EngineError | StateError | GraphError'.
+
+148   Effect.gen(function* () {
+      ~~~~~~~~~~~~~~~~~~~~~~~~~
+149     const store = yield* StateStore
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+259     return { envA, envB, models: reports }
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+260   }).pipe(Effect.withSpan("efmesh.diff.data", { attributes: { envA, envB } }))
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+src/plan/diff.ts:149:26 - error TS2488: Type 'typeof StateStore' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+149     const store = yield* StateStore
+                             ~~~~~~~~~~
+
+src/plan/diff.ts:150:27 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+150     const engine = yield* EngineAdapter
+                              ~~~~~~~~~~~~~
+
+src/plan/diff.ts:152:66 - error TS7006: Parameter 'row' implicitly has an 'any' type.
+
+152     const inA = new Set((yield* store.getEnvironment(envA)).map((row) => row.name))
+                                                                     ~~~
+
+src/plan/diff.ts:153:66 - error TS7006: Parameter 'row' implicitly has an 'any' type.
+
+153     const inB = new Set((yield* store.getEnvironment(envB)).map((row) => row.name))
+                                                                     ~~~
+
+src/plan/diff.ts:182:76 - error TS7006: Parameter 'c' implicitly has an 'any' type.
+
+182       const colsA = (yield* engine.describe(`SELECT * FROM ${refA}`)).map((c) => c.name)
+                                                                               ~
+
+src/plan/diff.ts:183:76 - error TS7006: Parameter 'c' implicitly has an 'any' type.
+
+183       const colsB = (yield* engine.describe(`SELECT * FROM ${refB}`)).map((c) => c.name)
+                                                                               ~
+
+src/plan/diff.ts:186:36 - error TS7006: Parameter 'column' implicitly has an 'any' type.
+
+186       const common = colsA.filter((column) => setB.has(column))
+                                       ~~~~~~
+
+src/plan/diff.ts:187:44 - error TS7006: Parameter 'column' implicitly has an 'any' type.
+
+187       const columnsOnlyInA = colsA.filter((column) => !setB.has(column))
+                                               ~~~~~~
+
+src/plan/diff.ts:188:44 - error TS7006: Parameter 'column' implicitly has an 'any' type.
+
+188       const columnsOnlyInB = colsB.filter((column) => !setA.has(column))
+                                               ~~~~~~
+
+src/plan/diff.ts:206:39 - error TS7006: Parameter 'column' implicitly has an 'any' type.
+
+206       const compared = common.filter((column) => !keySet.has(column))
+                                          ~~~~~~
+
+src/plan/diff.ts:210:12 - error TS7006: Parameter 'column' implicitly has an 'any' type.
+
+210           (column, index) =>
+               ~~~~~~
+
+src/plan/diff.ts:210:20 - error TS7006: Parameter 'index' implicitly has an 'any' type.
+
+210           (column, index) =>
+                       ~~~~~
+
+src/plan/diff.ts:216:12 - error TS7006: Parameter '_' implicitly has an 'any' type.
+
+216           (_, index) =>
+               ~
+
+src/plan/diff.ts:216:15 - error TS7006: Parameter 'index' implicitly has an 'any' type.
+
+216           (_, index) =>
+                  ~~~~~
+
+src/plan/diff.ts:236:15 - error TS7006: Parameter 'column' implicitly has an 'any' type.
+
+236         .map((column, index) => {
+                  ~~~~~~
+
+src/plan/diff.ts:236:23 - error TS7006: Parameter 'index' implicitly has an 'any' type.
+
+236         .map((column, index) => {
+                          ~~~~~
+
+src/plan/diff.ts:244:18 - error TS7006: Parameter 'drift' implicitly has an 'any' type.
+
+244         .filter((drift) => drift.mismatches > 0)
+                     ~~~~~
+
+src/plan/executor.ts:399:3 - error TS2375: Type 'Effect<{ plan: Plan; built: string[]; }, unknown, unknown>' is not assignable to type 'Effect<AppliedPlan, ApplyError, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'ApplyError'.
+
+399   Effect.gen(function* () {
+      ~~~~~~~~~~~~~~~~~~~~~~~~~
+400     const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+852     return { plan, built }
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~
+853   }).pipe(Effect.withSpan("efmesh.apply", { attributes: { env: plan.env } }))
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+src/plan/executor.ts:400:27 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+400     const engine = yield* EngineAdapter
+                              ~~~~~~~~~~~~~
+
+src/plan/executor.ts:401:26 - error TS2488: Type 'typeof StateStore' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+401     const store = yield* StateStore
+                             ~~~~~~~~~~
+
+src/plan/executor.ts:489:7 - error TS2375: Type 'Effect<void, unknown, unknown>' is not assignable to type 'Effect<void, ApplyError, never>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'ApplyError'.
+
+489       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+490         const model = graph.models.get(action.name)!
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+733         }
+    ~~~~~~~~~
+734       })
+    ~~~~~~~~
+
+src/plan/executor.ts:675:26 - error TS7006: Parameter 'record' implicitly has an 'any' type.
+
+675                 .filter((record) => record.status === "done")
+                             ~~~~~~
+
+src/plan/executor.ts:676:23 - error TS7006: Parameter 'record' implicitly has an 'any' type.
+
+676                 .map((record) => ({ startTs: record.startTs, endTs: record.endTs }))
+                          ~~~~~~
+
+src/plan/fingerprint.ts:152:3 - error TS2375: Type 'Effect<Map<string, ModelVersion>, unknown, unknown>' is not assignable to type 'Effect<ReadonlyMap<string, ModelVersion>, EngineError | SeedReadError | SqlParseError, EngineAdapter>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineError | SeedReadError | SqlParseError'.
+
+152   Effect.gen(function* () {
+      ~~~~~~~~~~~~~~~~~~~~~~~~~
+153     const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+177     return versions
+    ~~~~~~~~~~~~~~~~~~~
+178   })
+    ~~~~
+
+src/plan/fingerprint.ts:153:27 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+153     const engine = yield* EngineAdapter
+                              ~~~~~~~~~~~~~
+
+src/plan/fingerprint.ts:155:7 - error TS2375: Type 'Effect<any, unknown, unknown>' is not assignable to type 'Effect<string, EngineError | SqlParseError, never>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineError | SqlParseError'.
+
+155       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+156         if (cache === undefined) return yield* engine.canonicalize(source)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+162         return canon
+    ~~~~~~~~~~~~~~~~~~~~
+163       })
+    ~~~~~~~~
+
+src/plan/janitor.ts:50:3 - error TS2375: Type 'Effect<{ removed: string[]; kept: string[]; }, unknown, unknown>' is not assignable to type 'Effect<JanitorReport, EngineError | LockHeldError | StateError, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineError | LockHeldError | StateError'.
+
+ 50   Effect.gen(function* () {
+      ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 51     const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+128     withStateLock(janitorLockName, options?.lockTtlMs),
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+129   )
+    ~~~
+
+src/plan/janitor.ts:51:27 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+51     const engine = yield* EngineAdapter
+                             ~~~~~~~~~~~~~
+
+src/plan/janitor.ts:52:26 - error TS2488: Type 'typeof StateStore' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+52     const store = yield* StateStore
+                            ~~~~~~~~~~
+
+src/plan/janitor.ts:100:50 - error TS7006: Parameter 'snapshot' implicitly has an 'any' type.
+
+100     const physicalInUse = new Set(survivors.map((snapshot) => snapshot.physicalFp))
+                                                     ~~~~~~~~
+
+src/plan/lineage.ts:86:3 - error TS2375: Type 'Effect<LineageNode, unknown, unknown>' is not assignable to type 'Effect<LineageNode, EngineError | LineageError | SqlParseError, EngineAdapter>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineError | LineageError | SqlParseError'.
+
+ 86   Effect.gen(function* () {
+      ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 87     const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+138     return yield* trace(root, column)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+139   })
+    ~~~~
+
+src/plan/lineage.ts:87:27 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+87     const engine = yield* EngineAdapter
+                             ~~~~~~~~~~~~~
+
+src/plan/lineage.ts:101:7 - error TS2375: Type 'Effect<unknown, unknown, unknown>' is not assignable to type 'Effect<unknown, EngineError | SqlParseError, never>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineError | SqlParseError'.
+
+101       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+102         const cached = asts.get(model.name.full)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+108         return ast
+    ~~~~~~~~~~~~~~~~~~
+109       })
+    ~~~~~~~~
+
+src/plan/lock.ts:36:5 - error TS2375: Type 'Effect<A, unknown, unknown>' is not assignable to type 'Effect<A, E | LockHeldError | StateError, R | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'E | LockHeldError | StateError'.
+
+ 36     Effect.gen(function* () {
+        ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 37       const store = yield* StateStore
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 53       )
+    ~~~~~~~
+ 54     })
+    ~~~~~~
+
+src/plan/lock.ts:37:28 - error TS2488: Type 'typeof StateStore' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+37       const store = yield* StateStore
+                              ~~~~~~~~~~
+
+src/plan/planner.ts:178:3 - error TS2375: Type 'Effect<{ env: string; actions: PlanAction[]; hasChanges: boolean; }, unknown, unknown>' is not assignable to type 'Effect<Plan, EngineError | FingerprintVersionError | ForwardOnlyError | InvalidEnvironmentError | ReclassifyError | SeedReadError | SqlParseError | StateError, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineError | FingerprintVersionError | ForwardOnlyError | InvalidEnvironmentError | ReclassifyError | SeedReadError | SqlParseError | StateError'.
+
+178   Effect.gen(function* () {
+      ~~~~~~~~~~~~~~~~~~~~~~~~~
+179     if (!validateEnvName(env)) return yield* new InvalidEnvironmentError({ env })
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+437     }
+    ~~~~~
+438   }).pipe(Effect.withSpan("efmesh.plan", { attributes: { env } }))
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+src/plan/planner.ts:180:26 - error TS2488: Type 'typeof StateStore' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+180     const store = yield* StateStore
+                             ~~~~~~~~~~
+
+src/plan/planner.ts:211:47 - error TS7006: Parameter 'row' implicitly has an 'any' type.
+
+211       (yield* store.getEnvironment(env)).map((row) => [row.name, row.fingerprint]),
+                                                  ~~~
+
+src/plan/planner.ts:324:11 - error TS2322: Type '{} | null' is not assignable to type 'string | undefined'.
+  Type 'null' is not assignable to type 'string | undefined'.
+
+324           reusedFrom = known
+              ~~~~~~~~~~
+
+src/plan/planner.ts:329:97 - error TS18047: 'known' is possibly 'null'.
+
+329                 reason: `forward-only by flag: physics and done intervals are inherited from @${known.slice(0, 8)}, history is not replayed`,
+                                                                                                    ~~~~~
+
+src/plan/planner.ts:329:103 - error TS2339: Property 'slice' does not exist on type '{}'.
+
+329                 reason: `forward-only by flag: physics and done intervals are inherited from @${known.slice(0, 8)}, history is not replayed`,
+                                                                                                          ~~~~~
+
+src/plan/planner.ts:417:29 - error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'string'.
+
+417       if (!graph.models.has(name)) {
+                                ~~~~
+
+src/plan/planner.ts:419:11 - error TS2322: Type 'unknown' is not assignable to type 'string'.
+
+419           name,
+              ~~~~
+
+  src/plan/planner.ts:84:12 - The expected type comes from property 'name' which is declared here on type 'PlanAction'
+    84   readonly name: string
+                  ~~~~
+
+src/plan/planner.ts:420:11 - error TS2322: Type 'unknown' is not assignable to type 'string'.
+
+420           fingerprint,
+              ~~~~~~~~~~~
+
+  src/plan/planner.ts:85:12 - The expected type comes from property 'fingerprint' which is declared here on type 'PlanAction'
+    85   readonly fingerprint: string
+                  ~~~~~~~~~~~
+
+src/plan/planner.ts:421:11 - error TS2322: Type 'unknown' is not assignable to type 'string'.
+
+421           physicalFingerprint: fingerprint,
+              ~~~~~~~~~~~~~~~~~~~
+
+  src/plan/planner.ts:90:12 - The expected type comes from property 'physicalFingerprint' which is declared here on type 'PlanAction'
+    90   readonly physicalFingerprint: string
+                  ~~~~~~~~~~~~~~~~~~~
+
+src/plan/run.ts:49:3 - error TS2375: Type 'Effect<AppliedPlan, unknown, unknown>' is not assignable to type 'Effect<AppliedPlan, RunError, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'RunError'.
+
+ 49   Effect.gen(function* () {
+      ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 50     const store = yield* StateStore
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 83     )
+    ~~~~~
+ 84   })
+    ~~~~
+
+src/plan/run.ts:50:26 - error TS2488: Type 'typeof StateStore' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+50     const store = yield* StateStore
+                            ~~~~~~~~~~
+
+src/plan/run.ts:66:16 - error TS2551: Property 'catchCause' does not exist on type 'typeof import("/home/avy/repos/pharos-labs/repos/pharos-experimental/efmesh/.claude/worktrees/agent-ac02dd7322c1dfb94/node_modules/effect/dist/dts/Effect")'. Did you mean 'matchCause'?
+
+66         Effect.catchCause((cause) => Effect.logWarning("tick journal is unavailable", cause)),
+                  ~~~~~~~~~~
+
+  node_modules/effect/dist/dts/Effect.d.ts:21783:22 - 'matchCause' is declared here.
+    21783 export declare const matchCause: {
+                               ~~~~~~~~~~
+
+src/plan/run.ts:66:28 - error TS7006: Parameter 'cause' implicitly has an 'any' type.
+
+66         Effect.catchCause((cause) => Effect.logWarning("tick journal is unavailable", cause)),
+                              ~~~~~
+
+src/plan/run.ts:82:51 - error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'RunError'.
+
+82       Effect.tapError((error) => journal(classify(error))),
+                                                     ~~~~~
+
+src/plan/run.ts:97:3 - error TS2375: Type 'Effect<never, unknown, unknown>' is not assignable to type 'Effect<never, never, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'never'.
+
+ 97   run(env, models, options).pipe(
+      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 98     Effect.tap((applied) =>
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+111     Effect.andThen(Effect.never),
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+112   )
+    ~~~
+
+src/plan/run.ts:107:12 - error TS2551: Property 'catchCause' does not exist on type 'typeof import("/home/avy/repos/pharos-labs/repos/pharos-experimental/efmesh/.claude/worktrees/agent-ac02dd7322c1dfb94/node_modules/effect/dist/dts/Effect")'. Did you mean 'matchCause'?
+
+107     Effect.catchCause((cause) => Effect.logError("tick failed", cause)),
+               ~~~~~~~~~~
+
+  node_modules/effect/dist/dts/Effect.d.ts:21783:22 - 'matchCause' is declared here.
+    21783 export declare const matchCause: {
+                               ~~~~~~~~~~
+
+src/plan/run.ts:107:24 - error TS7006: Parameter 'cause' implicitly has an 'any' type.
+
+107     Effect.catchCause((cause) => Effect.logError("tick failed", cause)),
+                           ~~~~~
+
+src/plan/status.ts:51:3 - error TS2375: Type 'Effect<{ env: string; storeVersion: number; models: any; promotedAt: any; lastPlan: any; ticks: any; lag: ModelLag[]; }, unknown, unknown>' is not assignable to type 'Effect<StatusReport, StateError | GraphError, StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'StateError | GraphError'.
+
+ 51   Effect.gen(function* () {
+      ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 52     const store = yield* StateStore
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 93     }
+    ~~~~~
+ 94   })
+    ~~~~
+
+src/plan/status.ts:52:26 - error TS2488: Type 'typeof StateStore' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+52     const store = yield* StateStore
+                            ~~~~~~~~~~
+
+src/plan/status.ts:58:44 - error TS7006: Parameter 'row' implicitly has an 'any' type.
+
+58       rows.length === 0 ? null : rows.map((row) => row.promotedAt).reduce((a, b) => (a > b ? a : b))
+                                              ~~~
+
+src/plan/status.ts:58:76 - error TS7006: Parameter 'a' implicitly has an 'any' type.
+
+58       rows.length === 0 ? null : rows.map((row) => row.promotedAt).reduce((a, b) => (a > b ? a : b))
+                                                                              ~
+
+src/plan/status.ts:58:79 - error TS7006: Parameter 'b' implicitly has an 'any' type.
+
+58       rows.length === 0 ? null : rows.map((row) => row.promotedAt).reduce((a, b) => (a > b ? a : b))
+                                                                                 ~
+
+src/plan/status.ts:73:18 - error TS7006: Parameter 'record' implicitly has an 'any' type.
+
+73         .filter((record) => record.status === "done")
+                    ~~~~~~
+
+src/plan/status.ts:74:15 - error TS7006: Parameter 'record' implicitly has an 'any' type.
+
+74         .map((record) => ({ start: fromIso(record.startTs), end: fromIso(record.endTs) }))
+                 ~~~~~~
+
+src/plan/status.ts:79:74 - error TS7006: Parameter 'i' implicitly has an 'any' type.
+
+79         doneUpTo: done.length === 0 ? null : toIso(Math.max(...done.map((i) => i.end))),
+                                                                            ~
+
+src/plan/status.ts:81:33 - error TS7006: Parameter 'record' implicitly has an 'any' type.
+
+81         failed: records.filter((record) => record.status === "failed").length,
+                                   ~~~~~~
+
+src/state/postgres.ts:146:3 - error TS2322: Type 'Layer<StateStore, StateError | StateSchemaError, Scope>' is not assignable to type 'Layer<StateStore, StateError | StateSchemaError, never>'.
+  Type 'Scope' is not assignable to type 'never'.
+
+146   Layer.effect(
+      ~~~~~~~~~~~~~
+147     StateStore,
+    ~~~~~~~~~~~~~~~
+... 
+444     }),
+    ~~~~~~~
+445   )
+    ~~~
+
+src/state/postgres.ts:147:5 - error TS2740: Type 'typeof StateStore' is missing the following properties from type 'Tag<StateStore, unknown>': _op, Service, Identifier, [TagTypeId], and 12 more.
+
+147     StateStore,
+        ~~~~~~~~~~
+
+src/state/sqlite.ts:144:3 - error TS2322: Type 'Layer<StateStore, StateError | StateSchemaError, Scope>' is not assignable to type 'Layer<StateStore, StateError | StateSchemaError, never>'.
+  Type 'Scope' is not assignable to type 'never'.
+
+144   Layer.effect(
+      ~~~~~~~~~~~~~
+145     StateStore,
+    ~~~~~~~~~~~~~~~
+... 
+454     }),
+    ~~~~~~~
+455   )
+    ~~~
+
+src/state/sqlite.ts:145:5 - error TS2740: Type 'typeof StateStore' is missing the following properties from type 'Tag<StateStore, unknown>': _op, Service, Identifier, [TagTypeId], and 12 more.
+
+145     StateStore,
+        ~~~~~~~~~~
+
+src/state/store.ts:202:41 - error TS2339: Property 'Service' does not exist on type 'typeof import("/home/avy/repos/pharos-labs/repos/pharos-experimental/efmesh/.claude/worktrees/agent-ac02dd7322c1dfb94/node_modules/effect/dist/dts/Context")'.
+
+202 export class StateStore extends Context.Service<StateStore, StateStoreShape>()(
+                                            ~~~~~~~
+
+src/testing/index.ts:171:5 - error TS2379: Argument of type 'Effect<any, unknown, unknown>' is not assignable to parameter of type 'Effect<any, unknown, never>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'never'.
+
+171     Effect.gen(function* () {
+        ~~~~~~~~~~~~~~~~~~~~~~~~~
+172       const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+173       return yield* engine.query(query)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+174     }).pipe(Effect.provide(DuckDBEngineLive())),
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+src/testing/index.ts:172:29 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+172       const engine = yield* EngineAdapter
+                                ~~~~~~~~~~~~~
+
+test/audit-run.test.ts:20:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+ 20       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 21         const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 56         ])
+    ~~~~~~~~~~
+ 57       }),
+    ~~~~~~~~
+
+test/audit-run.test.ts:21:31 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+21         const engine = yield* EngineAdapter
+                                 ~~~~~~~~~~~~~
+
+test/audit.test.ts:20:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+ 20       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 21         const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 38         expect(missing._tag).toBe("EngineError")
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 39       }),
+    ~~~~~~~~
+
+test/audit.test.ts:21:31 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+21         const engine = yield* EngineAdapter
+                                 ~~~~~~~~~~~~~
+
+test/audit.test.ts:38:16 - error TS18046: 'missing' is of type 'unknown'.
+
+38         expect(missing._tag).toBe("EngineError")
+                  ~~~~~~~
+
+test/audit.test.ts:85:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+ 85       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 86         const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+140         ])
+    ~~~~~~~~~~
+141       }),
+    ~~~~~~~~
+
+test/audit.test.ts:86:31 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+86         const engine = yield* EngineAdapter
+                                 ~~~~~~~~~~~~~
+
+test/audit.test.ts:87:30 - error TS2488: Type 'typeof StateStore' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+87         const store = yield* StateStore
+                                ~~~~~~~~~~
+
+test/audit.test.ts:137:28 - error TS7006: Parameter 'i' implicitly has an 'any' type.
+
+137         expect(ledger.map((i) => [i.startTs.slice(0, 10), i.status])).toEqual([
+                               ~
+
+test/backfill.test.ts:41:25 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+41   const engine = yield* EngineAdapter
+                           ~~~~~~~~~~~~~
+
+test/backfill.test.ts:55:25 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+55   const engine = yield* EngineAdapter
+                           ~~~~~~~~~~~~~
+
+test/backfill.test.ts:63:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+ 63       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 64         const store = yield* StateStore
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 96         expect(yield* countRows).toBe(5)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 97       }),
+    ~~~~~~~~
+
+test/backfill.test.ts:64:30 - error TS2488: Type 'typeof StateStore' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+64         const store = yield* StateStore
+                                ~~~~~~~~~~
+
+test/backfill.test.ts:81:31 - error TS7006: Parameter 'i' implicitly has an 'any' type.
+
+81         expect(ledger.filter((i) => i.status === "done")).toHaveLength(3)
+                                 ~
+
+test/backfill.test.ts:103:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+103       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+104         const store = yield* StateStore
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+133         expect(ledger.every((i) => i.status === "done")).toBe(true)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+134       }),
+    ~~~~~~~~
+
+test/backfill.test.ts:104:30 - error TS2488: Type 'typeof StateStore' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+104         const store = yield* StateStore
+                                 ~~~~~~~~~~
+
+test/backfill.test.ts:133:30 - error TS7006: Parameter 'i' implicitly has an 'any' type.
+
+133         expect(ledger.every((i) => i.status === "done")).toBe(true)
+                                 ~
+
+test/backfill.test.ts:140:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+140       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+141         const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+160         expect(yield* countRows).toBe(6)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+161       }),
+    ~~~~~~~~
+
+test/backfill.test.ts:141:31 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+141         const engine = yield* EngineAdapter
+                                  ~~~~~~~~~~~~~
+
+test/dag.test.ts:19:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+ 19       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 20         const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 45         expect(rows).toEqual([{ n: 112 }])
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 46       }),
+    ~~~~~~~~
+
+test/dag.test.ts:20:31 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+20         const engine = yield* EngineAdapter
+                                 ~~~~~~~~~~~~~
+
+test/dag.test.ts:52:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+ 52       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 53         const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 80         expect(yield* store.getSnapshot("dag.child", childFp)).toBeUndefined()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 81       }),
+    ~~~~~~~~
+
+test/dag.test.ts:53:31 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+53         const engine = yield* EngineAdapter
+                                 ~~~~~~~~~~~~~
+
+test/dag.test.ts:54:30 - error TS2488: Type 'typeof StateStore' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+54         const store = yield* StateStore
+                                ~~~~~~~~~~
+
+test/dag.test.ts:77:16 - error TS18046: 'missing' is of type 'unknown'.
+
+77         expect(missing._tag).toBe("EngineError")
+                  ~~~~~~~
+
+test/data-diff.test.ts:51:7 - error TS2379: Argument of type 'Effect<DataDiffReport, unknown, unknown>' is not assignable to parameter of type 'Effect<DataDiffReport, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+ 51       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 52         const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 92         return yield* dataDiffEnvironments("dev", "prod", models)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 93       }),
+    ~~~~~~~~
+
+test/data-diff.test.ts:52:31 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+52         const engine = yield* EngineAdapter
+                                 ~~~~~~~~~~~~~
+
+test/data-diff.test.ts:112:7 - error TS2379: Argument of type 'Effect<DataDiffReport, unknown, unknown>' is not assignable to parameter of type 'Effect<DataDiffReport, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+112       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+113         const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+123         return yield* dataDiffEnvironments("dev", "prod", models, { samplePercent: 25 })
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+124       }),
+    ~~~~~~~~
+
+test/data-diff.test.ts:113:31 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+113         const engine = yield* EngineAdapter
+                                  ~~~~~~~~~~~~~
+
+test/data-diff.test.ts:138:7 - error TS2379: Argument of type 'Effect<DataDiffError | EngineError | StateError | GraphError, unknown, unknown>' is not assignable to parameter of type 'Effect<DataDiffError | EngineError | StateError | GraphError, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+138       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+139         const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+147         )
+    ~~~~~~~~~
+148       }),
+    ~~~~~~~~
+
+test/data-diff.test.ts:139:31 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+139         const engine = yield* EngineAdapter
+                                  ~~~~~~~~~~~~~
+
+test/ducklake.test.ts:38:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+ 38       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 39         const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 57         expect(native).toEqual([])
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 58       }),
+    ~~~~~~~~
+
+test/ducklake.test.ts:39:31 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+39         const engine = yield* EngineAdapter
+                                 ~~~~~~~~~~~~~
+
+test/ducklake.test.ts:65:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+ 65       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 66         const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+101         expect(again.plan.hasChanges).toBe(false)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+102       }),
+    ~~~~~~~~
+
+test/ducklake.test.ts:66:31 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+66         const engine = yield* EngineAdapter
+                                 ~~~~~~~~~~~~~
+
+test/ducklake.test.ts:127:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+127       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+128         const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+153         expect(yield* engine.query(`SELECT n FROM dev__med.totals`)).toEqual([{ n: 2 }])
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+154       }),
+    ~~~~~~~~
+
+test/ducklake.test.ts:128:31 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+128         const engine = yield* EngineAdapter
+                                  ~~~~~~~~~~~~~
+
+test/embedded.test.ts:43:25 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+43   const engine = yield* EngineAdapter
+                           ~~~~~~~~~~~~~
+
+test/embedded.test.ts:55:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+ 55       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 56         const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 70         expect(physics.some((row) => String(row.table_name).includes("icu_moves"))).toBe(false)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 71       }),
+    ~~~~~~~~
+
+test/embedded.test.ts:56:31 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+56         const engine = yield* EngineAdapter
+                                 ~~~~~~~~~~~~~
+
+test/embedded.test.ts:66:16 - error TS18046: 'noView' is of type 'unknown'.
+
+66         expect(noView._tag).toBe("EngineError")
+                  ~~~~~~
+
+test/embedded.test.ts:70:30 - error TS7006: Parameter 'row' implicitly has an 'any' type.
+
+70         expect(physics.some((row) => String(row.table_name).includes("icu_moves"))).toBe(false)
+                                ~~~
+
+test/embedded.test.ts:77:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+ 77       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 78         const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 90         expect(count).toEqual([{ n: 1 }])
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 91       }),
+    ~~~~~~~~
+
+test/embedded.test.ts:78:31 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+78         const engine = yield* EngineAdapter
+                                 ~~~~~~~~~~~~~
+
+test/engine.test.ts:8:5 - error TS2379: Argument of type 'Effect<A, unknown, unknown>' is not assignable to parameter of type 'Effect<A, unknown, never>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'never'.
+
+ 8     Effect.gen(function* () {
+       ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 9       const engine = yield* EngineAdapter
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+10       return yield* body(engine)
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+11     }).pipe(Effect.provide(DuckDBEngineLive())),
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+test/engine.test.ts:9:29 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+9       const engine = yield* EngineAdapter
+                              ~~~~~~~~~~~~~
+
+test/errors.test.ts:17:5 - error TS2379: Argument of type 'Effect<A, unknown, unknown>' is not assignable to parameter of type 'Effect<A, unknown, never>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'never'.
+
+17     Effect.gen(function* () {
+       ~~~~~~~~~~~~~~~~~~~~~~~~~
+18       const engine = yield* EngineAdapter
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+19       return yield* body(engine)
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+20     }).pipe(Effect.provide(DuckDBEngineLive())),
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+test/errors.test.ts:18:29 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+18       const engine = yield* EngineAdapter
+                               ~~~~~~~~~~~~~
+
+test/export-diff.test.ts:33:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+ 33       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 34         const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 37         expect(rows).toEqual([{ id: "x" }])
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 38       }),
+    ~~~~~~~~
+
+test/export-diff.test.ts:34:31 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+34         const engine = yield* EngineAdapter
+                                 ~~~~~~~~~~~~~
+
+test/external.test.ts:23:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+ 23       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 24         const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 52         expect(again.built).toEqual([])
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 53       }),
+    ~~~~~~~~
+
+test/external.test.ts:24:31 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+24         const engine = yield* EngineAdapter
+                                 ~~~~~~~~~~~~~
+
+test/external.test.ts:47:16 - error TS18046: 'missing' is of type 'unknown'.
+
+47         expect(missing._tag).toBe("EngineError")
+                  ~~~~~~~
+
+test/external.test.ts:60:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+ 60       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 61         const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 92         expect(rows2).toEqual([{ n: 2 }])
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 93       }),
+    ~~~~~~~~
+
+test/external.test.ts:61:31 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+61         const engine = yield* EngineAdapter
+                                 ~~~~~~~~~~~~~
+
+test/fingerprint-golden.test.ts:119:7 - error TS2379: Argument of type 'Effect<EngineError | FingerprintVersionError | ForwardOnlyError | InvalidEnvironmentError | ... 4 more ... | GraphError, unknown, unknown>' is not assignable to parameter of type 'Effect<EngineError | FingerprintVersionError | ForwardOnlyError | InvalidEnvironmentError | ... 4 more ... | GraphError, unknown, never>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'never'.
+
+119       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+120         const store = yield* StateStore
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+132         return yield* Effect.flip(Efmesh.plan("dev", [raw, incremental, mart]))
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+133       }).pipe(Effect.provide(Layer.mergeAll(DuckDBEngineLive(), SqliteStateLive()))),
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+test/fingerprint-golden.test.ts:120:30 - error TS2488: Type 'typeof StateStore' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+120         const store = yield* StateStore
+                                 ~~~~~~~~~~
+
+test/fingerprint-golden.test.ts:145:7 - error TS2379: Argument of type 'Effect<{ first: Plan; second: Plan; }, unknown, unknown>' is not assignable to parameter of type 'Effect<{ first: Plan; second: Plan; }, unknown, never>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'never'.
+
+145       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+146         const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+165         return { first, second }
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+166       }).pipe(Effect.provide(Layer.mergeAll(DuckDBEngineLive(), SqliteStateLive()))),
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+test/fingerprint-golden.test.ts:146:31 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+146         const engine = yield* EngineAdapter
+                                  ~~~~~~~~~~~~~
+
+test/fingerprint-golden.test.ts:157:33 - error TS2740: Type 'typeof EngineAdapter' is missing the following properties from type 'Tag<unknown, unknown>': _op, Service, Identifier, [TagTypeId], and 12 more.
+
+157           Effect.provideService(EngineAdapter, counting),
+                                    ~~~~~~~~~~~~~
+
+test/fingerprint-golden.test.ts:161:33 - error TS2740: Type 'typeof EngineAdapter' is missing the following properties from type 'Tag<unknown, unknown>': _op, Service, Identifier, [TagTypeId], and 12 more.
+
+161           Effect.provideService(EngineAdapter, counting),
+                                    ~~~~~~~~~~~~~
+
+test/forward-only.test.ts:36:7 - error TS2322: Type 'Struct<{ id: typeof String$; happened_at: typeof DateTimeUtc; }> | Struct<{ id: typeof String$; happened_at: typeof DateTimeUtc; amount: NullOr<typeof Number$>; }> | Struct<...>' is not assignable to type 'Struct<{ happened_at: typeof DateTimeUtc; }>'.
+  Type 'Struct<{ id: typeof String$; happened_at: typeof DateTimeUtc; }>' is not assignable to type 'Struct<{ happened_at: typeof DateTimeUtc; }>'.
+    Types of property 'annotations' are incompatible.
+      Type '(annotations: Schema<{ readonly id: string; readonly happened_at: Utc; }, readonly []>) => Struct<{ id: typeof String$; happened_at: typeof DateTimeUtc; }>' is not assignable to type '(annotations: Schema<{ readonly happened_at: Utc; }, readonly []>) => Struct<{ happened_at: typeof DateTimeUtc; }>'.
+        Types of parameters 'annotations' and 'annotations' are incompatible.
+          Type 'Schema<{ readonly happened_at: Utc; }, readonly []>' is not assignable to type 'Schema<{ readonly id: string; readonly happened_at: Utc; }, readonly []>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+            The types returned by 'arbitrary(...)' are incompatible between these types.
+              Type 'LazyArbitrary<{ readonly happened_at: Utc; }>' is not assignable to type 'LazyArbitrary<{ readonly id: string; readonly happened_at: Utc; }>'.
+                Property 'id' is missing in type '{ readonly happened_at: Utc; }' but required in type '{ readonly id: string; readonly happened_at: Utc; }'.
+
+36       schema:
+         ~~~~~~
+
+  test/forward-only.test.ts:38:29 - 'id' is declared here.
+    38           ? Schema.Struct({ id: Schema.String, happened_at: Schema.DateTimeUtc })
+                                   ~~~~~~~~~~~~~~~~~
+
+  src/core/model.ts:146:12 - The expected type comes from property 'schema' which is declared here on type 'ModelConfig<{ happened_at: typeof DateTimeUtc; }>'
+    146   readonly schema: Schema.Struct<Fields>
+                   ~~~~~~
+
+test/forward-only.test.ts:83:25 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+83   const engine = yield* EngineAdapter
+                           ~~~~~~~~~~~~~
+
+test/forward-only.test.ts:97:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+ 97       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 98         const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+142         expect(planAgain.actions.find((a) => a.name === "med.events")!.change).toBe("unchanged")
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+143       }),
+    ~~~~~~~~
+
+test/forward-only.test.ts:98:31 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+98         const engine = yield* EngineAdapter
+                                 ~~~~~~~~~~~~~
+
+test/forward-only.test.ts:99:30 - error TS2488: Type 'typeof StateStore' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+99         const store = yield* StateStore
+                                ~~~~~~~~~~
+
+test/forward-only.test.ts:134:31 - error TS7006: Parameter 'i' implicitly has an 'any' type.
+
+134         expect(ledger.filter((i) => i.status === "done")).toHaveLength(3)
+                                  ~
+
+test/forward-only.test.ts:149:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+149       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+150         yield* seedSource
+    ~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+162         expect(child.backfill).toEqual([]) // the child has nothing to replay
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+163       }),
+    ~~~~~~~~
+
+test/forward-only.test.ts:169:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+169       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+170         yield* seedSource
+    ~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+177         expect(failure._tag).toBe("SchemaMismatchError")
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+178       }),
+    ~~~~~~~~
+
+test/helpers/lock-holder.ts:13:3 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, never>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'never'.
+
+ 13   Effect.gen(function* () {
+      ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 14     const store = yield* StateStore
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 22     yield* Effect.promise(() => new Promise(() => {}))
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 23   }).pipe(Effect.provide(SqliteStateLive({ path }))),
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+test/helpers/lock-holder.ts:14:26 - error TS2488: Type 'typeof StateStore' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+14     const store = yield* StateStore
+                            ~~~~~~~~~~
+
+test/janitor-race.test.ts:14:5 - error TS2379: Argument of type 'Effect<A, unknown, unknown>' is not assignable to parameter of type 'Effect<A, unknown, never>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'never'.
+
+14     Effect.gen(function* () {
+       ~~~~~~~~~~~~~~~~~~~~~~~~~
+15       const store = yield* StateStore
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+16       return yield* body(store)
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+17     }).pipe(Effect.provide(SqliteStateLive())),
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+test/janitor-race.test.ts:15:28 - error TS2488: Type 'typeof StateStore' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+15       const store = yield* StateStore
+                              ~~~~~~~~~~
+
+test/janitor.test.ts:30:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+ 30       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 31         const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 61         expect(again.removed).toEqual([])
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 62       }),
+    ~~~~~~~~
+
+test/janitor.test.ts:31:31 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+31         const engine = yield* EngineAdapter
+                                 ~~~~~~~~~~~~~
+
+test/janitor.test.ts:55:16 - error TS18046: 'gone' is of type 'unknown'.
+
+55         expect(gone._tag).toBe("EngineError")
+                  ~~~~
+
+test/lock-kill9.test.ts:58:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+ 58       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 59         const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 64         yield* Efmesh.apply("dev", [raw, events], { now: fromIso("2026-01-02T00:00:00Z") })
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 65       }),
+    ~~~~~~~~
+
+test/lock-kill9.test.ts:59:31 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+59         const engine = yield* EngineAdapter
+                                 ~~~~~~~~~~~~~
+
+test/lock-kill9.test.ts:102:7 - error TS2379: Argument of type 'Effect<any, unknown, unknown>' is not assignable to parameter of type 'Effect<any, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+102       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+103         const store = yield* StateStore
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+104         return yield* store.acquireLock("env:dev", 1000)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+105       }),
+    ~~~~~~~~
+
+test/lock-kill9.test.ts:103:30 - error TS2488: Type 'typeof StateStore' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+103         const store = yield* StateStore
+                                 ~~~~~~~~~~
+
+test/logging.test.ts:5:33 - error TS2305: Module '"effect"' has no exported member 'References'.
+
+5 import { Effect, Layer, Logger, References, Schema } from "effect"
+                                  ~~~~~~~~~~
+
+test/logging.test.ts:32:33 - error TS2551: Property 'fiber' does not exist on type 'Options<unknown>'. Did you mean 'fiberId'?
+
+32     const annotations = options.fiber.getRef(References.CurrentLogAnnotations)
+                                   ~~~~~
+
+  node_modules/effect/dist/dts/Logger.d.ts:55:18 - 'fiberId' is declared here.
+    55         readonly fiberId: FiberId.FiberId;
+                        ~~~~~~~
+
+test/logging.test.ts:38:24 - error TS2339: Property 'layer' does not exist on type 'typeof import("/home/avy/repos/pharos-labs/repos/pharos-experimental/efmesh/.claude/worktrees/agent-ac02dd7322c1dfb94/node_modules/effect/dist/dts/Logger")'.
+
+38   const layer = Logger.layer([logger]).pipe(
+                          ~~~~~
+
+test/logging.test.ts:47:25 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+47   const engine = yield* EngineAdapter
+                           ~~~~~~~~~~~~~
+
+test/logging.test.ts:82:43 - error TS2345: Argument of type 'string' is not assignable to parameter of type 'LogLevel'.
+
+82     const { entries, layer } = collecting("Info")
+                                             ~~~~~~
+
+test/logging.test.ts:84:7 - error TS2379: Argument of type 'Effect<void, any, any>' is not assignable to parameter of type 'Effect<void, any, never>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'any' is not assignable to type 'never'.
+
+ 84       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 85         yield* seedSource
+    ~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 87         yield* Efmesh.apply("dev", [raw, daily], { now: fromIso("2026-01-04T00:00:00Z") })
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 88       }).pipe(Effect.provide(engineState), Effect.provide(layer)),
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+test/logging.test.ts:92:14 - error TS2367: This comparison appears to be unintentional because the types 'LogLevel' and 'string' have no overlap.
+
+92       (e) => e.level === "Info" && e.message.startsWith("backfill batch"),
+                ~~~~~~~~~~~~~~~~~~
+
+test/logging.test.ts:107:32 - error TS2367: This comparison appears to be unintentional because the types 'LogLevel' and 'string' have no overlap.
+
+107     expect(entries.some((e) => e.level === "Info" && e.message === "build start")).toBe(true)
+                                   ~~~~~~~~~~~~~~~~~~
+
+test/logging.test.ts:108:32 - error TS2367: This comparison appears to be unintentional because the types 'LogLevel' and 'string' have no overlap.
+
+108     expect(entries.some((e) => e.level === "Info" && e.message.startsWith("build done"))).toBe(true)
+                                   ~~~~~~~~~~~~~~~~~~
+
+test/logging.test.ts:113:29 - error TS2345: Argument of type 'string' is not assignable to parameter of type 'LogLevel'.
+
+113     const info = collecting("Info")
+                                ~~~~~~
+
+test/logging.test.ts:115:7 - error TS2379: Argument of type 'Effect<void, any, any>' is not assignable to parameter of type 'Effect<void, any, never>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'any' is not assignable to type 'never'.
+
+115       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+116         yield* seedSource
+    ~~~~~~~~~~~~~~~~~~~~~~~~~
+117         yield* Efmesh.apply("dev", [raw, daily], { now: fromIso("2026-01-04T00:00:00Z") })
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+118       }).pipe(Effect.provide(engineState), Effect.provide(info.layer)),
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+test/logging.test.ts:123:30 - error TS2345: Argument of type 'string' is not assignable to parameter of type 'LogLevel'.
+
+123     const debug = collecting("Debug")
+                                 ~~~~~~~
+
+test/logging.test.ts:125:7 - error TS2379: Argument of type 'Effect<void, any, any>' is not assignable to parameter of type 'Effect<void, any, never>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'any' is not assignable to type 'never'.
+
+125       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+126         yield* seedSource
+    ~~~~~~~~~~~~~~~~~~~~~~~~~
+127         yield* Efmesh.apply("dev", [raw, daily], { now: fromIso("2026-01-04T00:00:00Z") })
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+128       }).pipe(Effect.provide(engineState), Effect.provide(debug.layer)),
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+test/logging.test.ts:133:31 - error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Argument of type 'string' is not assignable to parameter of type 'LogLevel'.
+
+133       expect(line.level).toBe("Debug")
+                                  ~~~~~~~
+
+  node_modules/bun-types/test.d.ts:977:5 - The last overload is declared here.
+    977     toBe<X = T>(expected: NoInfer<X>): void;
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+test/logging.test.ts:139:43 - error TS2345: Argument of type 'string' is not assignable to parameter of type 'LogLevel'.
+
+139     const { entries, layer } = collecting("Info")
+                                              ~~~~~~
+
+test/logging.test.ts:141:7 - error TS2379: Argument of type 'Effect<void, any, any>' is not assignable to parameter of type 'Effect<void, any, never>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'any' is not assignable to type 'never'.
+
+141       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+142         const warned = defineModel(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+151         yield* Efmesh.apply("dev", [warned])
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+152       }).pipe(Effect.provide(engineState), Effect.provide(layer)),
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+test/logging.test.ts:154:45 - error TS2367: This comparison appears to be unintentional because the types 'LogLevel' and 'string' have no overlap.
+
+154     const warnLines = entries.filter((e) => e.level === "Warn")
+                                                ~~~~~~~~~~~~~~~~~~
+
+test/migrate.test.ts:12:19 - error TS2488: Type 'typeof StateStore' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+12     return yield* StateStore
+                     ~~~~~~~~~~
+
+test/migrate.test.ts:37:43 - error TS2379: Argument of type 'Effect<any, unknown, unknown>' is not assignable to parameter of type 'Effect<any, unknown, never>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'never'.
+
+37     const store = await Effect.runPromise(openStore(path))
+                                             ~~~~~~~~~~~~~~~
+
+test/migrate.test.ts:47:45 - error TS2379: Argument of type 'Effect<unknown, any, unknown>' is not assignable to parameter of type 'Effect<unknown, any, never>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'never'.
+
+47     const failure = await Effect.runPromise(Effect.flip(openStore(path)))
+                                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+test/migrate.test.ts:48:12 - error TS18046: 'failure' is of type 'unknown'.
+
+48     expect(failure._tag).toBe("StateSchemaError")
+              ~~~~~~~
+
+test/migrate.test.ts:56:7 - error TS2379: Argument of type 'Effect<any, unknown, unknown>' is not assignable to parameter of type 'Effect<any, unknown, never>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'never'.
+
+56       Effect.gen(function* () {
+         ~~~~~~~~~~~~~~~~~~~~~~~~~
+57         const store = yield* StateStore
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+58         return yield* store.getSnapshot("med.a", "f1")
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+59       }).pipe(Effect.provide(SqliteStateLive({ path }))),
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+test/migrate.test.ts:57:30 - error TS2488: Type 'typeof StateStore' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+57         const store = yield* StateStore
+                                ~~~~~~~~~~
+
+test/migrate.test.ts:92:45 - error TS2379: Argument of type 'Effect<unknown, any, unknown>' is not assignable to parameter of type 'Effect<unknown, any, never>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'never'.
+
+92     const failure = await Effect.runPromise(Effect.flip(openStore(path)))
+                                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+test/migrate.test.ts:93:12 - error TS18046: 'failure' is of type 'unknown'.
+
+93     expect(failure._tag).toBe("StateSchemaError")
+              ~~~~~~~
+
+test/migrate.test.ts:100:7 - error TS2379: Argument of type 'Effect<any, unknown, unknown>' is not assignable to parameter of type 'Effect<any, unknown, never>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'never'.
+
+100       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+101         const store = yield* StateStore
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+103         return yield* store.listPlans("dev")
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+104       }).pipe(Effect.provide(SqliteStateLive({ path }))),
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+test/migrate.test.ts:101:30 - error TS2488: Type 'typeof StateStore' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+101         const store = yield* StateStore
+                                 ~~~~~~~~~~
+
+test/migrate.test.ts:107:23 - error TS7006: Parameter 'plan' implicitly has an 'any' type.
+
+107     expect(plans.map((plan) => plan.appliedBy)).toEqual(["", "avy"])
+                          ~~~~
+
+test/parquet.test.ts:27:25 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+27   const engine = yield* EngineAdapter
+                           ~~~~~~~~~~~~~
+
+test/parquet.test.ts:42:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+ 42       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 43         const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 74         expect(top).toEqual([{ n: 3 }])
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 75       }),
+    ~~~~~~~~
+
+test/parquet.test.ts:43:31 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+43         const engine = yield* EngineAdapter
+                                 ~~~~~~~~~~~~~
+
+test/parquet.test.ts:82:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+ 82       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 83         const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+119         expect(rows2).toEqual([{ n: 3 }])
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+120       }),
+    ~~~~~~~~
+
+test/parquet.test.ts:83:31 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+83         const engine = yield* EngineAdapter
+                                 ~~~~~~~~~~~~~
+
+test/parquet.test.ts:126:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+126       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+127         yield* seedSource
+    ~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+138         expect(error._tag).toBe("LakeNotConfiguredError")
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+139       }),
+    ~~~~~~~~
+
+test/plan.test.ts:54:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+ 54       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 55         const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 96         expect(prodRows2).toEqual([{ n: 1 }])
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 97       }),
+    ~~~~~~~~
+
+test/plan.test.ts:55:31 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+55         const engine = yield* EngineAdapter
+                                 ~~~~~~~~~~~~~
+
+test/plan.test.ts:103:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+103       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+104         const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+109         expect(error._tag).toBe("EngineError")
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+110       }),
+    ~~~~~~~~
+
+test/plan.test.ts:104:31 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+104         const engine = yield* EngineAdapter
+                                  ~~~~~~~~~~~~~
+
+test/plan.test.ts:109:16 - error TS18046: 'error' is of type 'unknown'.
+
+109         expect(error._tag).toBe("EngineError")
+                   ~~~~~
+
+test/plan.test.ts:116:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+116       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+117         const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+128         expect(rows).toEqual([{ n: 2 }])
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+129       }),
+    ~~~~~~~~
+
+test/plan.test.ts:117:31 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+117         const engine = yield* EngineAdapter
+                                  ~~~~~~~~~~~~~
+
+test/postgres.test.ts:38:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+ 38       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 39         const store = yield* StateStore
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 69         yield* store.releaseLock("run:dev")
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 70       }),
+    ~~~~~~~~
+
+test/postgres.test.ts:39:30 - error TS2488: Type 'typeof StateStore' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+39         const store = yield* StateStore
+                                ~~~~~~~~~~
+
+test/postgres.test.ts:61:28 - error TS7006: Parameter 'i' implicitly has an 'any' type.
+
+61         expect(ledger.map((i) => [i.startTs, i.status])).toEqual([["2026-01-01T00:00:00Z", "done"]])
+                              ~
+
+test/postgres.test.ts:76:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+ 76       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 77         const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 79         yield* engine.execute(`DROP TABLE IF EXISTS efmesh_state.meta`)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 80       }),
+    ~~~~~~~~
+
+test/postgres.test.ts:77:31 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+77         const engine = yield* EngineAdapter
+                                 ~~~~~~~~~~~~~
+
+test/postgres.test.ts:83:7 - error TS2379: Argument of type 'Effect<unknown, any, unknown>' is not assignable to parameter of type 'Effect<unknown, any, never>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'never'.
+
+ 83       Effect.flip(
+          ~~~~~~~~~~~~
+ 84         Effect.gen(function* () {
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 86         }).pipe(Effect.provide(PostgresStateLive({ url: cluster.url }))),
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 87       ),
+    ~~~~~~~
+
+test/postgres.test.ts:85:25 - error TS2488: Type 'typeof StateStore' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+85           return yield* StateStore
+                           ~~~~~~~~~~
+
+test/postgres.test.ts:89:12 - error TS18046: 'failure' is of type 'unknown'.
+
+89     expect(failure._tag).toBe("StateSchemaError")
+              ~~~~~~~
+
+test/postgres.test.ts:96:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+ 96       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 97         const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+107         expect(failure._tag).toBe("SqlParseError")
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+108       }),
+    ~~~~~~~~
+
+test/postgres.test.ts:97:31 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+97         const engine = yield* EngineAdapter
+                                 ~~~~~~~~~~~~~
+
+test/postgres.test.ts:107:16 - error TS18046: 'failure' is of type 'unknown'.
+
+107         expect(failure._tag).toBe("SqlParseError")
+                   ~~~~~~~
+
+test/postgres.test.ts:114:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+114       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+115         const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+121         expect(columns[2]!.type).toContain("timestamp")
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+122       }),
+    ~~~~~~~~
+
+test/postgres.test.ts:115:31 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+115         const engine = yield* EngineAdapter
+                                  ~~~~~~~~~~~~~
+
+test/postgres.test.ts:119:29 - error TS7006: Parameter 'c' implicitly has an 'any' type.
+
+119         expect(columns.map((c) => c.name)).toEqual(["name", "n", "ts"])
+                                ~
+
+test/postgres.test.ts:128:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+128       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+129         const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+193         expect(prod).toEqual([{ n: 6 }])
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+194       }),
+    ~~~~~~~~
+
+test/postgres.test.ts:129:31 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+129         const engine = yield* EngineAdapter
+                                  ~~~~~~~~~~~~~
+
+test/postgres.test.ts:200:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+200       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+201         const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+249         ])
+    ~~~~~~~~~~
+250       }),
+    ~~~~~~~~
+
+test/postgres.test.ts:201:31 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+201         const engine = yield* EngineAdapter
+                                  ~~~~~~~~~~~~~
+
+test/postgres.test.ts:275:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+275       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+276         const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+298         expect(rows).toEqual([{ n: 112 }])
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+299       }),
+    ~~~~~~~~
+
+test/postgres.test.ts:276:31 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+276         const engine = yield* EngineAdapter
+                                  ~~~~~~~~~~~~~
+
+test/reclassify.test.ts:87:25 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+87   const engine = yield* EngineAdapter
+                           ~~~~~~~~~~~~~
+
+test/reclassify.test.ts:96:26 - error TS2488: Type 'typeof StateStore' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+96     const store = yield* StateStore
+                            ~~~~~~~~~~
+
+test/reclassify.test.ts:103:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+103       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+104         const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+136         expect(yield* physicalFpOf("med.dim", dim.fingerprint)).toBe(oldDim.physicalFingerprint)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+137       }),
+    ~~~~~~~~
+
+test/reclassify.test.ts:104:31 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+104         const engine = yield* EngineAdapter
+                                  ~~~~~~~~~~~~~
+
+test/reclassify.test.ts:143:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+143       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+144         yield* seedSource
+    ~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+150         expect(dim.reusedFrom).toBeUndefined()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+151       }),
+    ~~~~~~~~
+
+test/reclassify.test.ts:157:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+157       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+158         yield* seedSource
+    ~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+165         expect(mart.reusedFrom).toBeUndefined()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+166       }),
+    ~~~~~~~~
+
+test/reclassify.test.ts:174:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+174       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+175         yield* seedSource
+    ~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+186         expect(dim.reusedFrom).toBe(oldDim.fingerprint)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+187       }),
+    ~~~~~~~~
+
+test/reclassify.test.ts:201:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+201       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+202         yield* seedSource
+    ~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+208         expect(failure).toMatchObject({ model: "med.base" })
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+209       }),
+    ~~~~~~~~
+
+test/reclassify.test.ts:215:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+215       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+216         yield* seedSource
+    ~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+228         expect(action.reclassifiedFrom).toBeUndefined()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+229       }),
+    ~~~~~~~~
+
+test/retry.test.ts:35:25 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+35   const engine = yield* EngineAdapter
+                           ~~~~~~~~~~~~~
+
+test/retry.test.ts:64:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+ 64       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 65         const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 75         expect(rows).toEqual([{ n: 2 }])
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 76       }),
+    ~~~~~~~~
+
+test/retry.test.ts:65:31 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+65         const engine = yield* EngineAdapter
+                                 ~~~~~~~~~~~~~
+
+test/retry.test.ts:71:39 - error TS2740: Type 'typeof EngineAdapter' is missing the following properties from type 'Tag<unknown, unknown>': _op, Service, Identifier, [TagTypeId], and 12 more.
+
+71         }).pipe(Effect.provideService(EngineAdapter, flaky(engine, failures)))
+                                         ~~~~~~~~~~~~~
+
+test/retry.test.ts:82:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+ 82       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 83         const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+107         expect(rows).toEqual([{ n: 2 }])
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+108       }),
+    ~~~~~~~~
+
+test/retry.test.ts:83:31 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+83         const engine = yield* EngineAdapter
+                                 ~~~~~~~~~~~~~
+
+test/retry.test.ts:87:35 - error TS2740: Type 'typeof EngineAdapter' is missing the following properties from type 'Tag<unknown, unknown>': _op, Service, Identifier, [TagTypeId], and 12 more.
+
+87             Effect.provideService(EngineAdapter, flaky(engine, { left: 1 })),
+                                     ~~~~~~~~~~~~~
+
+test/retry.test.ts:97:41 - error TS2740: Type 'typeof EngineAdapter' is missing the following properties from type 'Tag<unknown, unknown>': _op, Service, Identifier, [TagTypeId], and 12 more.
+
+97           }).pipe(Effect.provideService(EngineAdapter, flaky(engine, { left: 5 }))),
+                                           ~~~~~~~~~~~~~
+
+test/run.test.ts:37:25 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+37   const engine = yield* EngineAdapter
+                           ~~~~~~~~~~~~~
+
+test/run.test.ts:50:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+ 50       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 51         const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 70         expect(idle.built).toEqual([])
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 71       }),
+    ~~~~~~~~
+
+test/run.test.ts:51:31 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+51         const engine = yield* EngineAdapter
+                                 ~~~~~~~~~~~~~
+
+test/run.test.ts:77:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+ 77       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 78         const store = yield* StateStore
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 96         expect(yield* store.acquireLock(envLockName("dev"), 1000)).toBe(true)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 97       }),
+    ~~~~~~~~
+
+test/run.test.ts:78:30 - error TS2488: Type 'typeof StateStore' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+78         const store = yield* StateStore
+                                ~~~~~~~~~~
+
+test/run.test.ts:103:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+103       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+104         const store = yield* StateStore
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+121         expect(yield* store.acquireLock(envLockName("dev"), 1000)).toBe(true)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+122       }),
+    ~~~~~~~~
+
+test/run.test.ts:104:30 - error TS2488: Type 'typeof StateStore' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+104         const store = yield* StateStore
+                                 ~~~~~~~~~~
+
+test/run.test.ts:128:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+128       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+129         const store = yield* StateStore
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+132         expect(yield* store.acquireLock("run:zombie", 1000)).toBe(true)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+133       }),
+    ~~~~~~~~
+
+test/run.test.ts:129:30 - error TS2488: Type 'typeof StateStore' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+129         const store = yield* StateStore
+                                 ~~~~~~~~~~
+
+test/scd.test.ts:37:25 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+37   const engine = yield* EngineAdapter
+                           ~~~~~~~~~~~~~
+
+test/scd.test.ts:47:25 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+47   const engine = yield* EngineAdapter
+                           ~~~~~~~~~~~~~
+
+test/scd.test.ts:57:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+ 57       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 58         const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 92         ])
+    ~~~~~~~~~~
+ 93       }),
+    ~~~~~~~~
+
+test/scd.test.ts:58:31 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+58         const engine = yield* EngineAdapter
+                                 ~~~~~~~~~~~~~
+
+test/seed-uniquekey.test.ts:31:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+ 31       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 32         const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 48         expect(rows2).toEqual([{ n: 3 }])
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 49       }),
+    ~~~~~~~~
+
+test/seed-uniquekey.test.ts:32:31 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+32         const engine = yield* EngineAdapter
+                                 ~~~~~~~~~~~~~
+
+test/seed-uniquekey.test.ts:67:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+ 67       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 68         const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+101         ])
+    ~~~~~~~~~~
+102       }),
+    ~~~~~~~~
+
+test/seed-uniquekey.test.ts:68:31 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+68         const engine = yield* EngineAdapter
+                                 ~~~~~~~~~~~~~
+
+test/sql-model.test.ts:40:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+ 40       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 41         const engine = yield* EngineAdapter
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 55         expect(rows).toEqual([{ id: "e1" }, { id: "e2" }])
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 56       }),
+    ~~~~~~~~
+
+test/sql-model.test.ts:41:31 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+41         const engine = yield* EngineAdapter
+                                 ~~~~~~~~~~~~~
+
+test/state.test.ts:8:5 - error TS2379: Argument of type 'Effect<A, unknown, unknown>' is not assignable to parameter of type 'Effect<A, unknown, never>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'never'.
+
+ 8     Effect.gen(function* () {
+       ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 9       const store = yield* StateStore
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+10       return yield* body(store)
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+11     }).pipe(Effect.provide(SqliteStateLive())),
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+test/state.test.ts:9:28 - error TS2488: Type 'typeof StateStore' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+9       const store = yield* StateStore
+                             ~~~~~~~~~~
+
+test/status.test.ts:37:25 - error TS2488: Type 'typeof EngineAdapter' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+37   const engine = yield* EngineAdapter
+                           ~~~~~~~~~~~~~
+
+test/status.test.ts:54:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+ 54       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 55         const store = yield* StateStore
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+ 71         expect(ticks[0]!.finishedAt >= ticks[0]!.startedAt).toBe(true)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 72       }),
+    ~~~~~~~~
+
+test/status.test.ts:55:30 - error TS2488: Type 'typeof StateStore' must have a '[Symbol.iterator]()' method that returns an iterator.
+
+55         const store = yield* StateStore
+                                ~~~~~~~~~~
+
+test/status.test.ts:62:27 - error TS7006: Parameter 't' implicitly has an 'any' type.
+
+62         expect(ticks.map((t) => t.outcome)).toEqual(["awaiting-human"])
+                             ~
+
+test/status.test.ts:69:27 - error TS7006: Parameter 't' implicitly has an 'any' type.
+
+69         expect(ticks.map((t) => t.outcome)).toEqual(["ok", "awaiting-human"])
+                             ~
+
+test/status.test.ts:78:7 - error TS2379: Argument of type 'Effect<void, unknown, unknown>' is not assignable to parameter of type 'Effect<void, unknown, EngineAdapter | StateStore>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'unknown' is not assignable to type 'EngineAdapter | StateStore'.
+
+ 78       Effect.gen(function* () {
+          ~~~~~~~~~~~~~~~~~~~~~~~~~
+ 79         yield* seedSource
+    ~~~~~~~~~~~~~~~~~~~~~~~~~
+... 
+105         expect(caught.ticks[0]!.outcome).toBe("ok")
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+106       }),
+    ~~~~~~~~
+
+
+Found 296 errors in 60 files.
+
+Errors  Files
+     9  src/bin.ts:2
+     1  src/cli/commands/audit.ts:20
+     2  src/cli/commands/diff.ts:35
+     1  src/cli/commands/graph.ts:19
+     1  src/cli/commands/init.ts:9
+     1  src/cli/commands/janitor.ts:19
+     1  src/cli/commands/lineage.ts:13
+     1  src/cli/commands/migrate.ts:13
+     2  src/cli/commands/plan-apply.ts:40
+     1  src/cli/commands/render.ts:20
+     1  src/cli/commands/run.ts:18
+     1  src/cli/commands/schedule.ts:36
+     1  src/cli/commands/status.ts:12
+     1  src/engine/adapter.ts:65
+     3  src/engine/duckdb.ts:2
+     2  src/engine/postgres.ts:61
+     2  src/plan/audit-run.ts:74
+    28  src/plan/diff.ts:30
+     6  src/plan/executor.ts:399
+     3  src/plan/fingerprint.ts:152
+     4  src/plan/janitor.ts:50
+     3  src/plan/lineage.ts:86
+     2  src/plan/lock.ts:36
+    10  src/plan/planner.ts:178
+     8  src/plan/run.ts:49
+     9  src/plan/status.ts:51
+     2  src/state/postgres.ts:146
+     2  src/state/sqlite.ts:144
+     1  src/state/store.ts:202
+     2  src/testing/index.ts:171
+     2  test/audit-run.test.ts:20
+     7  test/audit.test.ts:20
+    10  test/backfill.test.ts:41
+     6  test/dag.test.ts:19
+     6  test/data-diff.test.ts:51
+     6  test/ducklake.test.ts:38
+     7  test/embedded.test.ts:43
+     2  test/engine.test.ts:8
+     2  test/errors.test.ts:17
+     2  test/export-diff.test.ts:33
+     5  test/external.test.ts:23
+     6  test/fingerprint-golden.test.ts:119
+     8  test/forward-only.test.ts:36
+     2  test/helpers/lock-holder.ts:13
+     2  test/janitor-race.test.ts:14
+     3  test/janitor.test.ts:30
+     4  test/lock-kill9.test.ts:58
+    17  test/logging.test.ts:5
+    11  test/migrate.test.ts:12
+     6  test/parquet.test.ts:27
+     7  test/plan.test.ts:54
+    20  test/postgres.test.ts:38
+     9  test/reclassify.test.ts:87
+     8  test/retry.test.ts:35
+     9  test/run.test.ts:37
+     4  test/scd.test.ts:37
+     4  test/seed-uniquekey.test.ts:31
+     2  test/sql-model.test.ts:40
+     2  test/state.test.ts:8
+     6  test/status.test.ts:37
+

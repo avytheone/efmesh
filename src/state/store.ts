@@ -199,6 +199,4 @@ export interface StateStoreShape {
   ) => Effect.Effect<ReadonlyArray<IntervalRecord>, StateError>
 }
 
-export class StateStore extends Context.Service<StateStore, StateStoreShape>()(
-  "efmesh/StateStore",
-) {}
+export class StateStore extends Context.Tag("efmesh/StateStore")<StateStore, StateStoreShape>() {}

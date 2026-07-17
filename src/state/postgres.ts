@@ -143,7 +143,7 @@ const SNAPSHOT_COLUMNS = `
 export const PostgresStateLive = (
   options: PostgresStateOptions,
 ): Layer.Layer<StateStore, StateError | StateSchemaError> =>
-  Layer.effect(
+  Layer.scoped(
     StateStore,
     Effect.gen(function* () {
       const sql = yield* Effect.acquireRelease(

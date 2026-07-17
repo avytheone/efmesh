@@ -58,7 +58,7 @@ export interface PostgresEngineOptions {
 export const PostgresEngineLive = (
   options: PostgresEngineOptions,
 ): Layer.Layer<EngineAdapter, EngineError> =>
-  Layer.effect(
+  Layer.scoped(
     EngineAdapter,
     Effect.gen(function* () {
       const sql = yield* Effect.acquireRelease(

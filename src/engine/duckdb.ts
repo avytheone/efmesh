@@ -1,5 +1,5 @@
 import { DuckDBInstance } from "@duckdb/node-api"
-import { Effect, Layer, Semaphore } from "effect"
+import { Effect, Layer } from "effect"
 import type { Engine, EngineColumn } from "./adapter.ts"
 import { EngineAdapter, EngineError, SqlParseError } from "./adapter.ts"
 
@@ -29,7 +29,7 @@ export interface DuckDBEngineOptions {
 export const DuckDBEngineLive = (
   options?: DuckDBEngineOptions,
 ): Layer.Layer<EngineAdapter, EngineError> =>
-  Layer.effect(
+  Layer.scoped(
     EngineAdapter,
     Effect.gen(function* () {
       const path = options?.path ?? ":memory:"
@@ -67,7 +67,7 @@ export const DuckDBEngineLive = (
 
       // single connection: parallel transactions are serialized by a semaphore
       // so fibers do not interleave each other's BEGIN/COMMIT
-      const transactionLock = yield* Semaphore.make(1)
+      const transactionLock = yield* Effect.makeSemaphore(1)
 
       const service: Engine = {
         dialect: "duckdb",

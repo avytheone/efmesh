@@ -49,16 +49,18 @@
   },
   "dependencies": {
     "@duckdb/node-api": "1.5.4-r.1",
-    "@effect/platform-bun": "4.0.0-beta.98",
+    "@effect/cli": "0.76.0",
+    "@effect/platform": "0.97.0",
+    "@effect/platform-bun": "0.91.0",
     "libpg-query": "^17.7.3"
   },
   "peerDependencies": {
-    "effect": "4.0.0-beta.98"
+    "effect": "3.22.0"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.4",
     "@types/bun": "latest",
-    "effect": "4.0.0-beta.98",
+    "effect": "3.22.0",
     "lefthook": "2.1.10",
     "typescript": "^7.0.2"
   }

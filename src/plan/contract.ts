@@ -1,4 +1,4 @@
-import { Data, Effect } from "effect"
+import { Data, Effect, Option, SchemaAST } from "effect"
 import type { AnyModel } from "../core/model.ts"
 import type { Engine, EngineError } from "../engine/adapter.ts"
 
@@ -24,24 +24,37 @@ export class SchemaMismatchError extends Data.TaggedError("SchemaMismatchError")
 
 export type TypeFamily = "text" | "numeric" | "boolean" | "temporal" | "any"
 
-/** Family expected from an Effect Schema field (by AST). Reuse: testModel renders fixtures from it. */
+/**
+ * Family expected from an Effect Schema field (by AST). Reuse: testModel renders
+ * fixtures from it.
+ *
+ * v3 SchemaAST discriminators differ from v4: primitives are `*Keyword`, and
+ * `DateTimeUtc` is a `Transformation` carrying an Identifier annotation rather
+ * than a `Declaration` with a `typeConstructor`. This mapping is invisible to
+ * tsc (the AST arrives as `unknown`); its only guard is the contract/testing
+ * suites.
+ */
 export const familyOfAst = (ast: unknown): TypeFamily => {
   const node = ast as {
     readonly _tag: string
     readonly types?: ReadonlyArray<unknown>
-    readonly annotations?: { readonly typeConstructor?: { readonly _tag?: string } }
+    readonly type?: unknown
   }
   switch (node._tag) {
-    case "String":
+    case "StringKeyword":
       return "text"
-    case "Number":
-    case "BigInt":
+    case "NumberKeyword":
+    case "BigIntKeyword":
       return "numeric"
-    case "Boolean":
+    case "BooleanKeyword":
       return "boolean"
+    case "Transformation":
     case "Declaration": {
-      const constructorTag = node.annotations?.typeConstructor?._tag ?? ""
-      return constructorTag.startsWith("effect/DateTime") ? "temporal" : "any"
+      const id = Option.getOrElse(
+        SchemaAST.getIdentifierAnnotation(ast as SchemaAST.AST),
+        () => "",
+      )
+      return id.startsWith("DateTime") ? "temporal" : "any"
     }
     case "Union": {
       // NullOr(X) and the like: the single recognized family among the members
@@ -50,6 +63,10 @@ export const familyOfAst = (ast: unknown): TypeFamily => {
       )
       return families.size === 1 ? [...families][0]! : "any"
     }
+    // Schema.optional wraps the value type in a PropertySignature (v3): unwrap.
+    case "PropertySignatureDeclaration":
+    case "PropertySignatureTransformation":
+      return node.type !== undefined ? familyOfAst(node.type) : "any"
     default:
       return "any"
   }
