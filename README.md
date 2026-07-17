@@ -165,6 +165,7 @@ export default defineConfig({
 | `efmesh plan <env>` | diff the project against an environment + missing intervals; changes nothing |
 | `efmesh apply <env>` | plan → confirmation (TTY) → physical tables, backfill, view layer |
 | `efmesh run <env>` | scheduler tick: new intervals only, under the lock; for cron |
+| `efmesh restate <env> --model m --from t --to t` | replay a past range for a model and its descendants; `--dry-run`, `--json` |
 | `efmesh status <env>` | what is going on: last plan, interval lag, recent run ticks |
 | `efmesh audit <env>` | audit the environment's view layer — catches after-the-fact degradation |
 | `efmesh diff <envA> <envB>` | how two environments differ; `--data` compares the actual data |
@@ -182,6 +183,18 @@ operator's verdict on top of `--explain`, journaled with `applied_by`. A
 non-breaking parent lets unchanged descendants reuse their previous physical
 tables instead of rebuilding (scdType2 keeps its row history); an override
 that plainly contradicts the AST (dropped columns) is refused.
+
+`restate <env> --model <m> --from <t> --to <t>` replays a past time range when
+bad source data arrived after the fact: it clears the range's done-intervals
+for the `incrementalByTimeRange` model **and its incrementalByTimeRange
+descendants** (the cascade is the planner's ordinary missing-interval logic),
+so the next `apply` — or a `run` tick — recomputes exactly that range. It
+mutates only the interval ledger, under the environment lock, and never touches
+the physics directly (the ensuing backfill's DELETE+INSERT does). Bounds are
+ISO UTC and must be aligned to the model's grain (a misaligned bound is a typed
+error); `scdType2` is refused by name (no time-range semantics over version
+history). `--dry-run` prints what would be recomputed and changes nothing;
+`--json` for CI.
 
 Every reporting command speaks `--json` — `plan`, `audit`, `status`, `diff`,
 `janitor`, `migrate`, `lineage`, `render` and `schedule --list` — a stable

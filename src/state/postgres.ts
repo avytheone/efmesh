@@ -472,6 +472,15 @@ export const PostgresStateLive = (
               [snapshotFp],
             )) as ReadonlyArray<IntervalRecord>
           }),
+
+        clearIntervals: (snapshotFp, from, to) =>
+          attempt("clearIntervals", async () => {
+            await sql.unsafe(
+              `DELETE FROM efmesh_state.intervals
+               WHERE snapshot_fp = $1 AND start_ts >= $2 AND start_ts < $3`,
+              [snapshotFp, from, to],
+            )
+          }),
       }
       return service
     }),

@@ -43,6 +43,18 @@ the first version gathers them in full.
 - Store-backup hygiene: leaked SQLite store backups under `examples/hospital`
   are removed from git and `*.sqlite.backup-v*` is now ignored. The hospital
   example runs via `bunx efmesh`, as a real project would.
+### Added
+
+- `efmesh restate <env> --model <m> --from <t> --to <t>` (#21) — replay a past
+  time range after bad source data arrives. It clears the range's done-intervals
+  for the `incrementalByTimeRange` model and its incrementalByTimeRange
+  descendants (the cascade is the planner's ordinary missing-interval logic), so
+  the next `apply` or `run` tick recomputes exactly that range; the physics is
+  never touched directly. Runs under the environment lock; bounds are ISO UTC
+  aligned to the model's grain (a misaligned bound is a typed error) and
+  `scdType2` is refused by name. `--dry-run` previews the model, its descendants
+  and the affected intervals without changing anything; `--json` emits a stable
+  object shape for CI.
 
 ## [0.2.2] — 2026-07-17
 

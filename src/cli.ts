@@ -16,6 +16,7 @@ export {
   migrateToJson,
   planToJson,
   renderToJson,
+  restateToJson,
   scheduleListToJson,
 } from "./cli/json.ts"
 export { renderFailure, wantsTrace } from "./cli/failure.ts"
