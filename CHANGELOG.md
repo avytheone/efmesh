@@ -5,6 +5,20 @@ versioning — [SemVer](https://semver.org/).
 Internal development history was tracked in phases F0–F6 (SPEC.md §13);
 the first version gathers them in full.
 
+## [Unreleased]
+
+- Full `--json` and exit-code coverage for headless operation (#16). `janitor`,
+  `migrate`, `lineage`, `render` and `schedule --list` now take `--json`,
+  joining `plan`/`audit`/`status`/`diff` — every reporting command speaks a
+  stable machine-readable shape (a SemVer-frozen contract for CI and agents).
+  Each shape is a JSON object (never a bare array or string), so a future
+  `apiVersion` stays additive; `--json` stdout is byte-clean (logs to stderr).
+  The exit-code contract (`0` ok, `1` error, `2` awaiting a human) is now
+  documented once as a table in the README and referenced from the CLI's own
+  `--help`. No command blocks on input without announcing it: the sole prompt
+  is `apply`'s confirmation, shown only at an interactive TTY — a non-TTY
+  `apply` with changes refuses with `2` rather than hanging.
+
 ## [0.2.1] — 2026-07-16
 
 Theme: hygiene for the first stranger — the whole surface is English,

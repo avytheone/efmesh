@@ -1,6 +1,16 @@
 import { describe, expect, test } from "bun:test"
 import { Effect } from "effect"
-import { decideApply, EXIT_AWAITING_HUMAN, isAffirmative, parseReclassify } from "../src/cli.ts"
+import {
+  decideApply,
+  EXIT_AWAITING_HUMAN,
+  isAffirmative,
+  janitorToJson,
+  lineageToJson,
+  migrateToJson,
+  parseReclassify,
+  renderToJson,
+  scheduleListToJson,
+} from "../src/cli.ts"
 
 describe("--reclassify — flag parsing (#5)", () => {
   test("model=category pairs; empty — undefined; garbage — an error", async () => {
@@ -103,5 +113,48 @@ describe("plan --json — the shape contract (#3)", () => {
         },
       ],
     })
+  })
+})
+
+describe("--json shapes for headless commands (#16)", () => {
+  test("janitor — { removed, kept }, nothing else leaks", () => {
+    expect(janitorToJson({ removed: ["med.a@abc12345"], kept: ["med.b@def67890"] })).toEqual({
+      removed: ["med.a@abc12345"],
+      kept: ["med.b@def67890"],
+    })
+  })
+
+  test("migrate — from/to always, backup only when present", () => {
+    expect(migrateToJson({ from: 3, to: 4 })).toEqual({ from: 3, to: 4 })
+    expect(migrateToJson({ from: 3, to: 4, backup: "s.sqlite.backup-v3" })).toEqual({
+      from: 3,
+      to: 4,
+      backup: "s.sqlite.backup-v3",
+    })
+  })
+
+  test("render — sql wrapped in an object; env null for logical names", () => {
+    expect(renderToJson("med.stays", "", "SELECT 1")).toEqual({
+      model: "med.stays",
+      env: null,
+      sql: "SELECT 1",
+    })
+    expect(renderToJson("med.stays", "prod", "SELECT 1")).toEqual({
+      model: "med.stays",
+      env: "prod",
+      sql: "SELECT 1",
+    })
+  })
+
+  test("lineage — { model, lineage: trees } carrying the node shape", () => {
+    const tree = { model: "med.stays", column: "dept", kind: "full", sources: [] }
+    expect(lineageToJson("med.stays", [tree])).toEqual({
+      model: "med.stays",
+      lineage: [tree],
+    })
+  })
+
+  test("schedule --list — entries wrapped in an object", () => {
+    expect(scheduleListToJson(["efmesh-proj-dev"])).toEqual({ entries: ["efmesh-proj-dev"] })
   })
 })
