@@ -11,7 +11,6 @@ import { defineExternal, defineModel, external, kind } from "../src/core/model.t
 import { EngineAdapter } from "../src/engine/adapter.ts"
 import { DuckDBEngineLive } from "../src/engine/duckdb.ts"
 import { SqliteStateLive } from "../src/state/sqlite.ts"
-import { StateStore } from "../src/state/store.ts"
 
 /**
  * The detailed execution log (#14) is emitted through Effect's logging system,

@@ -1,4 +1,4 @@
-import { Context, Data, Effect } from "effect"
+import { Context, Data, type Effect } from "effect"
 import { causeText } from "../error-text.ts"
 
 export class StateError extends Data.TaggedError("StateError")<{

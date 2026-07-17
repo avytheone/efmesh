@@ -5,7 +5,7 @@ import { Argument, Command, Flag } from "effect/unstable/cli"
 import type { EfmeshConfig } from "./config.ts"
 import { buildGraph } from "./core/graph.ts"
 import type { AnyModel } from "./core/model.ts"
-import { discoverModels, DiscoveryError, DiscoveryConflictError } from "./discovery.ts"
+import { discoverModels, type DiscoveryError, DiscoveryConflictError } from "./discovery.ts"
 import { Efmesh } from "./efmesh.ts"
 import { scaffold } from "./init.ts"
 import { DuckDBEngineLive } from "./engine/duckdb.ts"
@@ -616,7 +616,7 @@ const scheduleCommand = Command.make(
       yield* Console.log(`registered: ${registered.title} — "${cron}" (OS scheduler)`)
       yield* Console.log(`worker: ${registered.worker}`)
       yield* Console.log(
-        "tick journal: efmesh status " + env + "; NB: cron does not catch up missed runs — a systemd timer is stricter (--print-systemd)",
+        `tick journal: efmesh status ${env}; NB: cron does not catch up missed runs — a systemd timer is stricter (--print-systemd)`,
       )
     }).pipe(
       // reason is the most valuable part (a recipe for the operator): surface it in words, not a stacktrace
