@@ -15,6 +15,16 @@ the first version gathers them in full.
   blocked by structural changes), so a bot reads *why* nothing ran without
   scraping stderr. `graph --json` returns the DAG as `{models:[{name, kind,
   deps}]}` in topological order. Exit codes are unchanged.
+- Structured tick `detail` + `status --check` (#19). Every run tick's journal
+  `detail` is now one structured shape (stored JSON-encoded in the existing
+  text column — no `STATE_VERSION` bump), keyed by `outcome`: `ok → {built}`,
+  `awaiting-human → {blockedBy}`, `lock-held → {lock}`, `error →
+  {error, model?, interval?, message?}` — an error tick now names the model and
+  carries the human message, not just the error tag. `efmesh status <env>
+  --check` turns the report into a health probe: it exits non-zero when the env
+  is unhealthy (a stuck backfill, or a last tick that errored), staying `0` for
+  the normal awaiting-human / lock-held / lagging states — so it drops straight
+  into a systemd `OnFailure=` or a healthchecks.io ping.
 - **BREAKING** `status --json` shape (#28). `lastPlan.summary` and each
   `ticks[].detail` were JSON **encoded inside a string** — a caller had to
   `JSON.parse` a second time; they are now structured objects directly. In the

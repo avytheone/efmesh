@@ -603,7 +603,7 @@ efmesh restate <env> --model <m> --from <t> --to <t> [--dry-run] [--json] — re
 efmesh audit <env> [--model a,b] [--json] — audits of the environment's view layer, changing nothing
 efmesh render <model> [--env] [--json]   — show the final SQL (for debugging)
 efmesh diff <envA> <envB> [--data [--model a,b] [--sample P] [--json]] — how the environments differ
-efmesh status <env> [--json]    — last plan, interval lag, recent run ticks
+efmesh status <env> [--json] [--check]  — last plan, interval lag, recent run ticks (--check: exit non-zero when unhealthy)
 efmesh lineage <model[.column]> [--json]
 efmesh graph [--html] [--json]  — the model DAG
 efmesh janitor [--ttl 7] [--json]  — cleanup of orphaned physical tables
@@ -633,6 +633,21 @@ No command ever blocks on input silently: the only prompt is `apply`'s
 confirmation, shown solely at an interactive TTY; a non-TTY `apply` with
 changes refuses with `2` rather than hanging. The full exit-code table lives
 once in the README (§ Exit codes) and the CLI's own `--help`.
+
+**Tick detail + `status --check` (0.3.0, #19).** The tick journal's `detail`
+is one structured shape, stored JSON-encoded in the existing text column (no
+`STATE_VERSION` bump), discriminated by `outcome`: `ok → {built}`,
+`awaiting-human → {blockedBy}`, `lock-held → {lock}`, `error →
+{error,model?,interval?,message?}` (the error case names the model/interval it
+died on when the tagged error carries them). `status <env> --check` turns the
+report into a health probe for a monitoring timer: it exits **non-zero** when
+the env is unhealthy — a stuck backfill (`lag[].failed > 0`) or a last tick
+that ended in `error`. Deliberately NOT unhealthy: `awaiting-human` / `lock-held`
+ticks and plain missing lag (normal states), and a never-applied env; a store
+behind the schema version never gets that far — `status` fails to open it (exit
+1), which is already the non-zero a check wants. It composes with systemd
+`OnFailure=` and healthchecks.io; it prints the usual report alongside so an
+operator sees the reason. No new `--json` surface — just the flag.
 
 `schedule` (0.2.0, #10) registers the `run` tick in the OS scheduler via
 `Bun.cron` (>= 1.3.11; `engines.bun` pins it): crontab on Linux, launchd on

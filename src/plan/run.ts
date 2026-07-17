@@ -35,15 +35,48 @@ export type RunError = ApplyError | LockHeldError | LockLostError | RunBlockedBy
 
 export interface RunOptions extends PlanOptions, ApplyOptions, LockOptions {}
 
-/** Tick outcome for the journal: error → category + detail. */
-const classify = (error: RunError): Pick<RunRecord, "outcome" | "detail"> => {
+/**
+ * Structured tick detail (SPEC §7, #19), stored as a JSON string in the
+ * journal's `detail` column — the column is already text, so this is NOT a
+ * schema change (no STATE_VERSION bump). The shape is discriminated by the
+ * sibling `outcome`; `status --json` hands it back as an object (no more
+ * JSON-inside-a-string), and `status` renders it for a human. The `error`
+ * case names the model and interval it died on when the tagged error carries
+ * them, plus the same human message the failure screen shows.
+ */
+export type TickDetail =
+  | { readonly built: ReadonlyArray<string> }
+  | { readonly blockedBy: ReadonlyArray<string> }
+  | { readonly lock: string }
+  | {
+      readonly error: string
+      readonly model?: string
+      readonly interval?: string
+      readonly message?: string
+    }
+
+/** Tick outcome for the journal: error → category + structured detail. */
+const classify = (error: RunError): { outcome: RunRecord["outcome"]; detail: TickDetail } => {
   switch (error._tag) {
     case "RunBlockedByChangesError":
-      return { outcome: "awaiting-human", detail: error.changes.join("; ") }
+      return { outcome: "awaiting-human", detail: { blockedBy: error.changes } }
     case "LockHeldError":
-      return { outcome: "lock-held", detail: error.name }
-    default:
-      return { outcome: "error", detail: error._tag }
+      return { outcome: "lock-held", detail: { lock: error.name } }
+    default: {
+      // an ApplyError/LockLostError names its culprit when it knows it (EngineError
+      // has `model`, others may add `interval`); `message` is every TaggedError's
+      // rendered line — the same one the failure screen prints
+      const named = error as { model?: unknown; interval?: unknown; message?: unknown }
+      return {
+        outcome: "error",
+        detail: {
+          error: error._tag,
+          ...(typeof named.model === "string" ? { model: named.model } : {}),
+          ...(typeof named.interval === "string" ? { interval: named.interval } : {}),
+          ...(typeof named.message === "string" ? { message: named.message } : {}),
+        },
+      }
+    }
   }
 }
 
@@ -59,14 +92,15 @@ export const run = (
     // failure — a cron tick that fell over at three in the morning is debugged
     // after the fact; a failure of the write itself does not mask the real
     // outcome (log + ignore)
-    const journal = (entry: Pick<RunRecord, "outcome" | "detail">) =>
+    const journal = (outcome: RunRecord["outcome"], detail: TickDetail) =>
       Clock.currentTimeMillis.pipe(
         Effect.flatMap((now) =>
           store.recordRun({
             env,
             startedAt,
             finishedAt: new Date(now).toISOString(),
-            ...entry,
+            outcome,
+            detail: JSON.stringify(detail),
           }),
         ),
         Effect.catchCause((cause) => Effect.logWarning("tick journal is unavailable", cause)),
@@ -84,8 +118,11 @@ export const run = (
       return yield* applyPlan(plan, graph, options)
     }).pipe(
       withStateLock(envLockName(env), options?.lockTtlMs),
-      Effect.tap((applied) => journal({ outcome: "ok", detail: JSON.stringify(applied.built) })),
-      Effect.tapError((error) => journal(classify(error))),
+      Effect.tap((applied) => journal("ok", { built: applied.built })),
+      Effect.tapError((error) => {
+        const { detail, outcome } = classify(error)
+        return journal(outcome, detail)
+      }),
     )
   })
 

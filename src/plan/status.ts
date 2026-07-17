@@ -36,6 +36,19 @@ export interface StatusReport {
   readonly lag: ReadonlyArray<ModelLag>
 }
 
+/**
+ * Health verdict for `status <env> --check` (#19): an env is unhealthy when a
+ * backfill is stuck (any failed intervals) or its last tick ended in an error.
+ * These are exactly the two states an alerting timer must page on. Everything
+ * else is a NORMAL state that must NOT trip a page: an awaiting-human or
+ * lock-held tick, plain missing lag (a run simply hasn't caught up yet), and a
+ * never-applied env (models === 0). A store that is behind the schema version
+ * never reaches here — `environmentStatus` fails to open it (exit 1) before a
+ * report exists, which is itself the non-zero the check wants.
+ */
+export const isEnvHealthy = (report: StatusReport): boolean =>
+  !report.lag.some((entry) => entry.failed > 0) && report.ticks[0]?.outcome !== "error"
+
 export interface StatusOptions {
   /** «Now» for computing lag; by default — Clock. Injected for tests. */
   readonly now?: number

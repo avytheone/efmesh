@@ -166,7 +166,7 @@ export default defineConfig({
 | `efmesh apply <env>` | plan → confirmation (TTY) → physical tables, backfill, view layer; `--json` |
 | `efmesh run <env>` | scheduler tick: new intervals only, under the lock; for cron; `--json` |
 | `efmesh restate <env> --model m --from t --to t` | replay a past range for a model and its descendants; `--dry-run`, `--json` |
-| `efmesh status <env>` | what is going on: last plan, interval lag, recent run ticks |
+| `efmesh status <env>` | what is going on: last plan, interval lag, recent run ticks; `--json`, `--check` |
 | `efmesh audit <env>` | audit the environment's view layer — catches after-the-fact degradation |
 | `efmesh diff <envA> <envB>` | how two environments differ; `--data` compares the actual data |
 | `efmesh render <model> [--env] [--json]` | the final SQL of a model |
@@ -245,6 +245,36 @@ Nothing ever blocks waiting for input without announcing it: the only prompt is
 `apply`'s confirmation, and it appears solely at an interactive TTY — a non-TTY
 `apply` with changes refuses with code `2` instead of hanging. efmesh will not
 silently roll out a plan nobody has seen.
+
+### Alerting
+
+`status <env> --check` turns the report into a health probe: it exits non-zero
+when the environment is **unhealthy** — a stuck backfill (failed intervals) or
+a last tick that ended in `error`. Normal states never trip it: `awaiting-human`
+/ `lock-held` ticks, plain lag (a tick simply hasn't caught up yet), and a
+never-applied environment all stay exit `0`. It still prints the report, so an
+operator paged by it sees the reason.
+
+It composes with a scheduled `run` and systemd `OnFailure=`: point the timer's
+failure handler at a check, and let a dead-man's-switch service (e.g.
+[healthchecks.io](https://healthchecks.io)) page when the check itself stops
+reporting.
+
+```ini
+# efmesh-run@.service — the hourly tick
+[Service]
+ExecStart=/usr/bin/env efmesh run %i
+OnFailure=efmesh-alert@%i.service      # fires on a run that exits 1
+
+# efmesh-alert@.service — probe health, then ping the dead-man's switch
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/env efmesh status %i --check
+ExecStart=/usr/bin/curl -fsS https://hc-ping.com/<uuid>/${EXIT_STATUS}
+```
+
+Exit `2` (a `run` blocked by structural changes) is *not* a failure and does
+not fire `OnFailure`; it means a human must `apply` — see [exit codes](#exit-codes).
 
 ## Logging
 
