@@ -7,6 +7,11 @@ the first version gathers them in full.
 
 ## [Unreleased]
 
+- In-repo agent skills (#26) under `.claude/skills/` make the CLAUDE.md culture
+  executable: `release`, `store-migration`, `fingerprint-change`,
+  `add-model-kind` and `issue-workflow` — each a checklist of the exact commands
+  and invariants for a recurring, mistake-prone procedure; referenced from
+  CONTRIBUTING.md.
 - Full `--json` and exit-code coverage for headless operation (#16). `janitor`,
   `migrate`, `lineage`, `render` and `schedule --list` now take `--json`,
   joining `plan`/`audit`/`status`/`diff` — every reporting command speaks a
