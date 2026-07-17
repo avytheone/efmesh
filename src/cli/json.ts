@@ -2,6 +2,7 @@ import { Console } from "effect"
 import type { JanitorReport } from "../plan/janitor.ts"
 import type { LineageNode } from "../plan/lineage.ts"
 import type { Plan } from "../plan/planner.ts"
+import type { RestatePlan } from "../plan/restate.ts"
 import type { MigrationReport } from "../state/store.ts"
 
 /**
@@ -64,5 +65,27 @@ export const lineageToJson = (model: string, trees: ReadonlyArray<LineageNode>):
 
 /** OS-scheduler entries as an object so the list can gain sibling fields later. */
 export const scheduleListToJson = (entries: ReadonlyArray<string>): unknown => ({ entries })
+
+/**
+ * Restate (#21) as an object: the range and, per touched model, the intervals
+ * that will be (dryRun) or were cleared for recompute. Intervals are ISO UTC;
+ * `dryRun` tells a bot whether the store was mutated.
+ */
+export const restateToJson = (plan: RestatePlan): unknown => ({
+  env: plan.env,
+  model: plan.model,
+  from: new Date(plan.from).toISOString(),
+  to: new Date(plan.to).toISOString(),
+  interval: plan.interval,
+  dryRun: plan.dryRun,
+  targets: plan.targets.map((target) => ({
+    name: target.name,
+    fingerprint: target.fingerprint,
+    intervals: target.intervals.map((range) => ({
+      start: new Date(range.start).toISOString(),
+      end: new Date(range.end).toISOString(),
+    })),
+  })),
+})
 
 export const printJson = (payload: unknown) => Console.log(JSON.stringify(payload, null, 2))

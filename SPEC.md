@@ -294,6 +294,19 @@ engine's canon and are a debugging hint, not a versioned contract.
   audits are not retried — their failure is deterministic.*
 - Progress is written to the state store per interval: an interrupted backfill resumes
   from where it stopped, not from scratch.
+- **Restate (#21).** When bad source data arrives after the fact, `efmesh
+  restate <env> --model <m> --from <t> --to <t>` replays a past range. It does
+  not rebuild anything itself: under the environment lock it CLEARS the
+  done-intervals of the target `incrementalByTimeRange` model — and, by
+  cascade, of its `incrementalByTimeRange` descendants present in the
+  environment — in `[from, to)`, so the very next `apply` (or a `run` tick)
+  picks them up through the ordinary missing-interval logic above. The cascade
+  is the DAG's descendants, not a second mechanism; non-time-range kinds have
+  no interval ledger, and `scdType2` is refused by name (no time-range
+  semantics over its accumulated version history). Bounds are ISO UTC aligned
+  to the model's grain (a misaligned bound is a typed error). `--dry-run`
+  reports the model, its descendants and the intervals that would be recomputed,
+  taking no lock and changing nothing.
 
 ### 5.4 Promotion and janitor
 
@@ -554,6 +567,7 @@ efmesh init [dir]               — scaffold a project (config, example models, 
 efmesh plan <env> [--forward-only <model>,…] [--reclassify m=cat,…] [--explain] [--json]
 efmesh apply <env> [--yes] [--jobs N] [--retries N] [--forward-only …] [--reclassify …]  — plan + confirmation + application
 efmesh run  <env> [--jobs N] [--retries N]  — a scheduler tick
+efmesh restate <env> --model <m> --from <t> --to <t> [--dry-run] [--json] — replay a past range (§5.3)
 efmesh audit <env> [--model a,b] [--json] — audits of the environment's view layer, changing nothing
 efmesh render <model> [--env] [--json]   — show the final SQL (for debugging)
 efmesh diff <envA> <envB> [--data [--model a,b] [--sample P] [--json]] — how the environments differ

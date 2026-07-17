@@ -197,6 +197,18 @@ export interface StateStoreShape {
   readonly listIntervals: (
     snapshotFp: string,
   ) => Effect.Effect<ReadonlyArray<IntervalRecord>, StateError>
+  /**
+   * Deletes a snapshot's interval bookkeeping whose start falls in the
+   * half-open `[from, to)` (ISO UTC, lexicographic) — restate (#21): a range
+   * with no records reads as "empty", so the next plan/apply recomputes it as
+   * backfill. The physics is not touched; the ensuing backfill's DELETE+INSERT
+   * overwrites it. Transactional (a single DELETE).
+   */
+  readonly clearIntervals: (
+    snapshotFp: string,
+    from: string,
+    to: string,
+  ) => Effect.Effect<void, StateError>
 }
 
 export class StateStore extends Context.Service<StateStore, StateStoreShape>()(

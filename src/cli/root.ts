@@ -8,6 +8,7 @@ import { lineageCommand } from "./commands/lineage.ts"
 import { migrateCommand } from "./commands/migrate.ts"
 import { applyCommand, planCommand } from "./commands/plan-apply.ts"
 import { renderCommand } from "./commands/render.ts"
+import { restateCommand } from "./commands/restate.ts"
 import { runCommand } from "./commands/run.ts"
 import { scheduleCommand } from "./commands/schedule.ts"
 import { statusCommand } from "./commands/status.ts"
@@ -28,6 +29,7 @@ export const rootCommand = Command.make("efmesh").pipe(
     planCommand,
     applyCommand,
     runCommand,
+    restateCommand,
     statusCommand,
     auditCommand,
     renderCommand,

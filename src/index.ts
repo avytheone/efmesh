@@ -40,6 +40,17 @@ export {
   type RunError,
   type RunOptions,
 } from "./plan/run.ts"
+export {
+  restate,
+  RestateEnvError,
+  RestateGrainError,
+  RestateKindError,
+  RestateRangeError,
+  type RestateError,
+  type RestateOptions,
+  type RestatePlan,
+  type RestateTarget,
+} from "./plan/restate.ts"
 export { janitor, type JanitorOptions, type JanitorReport } from "./plan/janitor.ts"
 export {
   auditEnvironment,
