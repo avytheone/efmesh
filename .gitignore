@@ -18,5 +18,6 @@ lefthook-local.yml
 # артефакты примеров/озера
 examples/**/lake/
 
-# Claude Code worktrees and session data
-.claude/
+# Claude Code session-local data (skills in .claude/skills/ are versioned)
+.claude/worktrees/
+.claude/settings.local.json
