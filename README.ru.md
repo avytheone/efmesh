@@ -167,15 +167,15 @@ export default defineConfig({
 |---|---|
 | `efmesh init [dir]` | скаффолд проекта: конфиг, модели-пример, seed |
 | `efmesh plan <env>` | diff проекта против окружения + недостающие интервалы, ничего не меняет |
-| `efmesh apply <env>` | план → подтверждение (TTY) → физика, бэкфилл, view-слой |
-| `efmesh run <env>` | тик планировщика: только новые интервалы, под локом; для cron |
+| `efmesh apply <env>` | план → подтверждение (TTY) → физика, бэкфилл, view-слой; `--json` |
+| `efmesh run <env>` | тик планировщика: только новые интервалы, под локом; для cron; `--json` |
 | `efmesh restate <env> --model m --from t --to t` | переиграть прошлый диапазон для модели и её потомков; `--dry-run`, `--json` |
 | `efmesh status <env>` | что происходит: последний план, отставание интервалов, тики run |
 | `efmesh audit <env>` | аудиты view-слоя окружения — ловит деградацию задним числом |
 | `efmesh diff <envA> <envB>` | чем окружения отличаются; `--data` сравнивает сами данные |
 | `efmesh render <model> [--env] [--json]` | итоговый SQL модели |
 | `efmesh lineage <model[.col]> [--json]` | колоночный lineage до сырья |
-| `efmesh graph [--html]` | DAG моделей текстом или страницей |
+| `efmesh graph [--html] [--json]` | DAG моделей текстом, HTML-страницей или JSON |
 | `efmesh janitor [--ttl 7] [--json]` | снести осиротевшую физику старше ttl |
 | `efmesh migrate [--json]` | догнать схему state store до текущей версии |
 | `efmesh schedule <env>` | зарегистрировать `run <env>` в OS-шедулере через `Bun.cron` (`--list [--json]`) |
@@ -200,11 +200,17 @@ UTC и должны быть выровнены по грануле модели
 семантики диапазона времени). `--dry-run` печатает, что было бы пересчитано, и
 ничего не меняет; `--json` для CI.
 
-Все отчётные команды говорят на `--json` — `plan`, `audit`, `status`, `diff`,
-`janitor`, `migrate`, `lineage`, `render` и `schedule --list` — стабильная
-машиночитаемая форма (контракт в рамках semver) для CI и ботов; exit-коды не
-меняются, stdout — чистый JSON (логи идут в stderr). Каждая форма — JSON-объект,
-поэтому новые поля верхнего уровня остаются аддитивными.
+Все команды, которым есть что доложить, говорят на `--json` — `plan`, `apply`,
+`run`, `audit`, `status`, `diff`, `graph`, `janitor`, `migrate`, `lineage`,
+`render` и `schedule --list` — стабильная машиночитаемая форма (контракт в
+рамках semver) для CI и ботов; exit-коды не меняются, stdout — чистый JSON
+(логи идут в stderr). `apply --json` отдаёт `{env, applied, plan, built,
+promoted}`, `run --json` — `{env, outcome, processed, blockedBy?}`; оба выдают
+свой payload даже на exit 2 (non-TTY `apply` без `--yes` или `run`,
+заблокированный структурными изменениями), так что бот всегда читает, *почему*
+ничего не выполнилось. `status --json` отдаёт `lastPlan.summary` и каждый
+`ticks[].detail` структурированными объектами, а не JSON внутри строки. Каждая
+форма — JSON-объект, поэтому новые поля верхнего уровня остаются аддитивными.
 
 `plan --explain` добавляет к каждому изменению обоснование: какие узлы
 канонического AST разошлись (`where_clause`, `select_list[2] (добавлен)`, …)

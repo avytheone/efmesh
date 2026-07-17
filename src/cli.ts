@@ -11,13 +11,17 @@
 export { ConfigLoadError } from "./cli/config.ts"
 export { decideApply, EXIT_AWAITING_HUMAN, isAffirmative, parseReclassify } from "./cli/flags.ts"
 export {
+  applyToJson,
+  graphToJson,
   janitorToJson,
   lineageToJson,
   migrateToJson,
   planToJson,
   renderToJson,
   restateToJson,
+  runToJson,
   scheduleListToJson,
+  statusToJson,
 } from "./cli/json.ts"
 export { renderFailure, wantsTrace } from "./cli/failure.ts"
 export { rootCommand } from "./cli/root.ts"

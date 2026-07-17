@@ -163,15 +163,15 @@ export default defineConfig({
 |---|---|
 | `efmesh init [dir]` | scaffold a project: config, example models, a seed |
 | `efmesh plan <env>` | diff the project against an environment + missing intervals; changes nothing |
-| `efmesh apply <env>` | plan → confirmation (TTY) → physical tables, backfill, view layer |
-| `efmesh run <env>` | scheduler tick: new intervals only, under the lock; for cron |
+| `efmesh apply <env>` | plan → confirmation (TTY) → physical tables, backfill, view layer; `--json` |
+| `efmesh run <env>` | scheduler tick: new intervals only, under the lock; for cron; `--json` |
 | `efmesh restate <env> --model m --from t --to t` | replay a past range for a model and its descendants; `--dry-run`, `--json` |
 | `efmesh status <env>` | what is going on: last plan, interval lag, recent run ticks |
 | `efmesh audit <env>` | audit the environment's view layer — catches after-the-fact degradation |
 | `efmesh diff <envA> <envB>` | how two environments differ; `--data` compares the actual data |
 | `efmesh render <model> [--env] [--json]` | the final SQL of a model |
 | `efmesh lineage <model[.col]> [--json]` | column lineage down to the raw sources |
-| `efmesh graph [--html]` | the model DAG as text or a page |
+| `efmesh graph [--html] [--json]` | the model DAG as text, an HTML page, or JSON |
 | `efmesh janitor [--ttl 7] [--json]` | remove orphaned physical storage older than ttl |
 | `efmesh migrate [--json]` | bring the state-store schema up to the current version |
 | `efmesh schedule <env>` | register `run <env>` in the OS scheduler via `Bun.cron` (`--list [--json]`) |
@@ -196,10 +196,16 @@ error); `scdType2` is refused by name (no time-range semantics over version
 history). `--dry-run` prints what would be recomputed and changes nothing;
 `--json` for CI.
 
-Every reporting command speaks `--json` — `plan`, `audit`, `status`, `diff`,
-`janitor`, `migrate`, `lineage`, `render` and `schedule --list` — a stable
-machine-readable shape (a contract under semver) for CI and bots; exit codes
-are unchanged, stdout stays pure JSON (logs go to stderr). Each shape is a JSON
+Every command with something to report speaks `--json` — `plan`, `apply`,
+`run`, `audit`, `status`, `diff`, `graph`, `janitor`, `migrate`, `lineage`,
+`render` and `schedule --list` — a stable machine-readable shape (a contract
+under semver) for CI and bots; exit codes are unchanged, stdout stays pure
+JSON (logs go to stderr). `apply --json` returns `{env, applied, plan, built,
+promoted}` and `run --json` returns `{env, outcome, processed, blockedBy?}` —
+both emit their payload even on exit 2 (a non-TTY `apply` that needs `--yes`,
+or a `run` blocked by structural changes), so a bot always reads *why* nothing
+ran. `status --json` returns `lastPlan.summary` and each `ticks[].detail` as
+structured objects, not JSON encoded inside a string. Each shape is a JSON
 object, so new top-level fields stay additive.
 
 `plan --explain` adds the reasoning to every change: which canonical-AST

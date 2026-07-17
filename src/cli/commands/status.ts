@@ -3,7 +3,7 @@ import { Argument, Command } from "effect/unstable/cli"
 import { environmentStatus } from "../../plan/status.ts"
 import { configLayers, loadConfig } from "../config.ts"
 import { configFlag, jsonFlag } from "../flags.ts"
-import { printJson } from "../json.ts"
+import { printJson, statusToJson } from "../json.ts"
 
 export const statusCommand = Command.make(
   "status",
@@ -15,7 +15,7 @@ export const statusCommand = Command.make(
         Effect.provide(configLayers(loaded)),
       )
       if (json) {
-        yield* printJson(report)
+        yield* printJson(statusToJson(report))
         return
       }
       if (report.models === 0) {

@@ -7,6 +7,21 @@ the first version gathers them in full.
 
 ## [Unreleased]
 
+- `--json` on `apply`, `run` and `graph` (#28) — the last commands an agent
+  drives that had no machine-readable output. `apply --json` returns `{env,
+  applied, plan, built, promoted}` with the plan nested in the frozen plan
+  shape; `run --json` returns `{env, outcome, processed, blockedBy?}`; both
+  emit their payload even on exit 2 (a non-TTY `apply` needing `--yes`, a `run`
+  blocked by structural changes), so a bot reads *why* nothing ran without
+  scraping stderr. `graph --json` returns the DAG as `{models:[{name, kind,
+  deps}]}` in topological order. Exit codes are unchanged.
+- **BREAKING** `status --json` shape (#28). `lastPlan.summary` and each
+  `ticks[].detail` were JSON **encoded inside a string** — a caller had to
+  `JSON.parse` a second time; they are now structured objects directly. In the
+  same one-time break the store's internal row `id` and the redundant per-row
+  `env` are dropped from the nested plan and tick records (`env` is already the
+  top-level key; the id was never contract). Consumers that double-parsed
+  `summary`/`detail`, or read `ticks[].id` / `lastPlan.id`, must update.
 - Column types now participate in the model fingerprint (#17). Previously the
   fingerprint hashed column *names* only, so a schema type change (e.g.
   `Number`→`String`) categorized as `unchanged` — the plan lied about "types
