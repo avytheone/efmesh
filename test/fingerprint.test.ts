@@ -62,6 +62,40 @@ describe("fingerprint over the canonical AST (SPEC §4)", () => {
     expect(a.get("raw.moves")).toBe(a2.get("raw.moves")!)
   })
 
+  test("a column type change (Number→String) is a new version — types are the DAG contract (#17)", async () => {
+    // identical name, kind and SQL body; only the declared type of `n` differs.
+    // Before v2 the fingerprint hashed column names only, so both hashed equal
+    // and the plan lied "unchanged"; now the type family (numeric vs text) parts them.
+    const counted = (n: Schema.Struct.Fields[string]) =>
+      defineModel(
+        {
+          name: "med.counts",
+          kind: kind.full(),
+          schema: Schema.Struct({ case_id: Schema.String, n }),
+        },
+        (ctx) => ctx.sql`SELECT case_id, n FROM src.raw`,
+      )
+    const asNumber = await fingerprintsOf([counted(Schema.Number)])
+    const asString = await fingerprintsOf([counted(Schema.String)])
+    expect(asNumber.get("med.counts")).not.toBe(asString.get("med.counts")!)
+  })
+
+  test("a same-family retype does not churn — family granularity (#17)", async () => {
+    // NullOr(Number) stays in the numeric family: no rebuild, unlike Number→String.
+    const nType = (n: Schema.Struct.Fields[string]) =>
+      defineModel(
+        {
+          name: "med.counts",
+          kind: kind.full(),
+          schema: Schema.Struct({ case_id: Schema.String, n }),
+        },
+        (ctx) => ctx.sql`SELECT case_id, n FROM src.raw`,
+      )
+    const plain = await fingerprintsOf([nType(Schema.Number)])
+    const nullable = await fingerprintsOf([nType(Schema.NullOr(Schema.Number))])
+    expect(plain.get("med.counts")).toBe(nullable.get("med.counts")!)
+  })
+
   test("changing timeColumn — a new version, changing batchSize — not", async () => {
     const incremental = (timeColumn: "case_id" | "dept", batchSize: number) =>
       defineModel(

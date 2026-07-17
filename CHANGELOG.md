@@ -7,6 +7,16 @@ the first version gathers them in full.
 
 ## [Unreleased]
 
+- Column types now participate in the model fingerprint (#17). Previously the
+  fingerprint hashed column *names* only, so a schema type change (e.g.
+  `Number`→`String`) categorized as `unchanged` — the plan lied about "types
+  as the DAG contract". The payload now folds in each column's type *family*
+  (reusing the same `familyOfAst` map as the DESCRIBE contract check), so a
+  cross-family retype rebuilds the model and its descendants. `FINGERPRINT_VERSION`
+  bumps to **2**: an environment whose snapshots were fingerprinted under v1
+  halts with `FingerprintVersionError` (model named) on the first changed model
+  — re-plan and re-apply to rebuild physics under the v2 fingerprints.
+
 ## [0.2.2] — 2026-07-17
 
 Theme: the repo an AI agent can develop and operate — skills, full
