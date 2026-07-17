@@ -194,7 +194,7 @@ export const parseReclassify = (
 
 const yesFlag = Flag.boolean("yes").pipe(
   Flag.withAlias("y"),
-  Flag.withDescription("apply without confirmation (non-TTY never asks)"),
+  Flag.withDescription("apply without confirmation; required in a non-TTY when the plan has changes (else exit 2)"),
 )
 
 /** Accepts y/yes, case-insensitive; anything else (including empty) is a refusal. */
@@ -387,7 +387,11 @@ const applyCommand = Command.make(
         yield* Console.log(`environment "${applied.plan.env}" promoted`)
       }).pipe(withStateLock(envLockName(env)), Effect.provide(configLayers(loaded)))
     }),
-).pipe(Command.withDescription("apply the plan: build physics and swap views"))
+).pipe(
+  Command.withDescription(
+    "apply the plan: build physics and swap views (a non-TTY with changes needs --yes; exit 2 = awaiting confirmation)",
+  ),
+)
 
 const renderCommand = Command.make(
   "render",
@@ -448,7 +452,7 @@ const runCommand = Command.make(
     }),
 ).pipe(
   Command.withDescription(
-    "scheduler tick: catch up intervals of existing versions (changes go through apply)",
+    "scheduler tick: catch up intervals of existing versions (structural changes go through apply; exit 2 = changes await a human)",
   ),
 )
 
