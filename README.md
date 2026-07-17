@@ -345,9 +345,9 @@ The architectural non-goals (heavy ingest, general orchestration, BI) live in [S
 
 ## Status
 
-**0.2.2** (beta). The core is built and exercised on a live example: phases F0–F6 ([SPEC.md §13](https://github.com/avytheone/efmesh/blob/main/SPEC.md), [CHANGELOG](https://github.com/avytheone/efmesh/blob/main/CHANGELOG.md)), 187 tests including a live Postgres cluster and golden tests freezing fingerprint stability. Effect v4 is a beta dependency: pinned exactly (peerDependencies); a weekly CI job tracks drift against fresh betas.
+**0.3.0** (beta). The core is built and exercised on a live example: phases F0–F6 ([SPEC.md §13](https://github.com/avytheone/efmesh/blob/main/SPEC.md), [CHANGELOG](https://github.com/avytheone/efmesh/blob/main/CHANGELOG.md)), 215 tests including a live Postgres cluster and golden tests freezing fingerprint stability. Effect v4 is a beta dependency: pinned exactly (peerDependencies); a weekly CI job tracks drift against fresh betas.
 
-Next up: making efmesh legible to an evaluating AI agent — broader `--json` coverage and an agent-oriented `llms.txt` map (milestone 0.3.0). Known limitation: a single `bun build --compile` binary builds, but standalone Bun executables can't resolve the `"efmesh"` import from a runtime-loaded config — distribution is via the package (SPEC §10).
+The 0.3.0 milestone — making efmesh legible, developable and operable by an AI agent (complete `--json` coverage with a pinnable `apiVersion`, in-repo and packaged skills, honest contracts) — is done. Further work is driven by dogfood needs from real adopters rather than a fixed roadmap. Known limitation: a single `bun build --compile` binary builds, but standalone Bun executables can't resolve the `"efmesh"` import from a runtime-loaded config — distribution is via the package (SPEC §10).
 
 ## Documentation
 

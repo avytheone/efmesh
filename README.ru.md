@@ -352,9 +352,9 @@ state:  { url: "postgres://…" },  // схема efmesh_state
 
 ## Статус
 
-**0.2.2** (beta). Ядро построено и прогнано на живом примере: фазы F0–F6 (см. [SPEC.md §13](https://github.com/avytheone/efmesh/blob/main/SPEC.md) и [CHANGELOG](https://github.com/avytheone/efmesh/blob/main/CHANGELOG.md)), 187 тестов, включая живой Postgres-кластер и golden-тесты стабильности fingerprint. Effect v4 — beta-зависимость: пинована точно (peerDependencies), дрейф свежих бет ловит еженедельный CI.
+**0.3.0** (beta). Ядро построено и прогнано на живом примере: фазы F0–F6 (см. [SPEC.md §13](https://github.com/avytheone/efmesh/blob/main/SPEC.md) и [CHANGELOG](https://github.com/avytheone/efmesh/blob/main/CHANGELOG.md)), 215 тестов, включая живой Postgres-кластер и golden-тесты стабильности fingerprint. Effect v4 — beta-зависимость: пинована точно (peerDependencies), дрейф свежих бет ловит еженедельный CI.
 
-Дальше: сделать efmesh читаемым для оценивающего ИИ-агента — более широкое покрытие `--json` и агентская карта репозитория `llms.txt` (milestone 0.3.0). Известное ограничение: одиночный бинарник `bun build --compile` собирается, но standalone-исполняемые Bun не резолвят импорт `"efmesh"` из рантайм-конфига — дистрибуция пакетом (SPEC §10).
+Milestone 0.3.0 — сделать efmesh читаемым, разрабатываемым и эксплуатируемым ИИ-агентом (полное покрытие `--json` с фиксируемым `apiVersion`, скилы в репозитории и в пакете, честные контракты) — завершён. Дальнейшая работа идёт от нужд догфуда у реальных потребителей, а не по фиксированному роадмапу. Известное ограничение: одиночный бинарник `bun build --compile` собирается, но standalone-исполняемые Bun не резолвят импорт `"efmesh"` из рантайм-конфига — дистрибуция пакетом (SPEC §10).
 
 ## Документация
 

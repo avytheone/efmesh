@@ -7,6 +7,13 @@ the first version gathers them in full.
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-07-17
+
+Theme: the first stranger is an AI agent. The whole surface an agent
+reads, develops and operates through — machine-readable `--json` with a
+pinnable `apiVersion`, honest contracts, in-repo and packaged skills,
+mechanical tooling — is now good end to end.
+
 - `apiVersion` on every `--json` payload (#20). Each shape now carries a
   top-level `apiVersion` integer (currently `1`) — a single field a CI job or
   agent pins on to know the field names it can trust. It is stamped in one
