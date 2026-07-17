@@ -13,6 +13,10 @@ Compare environments and reclaim storage using `--json` only. An environment is
 a set of virtual views over shared physical storage; two envs can point at
 different versions of the same model.
 
+Every `--json` shape below also carries a top-level `apiVersion` (currently
+`1`) — the wire-contract version; pin on it, a bump means field names may have
+changed. It is elided from the example bodies for brevity.
+
 ## Verify before promotion (dev → prod)
 
 ### 1. Version diff (which model versions differ)

@@ -7,6 +7,40 @@ the first version gathers them in full.
 
 ## [Unreleased]
 
+- `apiVersion` on every `--json` payload (#20). Each shape now carries a
+  top-level `apiVersion` integer (currently `1`) — a single field a CI job or
+  agent pins on to know the field names it can trust. It is stamped in one
+  place (a `withApiVersion` wrapper inside `printJson`, through which every
+  `--json` command already prints), so no command can ship an unversioned
+  payload; a bump is a breaking SemVer event, additive fields never bump it.
+  Shipped alongside a one-time breaking-review pass over the whole `--json`
+  surface at this freeze (see the BREAKING `status` note below); `audit`/`diff`
+  still echo their reports directly and were reviewed and left as-is.
+- `--json` on `apply`, `run` and `graph` (#28) — the last commands an agent
+  drives that had no machine-readable output. `apply --json` returns `{env,
+  applied, plan, built, promoted}` with the plan nested in the frozen plan
+  shape; `run --json` returns `{env, outcome, processed, blockedBy?}`; both
+  emit their payload even on exit 2 (a non-TTY `apply` needing `--yes`, a `run`
+  blocked by structural changes), so a bot reads *why* nothing ran without
+  scraping stderr. `graph --json` returns the DAG as `{models:[{name, kind,
+  deps}]}` in topological order. Exit codes are unchanged.
+- Structured tick `detail` + `status --check` (#19). Every run tick's journal
+  `detail` is now one structured shape (stored JSON-encoded in the existing
+  text column — no `STATE_VERSION` bump), keyed by `outcome`: `ok → {built}`,
+  `awaiting-human → {blockedBy}`, `lock-held → {lock}`, `error →
+  {error, model?, interval?, message?}` — an error tick now names the model and
+  carries the human message, not just the error tag. `efmesh status <env>
+  --check` turns the report into a health probe: it exits non-zero when the env
+  is unhealthy (a stuck backfill, or a last tick that errored), staying `0` for
+  the normal awaiting-human / lock-held / lagging states — so it drops straight
+  into a systemd `OnFailure=` or a healthchecks.io ping.
+- **BREAKING** `status --json` shape (#28). `lastPlan.summary` and each
+  `ticks[].detail` were JSON **encoded inside a string** — a caller had to
+  `JSON.parse` a second time; they are now structured objects directly. In the
+  same one-time break the store's internal row `id` and the redundant per-row
+  `env` are dropped from the nested plan and tick records (`env` is already the
+  top-level key; the id was never contract). Consumers that double-parsed
+  `summary`/`detail`, or read `ticks[].id` / `lastPlan.id`, must update.
 - Column types now participate in the model fingerprint (#17). Previously the
   fingerprint hashed column *names* only, so a schema type change (e.g.
   `Number`→`String`) categorized as `unchanged` — the plan lied about "types

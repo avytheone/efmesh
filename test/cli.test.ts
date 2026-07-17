@@ -1,15 +1,23 @@
 import { describe, expect, test } from "bun:test"
 import { Effect } from "effect"
 import {
+  API_VERSION,
+  applyToJson,
   decideApply,
   EXIT_AWAITING_HUMAN,
+  graphToJson,
   isAffirmative,
   janitorToJson,
   lineageToJson,
   migrateToJson,
   parseReclassify,
+  planToJson,
   renderToJson,
+  restateToJson,
+  runToJson,
   scheduleListToJson,
+  statusToJson,
+  withApiVersion,
 } from "../src/cli.ts"
 
 describe("--reclassify — flag parsing (#5)", () => {
@@ -156,5 +164,207 @@ describe("--json shapes for headless commands (#16)", () => {
 
   test("schedule --list — entries wrapped in an object", () => {
     expect(scheduleListToJson(["efmesh-proj-dev"])).toEqual({ entries: ["efmesh-proj-dev"] })
+  })
+})
+
+describe("apply/run/status/graph --json — the shape contract (#28)", () => {
+  const plan = {
+    env: "dev",
+    hasChanges: true,
+    actions: [
+      {
+        name: "med.daily",
+        change: "breaking",
+        fingerprint: "def",
+        physicalFingerprint: "def",
+        canonicalAst: "{}",
+        build: true,
+        refresh: false,
+        backfill: [],
+      },
+    ],
+  } as never
+
+  test("apply — env/applied/plan/built/promoted; plan rides the planToJson shape", () => {
+    expect(
+      applyToJson({ env: "dev", applied: true, plan, built: ["med.daily"], promoted: true }),
+    ).toEqual({
+      env: "dev",
+      applied: true,
+      plan: {
+        env: "dev",
+        hasChanges: true,
+        actions: [
+          { name: "med.daily", change: "breaking", fingerprint: "def", build: true, backfill: [] },
+        ],
+      },
+      built: ["med.daily"],
+      promoted: true,
+    })
+  })
+
+  test("apply — a refused non-TTY plan is applied:false, nothing built or promoted", () => {
+    expect(
+      applyToJson({ env: "dev", applied: false, plan, built: [], promoted: false }),
+    ).toMatchObject({
+      applied: false,
+      built: [],
+      promoted: false,
+    })
+  })
+
+  test("run — ok carries processed; awaiting-human adds blockedBy, drops it otherwise", () => {
+    expect(runToJson({ env: "dev", outcome: "ok", processed: ["med.daily"] })).toEqual({
+      env: "dev",
+      outcome: "ok",
+      processed: ["med.daily"],
+    })
+    expect(
+      runToJson({
+        env: "dev",
+        outcome: "awaiting-human",
+        processed: [],
+        blockedBy: ["med.daily: breaking"],
+      }),
+    ).toEqual({
+      env: "dev",
+      outcome: "awaiting-human",
+      processed: [],
+      blockedBy: ["med.daily: breaking"],
+    })
+  })
+
+  test("status — lastPlan.summary and ticks[].detail are objects, not JSON-in-a-string", () => {
+    const report = {
+      env: "dev",
+      storeVersion: 5,
+      models: 2,
+      promotedAt: "2026-01-02T00:00:00.000Z",
+      lastPlan: {
+        id: 7,
+        env: "dev",
+        appliedAt: "2026-01-02T00:00:00.000Z",
+        appliedBy: "avy",
+        summary: JSON.stringify({ actions: [{ name: "med.daily", change: "breaking" }] }),
+      },
+      lag: [{ model: "med.daily", doneUpTo: "2026-01-02T00:00:00.000Z", missing: 1, failed: 0 }],
+      ticks: [
+        {
+          id: 3,
+          env: "dev",
+          startedAt: "2026-01-03T00:00:00.000Z",
+          finishedAt: "2026-01-03T00:00:01.000Z",
+          outcome: "ok",
+          detail: JSON.stringify({ built: ["med.daily"] }),
+        },
+      ],
+    } as never
+    // the store's internal row ids and the redundant per-row env are dropped (#28)
+    expect(statusToJson(report)).toEqual({
+      env: "dev",
+      storeVersion: 5,
+      models: 2,
+      promotedAt: "2026-01-02T00:00:00.000Z",
+      lastPlan: {
+        appliedAt: "2026-01-02T00:00:00.000Z",
+        appliedBy: "avy",
+        summary: { actions: [{ name: "med.daily", change: "breaking" }] },
+      },
+      lag: [{ model: "med.daily", doneUpTo: "2026-01-02T00:00:00.000Z", missing: 1, failed: 0 }],
+      ticks: [
+        {
+          startedAt: "2026-01-03T00:00:00.000Z",
+          finishedAt: "2026-01-03T00:00:01.000Z",
+          outcome: "ok",
+          detail: { built: ["med.daily"] },
+        },
+      ],
+    })
+  })
+
+  test("status — an unparseable legacy detail falls back to { raw } rather than throwing", () => {
+    const report = {
+      env: "dev",
+      storeVersion: 5,
+      models: 0,
+      promotedAt: null,
+      lastPlan: null,
+      lag: [],
+      ticks: [
+        {
+          id: 1,
+          env: "dev",
+          startedAt: "2026-01-03T00:00:00.000Z",
+          finishedAt: "2026-01-03T00:00:00.000Z",
+          outcome: "error",
+          detail: "EngineError",
+        },
+      ],
+    } as never
+    expect(
+      (statusToJson(report) as { ticks: Array<{ detail: unknown }> }).ticks[0]!.detail,
+    ).toEqual({ raw: "EngineError" })
+  })
+
+  test("graph — models in topological order with kind and sorted deps", () => {
+    const graph = {
+      order: ["med.a", "med.b"],
+      models: new Map([
+        ["med.a", { kind: { _tag: "full" }, deps: new Set<string>() }],
+        ["med.b", { kind: { _tag: "view" }, deps: new Set(["med.a"]) }],
+      ]),
+    } as never
+    expect(graphToJson(graph)).toEqual({
+      models: [
+        { name: "med.a", kind: "full", deps: [] },
+        { name: "med.b", kind: "view", deps: ["med.a"] },
+      ],
+    })
+  })
+})
+
+describe("apiVersion — one wrapper stamps every --json payload (#20)", () => {
+  const plan = { env: "dev", hasChanges: false, actions: [] } as never
+  const restate = {
+    env: "dev",
+    model: "med.a",
+    from: 0,
+    to: 0,
+    interval: "day",
+    dryRun: true,
+    targets: [],
+  } as never
+
+  test("withApiVersion prepends apiVersion and preserves every field", () => {
+    expect(withApiVersion({ env: "dev", hasChanges: false })).toEqual({
+      apiVersion: API_VERSION,
+      env: "dev",
+      hasChanges: false,
+    })
+  })
+
+  test("it rides on top of the actual transformers — plan/apply/run/status/janitor/restate", () => {
+    for (const payload of [
+      planToJson(plan),
+      applyToJson({ env: "dev", applied: true, plan, built: [], promoted: true }),
+      runToJson({ env: "dev", outcome: "ok", processed: [] }),
+      statusToJson({
+        env: "dev",
+        storeVersion: 5,
+        models: 0,
+        promotedAt: null,
+        lastPlan: null,
+        lag: [],
+        ticks: [],
+      } as never),
+      janitorToJson({ removed: [], kept: [] } as never),
+      restateToJson(restate),
+    ]) {
+      expect((withApiVersion(payload) as { apiVersion: number }).apiVersion).toBe(API_VERSION)
+    }
+  })
+
+  test("API_VERSION is the frozen integer 1 (a bump is a breaking SemVer event)", () => {
+    expect(API_VERSION).toBe(1)
   })
 })

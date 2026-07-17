@@ -597,33 +597,74 @@ Schedule/Metric/Scope), with point adaptations — at the finalization of v4.
 ```
 efmesh init [dir]               — scaffold a project (config, example models, seed)
 efmesh plan <env> [--forward-only <model>,…] [--reclassify m=cat,…] [--explain] [--json]
-efmesh apply <env> [--yes] [--jobs N] [--retries N] [--forward-only …] [--reclassify …]  — plan + confirmation + application
-efmesh run  <env> [--jobs N] [--retries N]  — a scheduler tick
+efmesh apply <env> [--yes] [--jobs N] [--retries N] [--forward-only …] [--reclassify …] [--json]  — plan + confirmation + application
+efmesh run  <env> [--jobs N] [--retries N] [--json]  — a scheduler tick
 efmesh restate <env> --model <m> --from <t> --to <t> [--dry-run] [--json] — replay a past range (§5.3)
 efmesh audit <env> [--model a,b] [--json] — audits of the environment's view layer, changing nothing
 efmesh render <model> [--env] [--json]   — show the final SQL (for debugging)
 efmesh diff <envA> <envB> [--data [--model a,b] [--sample P] [--json]] — how the environments differ
-efmesh status <env> [--json]    — last plan, interval lag, recent run ticks
+efmesh status <env> [--json] [--check]  — last plan, interval lag, recent run ticks (--check: exit non-zero when unhealthy)
 efmesh lineage <model[.column]> [--json]
-efmesh graph [--html]           — the model DAG
+efmesh graph [--html] [--json]  — the model DAG
 efmesh janitor [--ttl 7] [--json]  — cleanup of orphaned physical tables
 efmesh migrate [--json]         — catch the state store schema up to the current version
 efmesh schedule <env> [--cron '@hourly'] [--remove] [--list [--json]] [--print-systemd]
 ```
 
-**Headless contract (0.3.0, #16).** efmesh is operated non-interactively by
-agents, so every reporting command exposes `--json` — `plan`, `audit`,
-`status`, `diff`, `janitor`, `migrate`, `lineage`, `render` and
-`schedule --list`. Each shape is a stable JSON **object** (never a bare array
-or string), so a future `apiVersion` (#20) is a purely additive change;
-intervals are ISO UTC, and `--json` stdout stays byte-clean (logs go to
-stderr). The shapes and the exit codes are one frozen contract (a SemVer
+**Headless contract (0.3.0, #16, #28).** efmesh is operated non-interactively
+by agents, so every command with something to report exposes `--json` —
+`plan`, `apply`, `run`, `audit`, `status`, `diff`, `graph`, `janitor`,
+`migrate`, `lineage`, `render` and `schedule --list`. Each shape is a stable
+JSON **object** (never a bare array or string) carrying a top-level
+`apiVersion` (#20, currently **1**) — a single integer, stamped in one place
+(`withApiVersion` inside `printJson`, through which every `--json` command
+prints, so none can forget it) and bumped only on a breaking shape change;
+additive fields never bump it. Intervals are ISO UTC, and `--json` stdout
+stays byte-clean (logs go to stderr). `apply --json` reports `{env, applied, plan,
+built, promoted}` (the plan rides the plan shape; `applied:false` with exit 2
+when a non-TTY refuses), `run --json` reports `{env, outcome, processed,
+blockedBy?}`, `graph --json` reports `{models:[{name, kind, deps}]}` in
+topological order, and `status --json` carries `lastPlan.summary` and
+`ticks[].detail` as structured objects — never JSON encoded inside a string
+(#28, #19). One deliberate cleanup at that break: the store's internal row
+`id` and the redundant per-row `env` are dropped from `status`'s nested plan
+and tick records (`env` is the top-level key; the id is a store detail, never
+contract). The shapes and the exit codes are one frozen contract (a SemVer
 event to change): `0` = ok, `1` = error, `2` = awaiting a human — the plan
 needs confirmation in a non-TTY (add `--yes`), or `run` met unapplied changes.
 No command ever blocks on input silently: the only prompt is `apply`'s
 confirmation, shown solely at an interactive TTY; a non-TTY `apply` with
 changes refuses with `2` rather than hanging. The full exit-code table lives
 once in the README (§ Exit codes) and the CLI's own `--help`.
+
+The frozen field contract for the commands added in this cluster (#28), each
+also carrying `apiVersion`: `plan → {env, hasChanges, actions[]}`; `apply →
+{env, applied, plan, built[], promoted}` (plan in the plan shape); `run →
+{env, outcome: "ok"|"awaiting-human", processed[], blockedBy?}`; `graph →
+{models:[{name, kind, deps[]}]}`; `status → {env, storeVersion, models,
+promotedAt, lastPlan:{appliedAt, appliedBy, summary}|null, lag[], ticks[]}`
+with each `ticks[].detail` the structured `TickDetail` (§7). The **one-time
+breaking review** at this `apiVersion: 1` freeze: `status` dropped the store's
+internal row `id` and the redundant per-row `env` from its nested plan/tick
+records; the tick `detail` and plan `summary` stopped being JSON-inside-a-string.
+`audit --json` and `diff --json` still echo their report objects directly
+(no transformer) — reviewed and left as-is; tightening them behind a transformer
+(as janitor/migrate already are) is a follow-up, not a silent break here.
+
+**Tick detail + `status --check` (0.3.0, #19).** The tick journal's `detail`
+is one structured shape, stored JSON-encoded in the existing text column (no
+`STATE_VERSION` bump), discriminated by `outcome`: `ok → {built}`,
+`awaiting-human → {blockedBy}`, `lock-held → {lock}`, `error →
+{error,model?,interval?,message?}` (the error case names the model/interval it
+died on when the tagged error carries them). `status <env> --check` turns the
+report into a health probe for a monitoring timer: it exits **non-zero** when
+the env is unhealthy — a stuck backfill (`lag[].failed > 0`) or a last tick
+that ended in `error`. Deliberately NOT unhealthy: `awaiting-human` / `lock-held`
+ticks and plain missing lag (normal states), and a never-applied env; a store
+behind the schema version never gets that far — `status` fails to open it (exit
+1), which is already the non-zero a check wants. It composes with systemd
+`OnFailure=` and healthchecks.io; it prints the usual report alongside so an
+operator sees the reason. No new `--json` surface — just the flag.
 
 `schedule` (0.2.0, #10) registers the `run` tick in the OS scheduler via
 `Bun.cron` (>= 1.3.11; `engines.bun` pins it): crontab on Linux, launchd on

@@ -98,7 +98,12 @@ export interface RunRecord {
   readonly startedAt: string
   readonly finishedAt: string
   readonly outcome: "ok" | "awaiting-human" | "lock-held" | "error"
-  /** ok: JSON array of collected models; awaiting-human: list of changes; error: error tag. */
+  /**
+   * Structured detail as a JSON string (#19): ok → {built}, awaiting-human →
+   * {blockedBy}, lock-held → {lock}, error → {error,model?,interval?,message?}.
+   * Stored encoded (the column is text — no STATE_VERSION bump) so `status
+   * --json` returns an object, not text a reader must parse by outcome (SPEC §7).
+   */
   readonly detail: string
 }
 

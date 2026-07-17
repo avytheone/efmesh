@@ -23,7 +23,7 @@ import {
   retriesFlag,
   yesFlag,
 } from "../flags.ts"
-import { planToJson, printJson } from "../json.ts"
+import { applyToJson, planToJson, printJson } from "../json.ts"
 import { printPlan } from "../print.ts"
 
 export const planCommand = Command.make(
@@ -59,8 +59,9 @@ export const applyCommand = Command.make(
     jobs: jobsFlag,
     retries: retriesFlag,
     yes: yesFlag,
+    json: jsonFlag,
   },
-  ({ config, env, forwardOnly, jobs, reclassify, retries, yes }) =>
+  ({ config, env, forwardOnly, jobs, json, reclassify, retries, yes }) =>
     Effect.gen(function* () {
       const loaded = yield* loadConfig(config)
       const names = parseForwardOnly(forwardOnly)
@@ -77,19 +78,30 @@ export const applyCommand = Command.make(
           ...(names !== undefined ? { forwardOnly: names } : {}),
           ...(overrides !== undefined ? { reclassify: overrides } : {}),
         })
-        yield* printPlan(plan)
+        // --json keeps stdout pure JSON: the human plan screen is suppressed,
+        // and a refusal/cancellation still emits the payload (applied:false)
+        // that explains why nothing ran — exit codes are unchanged
+        if (!json) yield* printPlan(plan)
         const decision = decideApply(plan.hasChanges, yes, process.stdin.isTTY === true)
         if (decision === "refuse") {
-          yield* Console.error(
-            "the plan changes models but there is no one to confirm (non-TTY): add --yes",
-          )
+          if (json) {
+            yield* printJson(applyToJson({ env, applied: false, plan, built: [], promoted: false }))
+          } else {
+            yield* Console.error(
+              "the plan changes models but there is no one to confirm (non-TTY): add --yes",
+            )
+          }
           yield* Effect.sync(() => {
             process.exitCode = EXIT_AWAITING_HUMAN
           })
           return
         }
         if (decision === "ask" && !isAffirmative(globalThis.prompt("apply the plan? [y/N]"))) {
-          yield* Console.log("apply cancelled")
+          if (json) {
+            yield* printJson(applyToJson({ env, applied: false, plan, built: [], promoted: false }))
+          } else {
+            yield* Console.log("apply cancelled")
+          }
           return
         }
         const applied = yield* applyPlan(plan, graph, {
@@ -99,16 +111,28 @@ export const applyCommand = Command.make(
           ...(modelConcurrency !== undefined ? { modelConcurrency } : {}),
           ...(retry !== undefined ? { retry } : {}),
         })
-        yield* Console.log(
-          applied.built.length > 0
-            ? `built: ${applied.built.join(", ")}`
-            : "no build needed (view-swap only)",
-        )
-        yield* Console.log(`environment "${applied.plan.env}" promoted`)
+        if (json) {
+          yield* printJson(
+            applyToJson({
+              env: applied.plan.env,
+              applied: true,
+              plan: applied.plan,
+              built: applied.built,
+              promoted: true,
+            }),
+          )
+        } else {
+          yield* Console.log(
+            applied.built.length > 0
+              ? `built: ${applied.built.join(", ")}`
+              : "no build needed (view-swap only)",
+          )
+          yield* Console.log(`environment "${applied.plan.env}" promoted`)
+        }
       }).pipe(withStateLock(envLockName(env)), Effect.provide(configLayers(loaded)))
     }),
 ).pipe(
   Command.withDescription(
-    "apply the plan: build physics and swap views (a non-TTY with changes needs --yes; exit 2 = awaiting confirmation)",
+    "apply the plan: build physics and swap views (--json for CI; a non-TTY with changes needs --yes; exit 2 = awaiting confirmation)",
   ),
 )

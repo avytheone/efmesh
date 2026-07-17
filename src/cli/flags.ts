@@ -119,6 +119,12 @@ export const jsonFlag = Flag.boolean("json").pipe(
   Flag.withDescription("machine-readable output (stable shape — a contract for CI)"),
 )
 
+export const checkFlag = Flag.boolean("check").pipe(
+  Flag.withDescription(
+    "exit non-zero when the environment is unhealthy (failed intervals or the last tick errored) — for systemd OnFailure / healthchecks.io",
+  ),
+)
+
 export const explainFlag = Flag.boolean("explain").pipe(
   Flag.withDescription(
     "for each change — which canonical AST nodes diverged and why the category is what it is",
