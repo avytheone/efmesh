@@ -24,6 +24,7 @@ const target = {
 describe("efmesh schedule (#10)", () => {
   test("Bun.cron title: only [A-Za-z0-9_-], project and environment inside", () => {
     expect(scheduleTitle(target)).toBe("efmesh-my-warehouse-prod")
+    // cyrillic-ok: Cyrillic path is deliberate input for the sanitiser
     expect(scheduleTitle({ project: "/x/жёсткий.проект", env: "dev/eu" })).toBe(
       "efmesh----------------dev-eu",
     )

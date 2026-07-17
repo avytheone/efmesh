@@ -12,5 +12,11 @@ coverage
 .cache
 .DS_Store
 
+# lefthook per-developer overrides
+lefthook-local.yml
+
 # артефакты примеров/озера
 examples/**/lake/
+
+# Claude Code worktrees and session data
+.claude/

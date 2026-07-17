@@ -1,0 +1,39 @@
+# Git hooks for repository discipline (issue #24).
+# Install once per clone with `bunx lefthook install` (also wired as a
+# postinstall step). Fast by construction: pre-commit touches only staged
+# files; the full test suite lives on pre-push.
+#
+# CI runs the same checks itself, so the hooks skip when $CI is set — the
+# `skip: [run: test -n "$CI"]` condition below. `LEFTHOOK=0` disables
+# everything ad hoc.
+
+pre-commit:
+  parallel: false
+  skip:
+    - run: test -n "$CI"
+  jobs:
+    # Whole-project type check: types are cross-file, so staged-only is
+    # meaningless here. Cheap enough to keep on every commit.
+    - name: typecheck
+      run: bunx tsc --noEmit
+
+    # Format + lint the staged files only. biome is a devDependency added
+    # by issue #25; `--write` applies safe fixes and `stage_fixed` re-stages
+    # them so the commit carries the formatted result.
+    - name: biome
+      glob: "*.{ts,tsx,js,jsx,json,jsonc}"
+      run: bunx biome check --write --no-errors-on-unmatched {staged_files}
+      stage_fixed: true
+
+    # Language gate: src/ and test/ are English-only (CLAUDE.md). The script
+    # names the offending file and line; README.ru.md is exempt.
+    - name: no-cyrillic
+      glob: "{src,test}/**/*"
+      run: bun scripts/no-cyrillic.ts {staged_files}
+
+pre-push:
+  skip:
+    - run: test -n "$CI"
+  jobs:
+    - name: test
+      run: bun test

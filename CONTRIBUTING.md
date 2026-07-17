@@ -16,6 +16,21 @@ Postgres tests spin up a throwaway cluster via `initdb` in tmp and are
 skipped automatically if the Postgres binaries are not on the PATH —
 for a full run install `postgresql` locally.
 
+### Git hooks
+
+`bun install` wires [lefthook](https://lefthook.dev) git hooks through the
+`prepare` script (run `bunx lefthook install` by hand if you skipped
+scripts). They keep the checks fast and local:
+
+- **pre-commit** — `tsc --noEmit`, biome on the staged files, and a
+  Cyrillic gate (`scripts/no-cyrillic.ts`: `src/` and `test/` are
+  English-only; a deliberate non-ASCII test fixture opts out with a
+  `cyrillic-ok` marker on or just above the line).
+- **pre-push** — the full `bun test`.
+
+The hooks skip when `$CI` is set (CI runs the same checks) and can be
+disabled ad hoc with `LEFTHOOK=0 git commit …`.
+
 ## Repository layout
 
 ```
