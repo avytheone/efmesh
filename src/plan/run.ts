@@ -4,7 +4,13 @@ import type { AnyModel } from "../core/model.ts"
 import type { EngineAdapter } from "../engine/adapter.ts"
 import { StateStore, type RunRecord } from "../state/store.ts"
 import { applyPlan, type AppliedPlan, type ApplyError, type ApplyOptions } from "./executor.ts"
-import { envLockName, withStateLock, type LockHeldError, type LockOptions } from "./lock.ts"
+import {
+  envLockName,
+  withStateLock,
+  type LockHeldError,
+  type LockLostError,
+  type LockOptions,
+} from "./lock.ts"
 import { planChanges, type PlanOptions } from "./planner.ts"
 
 /**
@@ -25,7 +31,7 @@ export class RunBlockedByChangesError extends Data.TaggedError("RunBlockedByChan
   }
 }
 
-export type RunError = ApplyError | LockHeldError | RunBlockedByChangesError
+export type RunError = ApplyError | LockHeldError | LockLostError | RunBlockedByChangesError
 
 export interface RunOptions extends PlanOptions, ApplyOptions, LockOptions {}
 

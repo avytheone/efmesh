@@ -5,7 +5,13 @@ import { EngineAdapter } from "../engine/adapter.ts"
 import type { EngineError } from "../engine/adapter.ts"
 import { StateStore } from "../state/store.ts"
 import type { StateError } from "../state/store.ts"
-import { janitorLockName, withStateLock, type LockHeldError, type LockOptions } from "./lock.ts"
+import {
+  janitorLockName,
+  withStateLock,
+  type LockHeldError,
+  type LockLostError,
+  type LockOptions,
+} from "./lock.ts"
 import { ducklakeAttachSql, ducklakeRef, parquetPrefix, physicalRef } from "./naming.ts"
 
 /**
@@ -44,7 +50,7 @@ export const janitor = (
   options?: JanitorOptions,
 ): Effect.Effect<
   JanitorReport,
-  EngineError | StateError | LockHeldError,
+  EngineError | StateError | LockHeldError | LockLostError,
   EngineAdapter | StateStore
 > =>
   Effect.gen(function* () {
