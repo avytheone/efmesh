@@ -614,6 +614,41 @@ window, so `perInterval` effectively means "per batch". A model whose invariant
 depends on the width of that window must pin `batchSize: 1` — the same
 constraint that makes windowed correctness chunking-dependent in general.
 
+### 8.2 Continuity audits
+
+`audit.assertContiguous(col)` — a sequence column covers its range with no
+holes. `audit.assertNoGaps(timeColumn, "hour" | "day")` — a time column has no
+missing buckets. Both are `whole` by construction: inside one written interval
+every sequence is contiguous with itself.
+
+Two invariants, transferred from a coverage gate that two incidents in one day
+paid for:
+
+- **The gate verifies the FACT of coverage, computing it from the data** — never
+  the presence of a flag. A "loaded" marker records what some other process
+  believed; the data records what is there, and the two diverge precisely when
+  it matters.
+- **Refusal prints the numbers**: where coverage stops, where it resumes, and
+  how many further holes exist. `covered through 41200, resumes at 44007 (and 2
+  further gap(s))`. A gate that reports "3 violations" makes the operator write
+  the query themselves to learn what to restate.
+
+The formulation for the docs, verbatim: **"refuse with numbers before the first
+write, rather than succeed with silently lost history."**
+
+Both report interior holes over the OBSERVED range, and assume neither end of
+it. A late start and a missing tail are not gaps — treating them as such would
+mean inventing bounds nobody declared. How far the data reaches is a freshness
+question, and §3.5's `completeThrough` already derives it from the ledger. The
+two mechanisms answer different questions and compose: the audit refuses a hole
+in the middle, the passport reports the edge.
+
+Mechanically this is an extension of the existing audit machinery, not a
+subsystem beside it: an audit may carry a `describe` that turns its own
+violating rows into a sentence, which lands in `AuditFailure.detail`, in the
+`efmesh audit` report and in its `--json`. `notNull` does not need one — there
+the row count IS the message.
+
 A **test** is a unit test of the query on fixtures, living in `bun test`:
 
 ```ts

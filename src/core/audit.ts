@@ -7,9 +7,16 @@ export class AuditFailure extends Data.TaggedError("AuditFailure")<{
   readonly model: string
   readonly audit: string
   readonly violations: number
+  /**
+   * What the violating rows actually SAY, when the audit can put it in words
+   * (#42) — the boundaries of a hole, not merely its existence. A count tells an
+   * operator that something is wrong; the numbers tell them what to restate.
+   */
+  readonly detail?: string
 }> {
   override get message(): string {
-    return `audit ${this.audit} on model «${this.model}»: ${this.violations} violating row(s)`
+    const head = `audit ${this.audit} on model «${this.model}»: ${this.violations} violating row(s)`
+    return this.detail === undefined ? head : `${head} — ${this.detail}`
   }
 }
 
@@ -51,6 +58,14 @@ export interface Audit {
   readonly scope: AuditScope
   /** The violations query; contains a Self node. */
   readonly fragment: SqlFragment
+  /**
+   * Turns the violating rows into an actionable sentence (#42). Optional: for
+   * `notNull` the row count IS the message, but a coverage gate that only says
+   * "3 violations" makes an operator write the query themselves to learn where
+   * the hole is. Runs on rows the audit itself shaped, so it may read its own
+   * column names.
+   */
+  readonly describe?: (rows: ReadonlyArray<Record<string, unknown>>) => string
 }
 
 export interface AuditCtx {
@@ -104,6 +119,63 @@ export const audit = {
     fragment: body({ sql, self: SELF }),
   }),
 
+  /**
+   * A sequence column covers its range with no holes (#42).
+   *
+   * Computes the FACT of coverage instead of trusting a flag: it compares each
+   * distinct value with its predecessor and reports every place the sequence
+   * jumps. That distinction is the whole point — a "loaded" marker says what
+   * some other process believed, the data says what is there.
+   *
+   * Interior holes only, over the observed range. A missing TAIL is not a gap
+   * but a freshness question, and the answer passport already derives it from
+   * the interval ledger (`completeThrough`); an audit that also guessed at an
+   * expected maximum would be inventing a bound nobody declared.
+   */
+  assertContiguous: <Fields extends Schema.Struct.Fields>(
+    column: Extract<keyof Fields, string>,
+  ): Audit => ({
+    name: `contiguous(${column})`,
+    blocking: true,
+    // by construction a statement about the whole sequence: inside one written
+    // interval every sequence looks contiguous with itself
+    scope: "whole",
+    fragment: sql`
+      SELECT prev_value AS covered_through, value AS resumes_at,
+             value - prev_value - 1 AS missing
+      FROM (
+        SELECT value, lag(value) OVER (ORDER BY value) AS prev_value
+        FROM (SELECT DISTINCT ${idents(column)} AS value FROM ${SELF}
+              WHERE ${idents(column)} IS NOT NULL) distinct_values
+      ) neighbours
+      WHERE prev_value IS NOT NULL AND value > prev_value + 1`,
+    describe: (rows) => gapSentence(rows, "covered_through", "resumes_at", (value) => `${value}`),
+  }),
+
+  /**
+   * A time column has no missing buckets of `step` (#42). Same computed-not-
+   * declared rule as assertContiguous; values are bucketed first, so several
+   * rows within one bucket are one bucket and not a false gap.
+   */
+  assertNoGaps: <Fields extends Schema.Struct.Fields>(
+    column: Extract<keyof Fields, string>,
+    step: "hour" | "day",
+  ): Audit => ({
+    name: `no_gaps(${column}, ${step})`,
+    blocking: true,
+    scope: "whole",
+    fragment: sql`
+      SELECT prev_bucket AS covered_through, bucket AS resumes_at
+      FROM (
+        SELECT bucket, lag(bucket) OVER (ORDER BY bucket) AS prev_bucket
+        FROM (SELECT DISTINCT date_trunc('${literalText(step)}', ${idents(column)}) AS bucket
+              FROM ${SELF} WHERE ${idents(column)} IS NOT NULL) distinct_buckets
+      ) neighbours
+      WHERE prev_bucket IS NOT NULL
+        AND bucket > prev_bucket + INTERVAL '1 ${literalText(step)}'`,
+    describe: (rows) => gapSentence(rows, "covered_through", "resumes_at", isoOf),
+  }),
+
   /** Downgrade an audit to a warning: log instead of failing. */
   warn: (base: Audit): Audit => ({ ...base, blocking: false }),
 
@@ -124,6 +196,40 @@ export const audit = {
    */
   whole: (base: Audit): Audit => ({ ...base, scope: "whole" }),
 } as const
+
+/**
+ * A closed-vocabulary word spliced into SQL text (a bucket unit). Never reaches
+ * here from user input — the type restricts it to the units efmesh knows — but
+ * it is filtered anyway, because a fragment builder that trusts a string is one
+ * refactor away from trusting the wrong one.
+ */
+const literalText = (word: string): SqlFragment => ({
+  _tag: "SqlFragment",
+  nodes: [{ _tag: "Text", text: word.replaceAll(/[^a-z]/g, "") }],
+})
+
+const isoOf = (value: unknown): string =>
+  value instanceof Date ? value.toISOString() : `${value as string}`
+
+/**
+ * The refusal, in numbers: where coverage stops, where it resumes, and how many
+ * holes there are in total. "Refuse with numbers before the first write, rather
+ * than succeed with silently lost history" — an operator reading this knows the
+ * range to restate without writing a query of their own.
+ */
+const gapSentence = (
+  rows: ReadonlyArray<Record<string, unknown>>,
+  fromKey: string,
+  toKey: string,
+  render: (value: unknown) => string,
+): string => {
+  const first = rows[0]
+  if (first === undefined) return "no gaps"
+  const head = `covered through ${render(first[fromKey])}, resumes at ${render(first[toKey])}`
+  // the first hole is the one to fix first; the rest are counted, not listed,
+  // so a badly broken table does not produce an unreadable wall of text
+  return rows.length === 1 ? head : `${head} (and ${rows.length - 1} further gap(s))`
+}
 
 const idents = (...names: ReadonlyArray<string>): SqlFragment => ({
   _tag: "SqlFragment",

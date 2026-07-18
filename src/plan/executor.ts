@@ -233,16 +233,20 @@ const runAudits = (
         yield* Metric.update(auditsPassed, 1)
         continue
       }
+      // an audit that can say what its rows MEAN says it here, so the refusal
+      // carries the numbers an operator needs rather than only a count (#42)
+      const detail = auditDef.describe?.(violations as ReadonlyArray<Record<string, unknown>>)
       if (auditDef.blocking) {
         yield* Metric.update(auditFailuresTotal, 1)
         return yield* new AuditFailure({
           model: model.name.full,
           audit: auditDef.name,
           violations: violations.length,
+          ...(detail === undefined ? {} : { detail }),
         })
       }
       yield* Effect.logWarning(
-        `audit ${auditDef.name} of model ${model.name.full}: ${violations.length} violations (warn)`,
+        `audit ${auditDef.name} of model ${model.name.full}: ${violations.length} violations (warn)${detail === undefined ? "" : ` — ${detail}`}`,
       )
     }
   })

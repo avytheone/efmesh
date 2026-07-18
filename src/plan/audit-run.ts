@@ -26,6 +26,8 @@ export interface AuditRunResult {
   readonly audit: string
   readonly blocking: boolean
   readonly violations: number
+  /** What the violations say, when the audit can put it in words (#42). */
+  readonly detail?: string
 }
 
 /** An audit this scope was never about — reported, never silently dropped (#53). */
@@ -115,11 +117,16 @@ export const auditEnvironment = (
         const violations = yield* engine.query(
           render(auditDef.fragment, { resolveRef: (ref) => ref, self }),
         )
+        const detail =
+          violations.length === 0
+            ? undefined
+            : auditDef.describe?.(violations as ReadonlyArray<Record<string, unknown>>)
         results.push({
           model: name,
           audit: auditDef.name,
           blocking: auditDef.blocking,
           violations: violations.length,
+          ...(detail === undefined ? {} : { detail }),
         })
       }
     }

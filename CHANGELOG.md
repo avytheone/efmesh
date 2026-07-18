@@ -42,6 +42,18 @@ the first version gathers them in full.
 - `efmesh audit` reports interval-scoped audits it skipped, in the human output
   and in `--json` (additive `skipped`). Silence about what was not checked reads
   as coverage, which is the failure mode the scope was introduced to end.
+- **Continuity audits** (#42): `audit.assertContiguous(col)` — a sequence column
+  covers its range with no holes — and `audit.assertNoGaps(timeColumn, step)` —
+  a time column has no missing buckets. Both compute the FACT of coverage from
+  the data rather than trusting a flag some other process set, and both refuse
+  with the boundaries of the hole (`covered through 41200, resumes at 44007 (and
+  2 further gap(s))`) instead of a violation count an operator would have to
+  investigate by hand. They look for holes inside the observed range and assume
+  neither end of it: a late start or a missing tail is a freshness question, and
+  the passport's `completeThrough` already answers it. An extension of the
+  existing audit machinery — an audit may now carry a `describe` that turns its
+  own violating rows into a sentence, which surfaces in `AuditFailure.detail`,
+  in the `efmesh audit` report and in its `--json`.
 - A whole-scoped audit on a time-range model is checked in its own pass **before
   promotion**, so an environment never serves data that failed a cross-interval
   invariant — an interval pass cannot catch one by construction.

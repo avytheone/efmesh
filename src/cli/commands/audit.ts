@@ -45,6 +45,9 @@ export const auditCommand = Command.make(
             ? `  ${result.violations} violations${result.blocking ? "" : " (warn)"}`
             : ""
         yield* Console.log(`  ${mark} ${result.model}  ${result.audit}${tail}`)
+        // the numbers, on their own line — a coverage gate that only reports a
+        // count makes the operator write the query themselves (#42)
+        if (result.detail !== undefined) yield* Console.log(`      ${result.detail}`)
       }
       // printed before the verdict, so "clean" is never read as "everything was
       // checked" — this command sees the environment view, and a perInterval
