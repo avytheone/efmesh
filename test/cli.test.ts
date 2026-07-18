@@ -99,10 +99,12 @@ describe("plan --json — the shape contract (#3)", () => {
           explain: { diverged: ["where_clause"], reason: "tree diverged" },
         },
       ],
+      warnings: [],
     } as never)
     expect(json).toEqual({
       env: "dev",
       hasChanges: true,
+      warnings: [],
       actions: [
         {
           name: "med.moves",
@@ -183,6 +185,7 @@ describe("apply/run/status/graph --json — the shape contract (#28)", () => {
         backfill: [],
       },
     ],
+    warnings: [],
   } as never
 
   test("apply — env/applied/plan/built/promoted; plan rides the planToJson shape", () => {
@@ -194,6 +197,7 @@ describe("apply/run/status/graph --json — the shape contract (#28)", () => {
       plan: {
         env: "dev",
         hasChanges: true,
+        warnings: [],
         actions: [
           { name: "med.daily", change: "breaking", fingerprint: "def", build: true, backfill: [] },
         ],
@@ -324,7 +328,7 @@ describe("apply/run/status/graph --json — the shape contract (#28)", () => {
 })
 
 describe("apiVersion — one wrapper stamps every --json payload (#20)", () => {
-  const plan = { env: "dev", hasChanges: false, actions: [] } as never
+  const plan = { env: "dev", hasChanges: false, actions: [], warnings: [] } as never
   const restate = {
     env: "dev",
     model: "med.a",

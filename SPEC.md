@@ -475,6 +475,37 @@ policy was written, `union_by_name` reconciles a transition-day partition that
 holds two schema generations, and the partition key stays in the directory name
 rather than being baked into the merged file.
 
+### 5.6 `batchSize` is not only a performance knob
+
+A backfill batch renders **one** `[start, end)` for the whole batch, not one per
+interval (§5.3). For a model whose correctness depends on the width of that
+range — any window function over it, which is exactly what a de-duplication
+recipe is — the semantics therefore change with how the work happened to be
+chunked: with `batchSize: 7` a fresh backfill de-duplicates across seven days,
+and the steady daily tick across one. Same model, same data, different result
+depending on whether the rows arrived while catching up or on schedule.
+
+efmesh detects the shape and warns at plan time: a `incrementalByTimeRange`
+model that leaves `batchSize` above 1 while its body contains a window function
+raises a `window-over-batch` warning, carried in the plan output and in `plan
+--json` under `warnings`. Detection is structural, over the canonical AST
+(DuckDB's `"class": "WINDOW"`, libpg_query's `over` clause) rather than a grep
+for `OVER`, which would match a column of that name, a string literal and a
+comment.
+
+It is a **warning and never a refusal**. A window over a wide frame is
+legitimate whenever the result does not depend on that frame, and efmesh cannot
+tell which; refusing would make a correct model unbuildable in order to protect
+an incorrect one. The fix, when it applies, is `batchSize: 1`.
+
+The constraint this places on future work, recorded before the design rather
+than after it: **whatever a global-guarantee kind (§14.7) does, `batchSize` must
+not be able to change its answer.** A kind that promises a guarantee over the
+whole table cannot inherit a knob that redefines the guarantee's scope — either
+it ignores `batchSize` for the purpose of that guarantee, or it refuses a value
+above 1. That is a design input, not an implementation detail to be discovered
+once someone's numbers move.
+
 ---
 
 ## 6. State
@@ -612,7 +643,7 @@ the batch **as rendered**, and a batch may span several intervals
 (`batchSize`, §5.3). With the default `batchSize` a fresh backfill is one wide
 window, so `perInterval` effectively means "per batch". A model whose invariant
 depends on the width of that window must pin `batchSize: 1` — the same
-constraint that makes windowed correctness chunking-dependent in general.
+constraint §5.6 states in general.
 
 ### 8.2 Continuity audits
 
@@ -1115,7 +1146,12 @@ object is not a duplicate, two different definitions with one name —
    guarantee needs a time-range scan combined with an upsert by key, i.e. a
    hybrid of `incrementalByTimeRange` and `incrementalByUniqueKey`; it stays a
    candidate kind, to be built only if practice produces cross-horizon
-   redeliveries a wider horizon cannot absorb.
+   redeliveries a wider horizon cannot absorb. **Design input, recorded before
+   that kind is designed rather than after (#54): `batchSize` must not be able
+   to change its answer.** A kind promising a guarantee over the whole table
+   cannot inherit a knob that silently redefines the guarantee's scope — it
+   either ignores `batchSize` for that purpose or refuses a value above 1
+   (§5.6).
 
 ---
 

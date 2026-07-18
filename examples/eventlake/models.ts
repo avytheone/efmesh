@@ -101,7 +101,9 @@ export const rawEvents = defineExternal({
  * `batchSize: 1` is deliberate. A batch renders one `[start, end)` for the
  * whole batch, so a larger batch would silently de-duplicate across a wider
  * range during backfill than during a steady tick — the guarantee would depend
- * on how the work happened to be chunked. With one interval per statement,
+ * on how the work happened to be chunked (#54 — efmesh now warns at plan time
+ * when a model with a window function leaves batchSize above 1). With one
+ * interval per statement,
  * HORIZON_DAYS is the whole story.
  */
 export const events = defineModel(

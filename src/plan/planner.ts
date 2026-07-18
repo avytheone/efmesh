@@ -10,6 +10,7 @@ import type { StateError } from "../state/store.ts"
 import { categorizeAstChange } from "./categorize.ts"
 import type { ChangeExplanation } from "./explain.ts"
 import { dropsColumns, explainCategorized } from "./explain.ts"
+import { windowRiskMessage, windowRiskOf } from "./window-risk.ts"
 import { FINGERPRINT_VERSION, fingerprintGraph, modelFingerprint } from "./fingerprint.ts"
 import { validateEnvName } from "./naming.ts"
 
@@ -126,6 +127,19 @@ export interface Plan {
   /** In topological order; removed comes last. */
   readonly actions: ReadonlyArray<PlanAction>
   readonly hasChanges: boolean
+  /**
+   * Things that are legal but probably not meant (#54). Never a reason to
+   * refuse — a plan with warnings applies exactly as it would without them —
+   * so an empty array is the common case and a caller may ignore it.
+   */
+  readonly warnings: ReadonlyArray<PlanWarning>
+}
+
+export interface PlanWarning {
+  /** Closed vocabulary, so CI can assert on a kind of warning rather than on prose. */
+  readonly code: "window-over-batch"
+  readonly model: string
+  readonly message: string
 }
 
 export interface PlanOptions {
@@ -452,11 +466,26 @@ export const planChanges = (
       }
     }
 
+    const warnings: Array<PlanWarning> = []
+    for (const action of actions) {
+      const model = graph.models.get(action.name)
+      if (model === undefined) continue
+      const risk = windowRiskOf(model, action.canonicalAst)
+      if (risk !== null) {
+        warnings.push({
+          code: "window-over-batch",
+          model: risk.model,
+          message: windowRiskMessage(risk),
+        })
+      }
+    }
+
     return {
       env,
       actions,
       hasChanges: actions.some(
         (a) => a.change !== "unchanged" || a.backfill.length > 0 || a.refresh,
       ),
+      warnings,
     }
   }).pipe(Effect.withSpan("efmesh.plan", { attributes: { env } }))

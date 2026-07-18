@@ -41,6 +41,11 @@ export const printPlan = (plan: Plan, explain = false) =>
       }
     }
     if (!plan.hasChanges) yield* Console.log("  no changes")
+    // after the actions, so the plan itself reads first and a warning is not
+    // mistaken for a reason the plan will not apply (#54)
+    for (const warning of plan.warnings) {
+      yield* Console.log(`  ! ${warning.message}`)
+    }
   })
 
 export const printDataDiff = (report: DataDiffReport) =>

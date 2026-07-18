@@ -158,7 +158,7 @@ audits: [
 
 They refuse with the numbers, not a count — `covered through 2026-01-02, resumes at 2026-01-04 (and 2 further gap(s))` — so an operator knows what to restate without writing a query first. Refuse with numbers before the first write, rather than succeed with silently lost history. Both look for holes inside the observed range and assume neither end of it: a late start or a missing tail is a freshness question, and `efmesh passport` already answers that from the interval ledger.
 
-`efmesh audit` reports a `perInterval` audit as skipped rather than answering a question it was never asked, so a clean run is not mistaken for full coverage. An unscoped audit runs everywhere, which is what audits did before scopes existed. One edge: the interval pass audits the batch as rendered, and with the default `batchSize` a fresh backfill is a single wide window — a model whose invariant depends on that width must pin `batchSize: 1`.
+`efmesh audit` reports a `perInterval` audit as skipped rather than answering a question it was never asked, so a clean run is not mistaken for full coverage. An unscoped audit runs everywhere, which is what audits did before scopes existed. One edge: the interval pass audits the batch as rendered, and with the default `batchSize` a fresh backfill is a single wide window — a model whose invariant depends on that width must pin `batchSize: 1`. `plan` warns about exactly that shape (`window-over-batch`) when it sees a window function over a batch wider than one interval.
 
 ## Event-lake canonical table
 

@@ -16,6 +16,14 @@ import type { MigrationReport } from "../state/store.ts"
 export const planToJson = (plan: Plan): unknown => ({
   env: plan.env,
   hasChanges: plan.hasChanges,
+  // additive (#54): legal-but-probably-unmeant configurations. Never a reason
+  // the plan will not apply — a caller that ignores this reads the plan exactly
+  // as before. `code` is a closed vocabulary so CI asserts on a kind, not prose.
+  warnings: plan.warnings.map((warning) => ({
+    code: warning.code,
+    model: warning.model,
+    message: warning.message,
+  })),
   actions: plan.actions.map((action) => ({
     name: action.name,
     change: action.change,

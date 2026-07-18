@@ -58,6 +58,20 @@ the first version gathers them in full.
   promotion**, so an environment never serves data that failed a cross-interval
   invariant — an interval pass cannot catch one by construction.
 
+- **`plan` warns when `batchSize` widens a model's rendered window** (#54). A
+  backfill batch renders one `[start, end)` for the whole batch, not one per
+  interval, so a model whose correctness depends on that width — any window
+  function over it, which is what a de-duplication recipe is — means something
+  different while catching up than on the steady tick. A time-range model that
+  leaves `batchSize` above 1 with a window function in its body now raises a
+  `window-over-batch` warning at plan time, before anything is written; the
+  plan's new `warnings` array is additive in `plan --json`. Detection is
+  structural over the canonical AST, not a grep for `OVER` — a column named
+  `over`, the word in a string literal and the word in a comment are all
+  correctly ignored. It is a warning and never a refusal: a wide frame is
+  legitimate whenever the result does not depend on it, and refusing would make
+  a correct model unbuildable to protect an incorrect one.
+
 ### Fixed
 
 - `Answerable` was declared twice — once in the model API, once in the manifest
