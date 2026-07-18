@@ -7,6 +7,20 @@ the first version gathers them in full.
 
 ## [Unreleased]
 
+### Fixed
+
+- Model definitions are validated at definition time (#51). Bun executes
+  TypeScript without checking it and the CLI loads your config by `import()`, so
+  a project with no `tsc` in the loop — an agent-authored config, a plain
+  `bunx efmesh` — could reach the engine with a required field simply missing.
+  `external.files("…")` without a format used to render as `FROM undefined('…')`
+  and fail as a DuckDB catalog error naming neither the config nor the field; it
+  now refuses immediately with `ModelDefinitionError` naming the model, the
+  argument and the accepted formats. Same for a missing or malformed `source`,
+  an empty table name, a seed without a `file` or with a non-seed format, and a
+  missing `schema` or `kind` on any model. Found by the #37 integration spike,
+  writing a config the way an adopter would.
+
 ### Removed
 
 - `README.ru.md`, the Russian README mirror, is gone — and with it the last

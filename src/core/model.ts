@@ -199,11 +199,82 @@ export type AnyModel = Model<any>
 export const columnNames = (model: AnyModel): ReadonlyArray<string> =>
   Object.keys(model.schema.fields)
 
+/**
+ * Runtime shape checks for what the types already say (#51). Bun executes
+ * TypeScript without checking it and the CLI loads the user's config by
+ * `import()`, so a project with no `tsc` in the loop — an agent-authored config,
+ * a plain `bunx efmesh` — reaches us with fields simply missing. Unchecked, an
+ * absent one degrades into malformed SQL (`FROM undefined('…')`) and surfaces as
+ * an engine catalog error naming neither the config nor the field. These refuse
+ * at definition time instead, where the model is still in hand.
+ */
+const requireSchema = (name: ModelName, schema: unknown): void => {
+  if (
+    typeof schema !== "object" ||
+    schema === null ||
+    typeof (schema as { fields?: unknown }).fields !== "object"
+  ) {
+    throw new ModelDefinitionError({
+      model: name.full,
+      reason: "schema is required and must be a Schema.Struct — it is the data-shape contract",
+    })
+  }
+}
+
+// The literal formats `external.files` accepts; the readers that render them
+// live in plan/naming.ts (importing it here would close a cycle), so the type
+// union on ExternalSource is what keeps the two aligned.
+const FILE_FORMATS = new Set(["parquet", "csv", "json"])
+
+const validateExternalSource = (name: ModelName, source: ExternalSource | undefined): void => {
+  if (typeof source !== "object" || source === null) {
+    throw new ModelDefinitionError({
+      model: name.full,
+      reason: "source is required — external.table(…) or external.files(path, format)",
+    })
+  }
+  if (source._tag === "table") {
+    if (typeof source.table !== "string" || source.table.trim() === "") {
+      throw new ModelDefinitionError({
+        model: name.full,
+        reason: "external.table(…) needs a non-empty table name",
+      })
+    }
+    return
+  }
+  if (source._tag === "files") {
+    if (typeof source.path !== "string" || source.path.trim() === "") {
+      throw new ModelDefinitionError({
+        model: name.full,
+        reason: "external.files(…) needs a non-empty path or URL",
+      })
+    }
+    if (!FILE_FORMATS.has(source.format as string)) {
+      throw new ModelDefinitionError({
+        model: name.full,
+        reason: `external.files(«${source.path}», …) needs a format — one of ${[...FILE_FORMATS].join(", ")}; got ${String(source.format)}`,
+      })
+    }
+    return
+  }
+  throw new ModelDefinitionError({
+    model: name.full,
+    reason: `unknown external source «${String((source as { _tag?: unknown })._tag)}» — use external.table(…) or external.files(…)`,
+  })
+}
+
 /** Shared model-kind config checks — for defineModel and defineSqlModel. */
 const validateKindConfig = <Fields extends Schema.Struct.Fields>(
   name: ModelName,
   config: ModelConfig<Fields>,
 ): void => {
+  requireSchema(name, config.schema)
+  if (typeof config.kind !== "object" || config.kind === null) {
+    throw new ModelDefinitionError({
+      model: name.full,
+      reason: "kind is required — kind.full(), kind.incrementalByTimeRange({…}), …",
+    })
+  }
   if (config.kind._tag === "external") {
     throw new ModelDefinitionError({
       model: name.full,
@@ -427,19 +498,24 @@ export interface ExternalConfig<Fields extends Schema.Struct.Fields> {
  */
 export const defineExternal = <const Fields extends Schema.Struct.Fields>(
   config: ExternalConfig<Fields>,
-): Model<Fields> => ({
-  _tag: "Model",
-  name: parseModelName(config.name),
-  kind: { _tag: "external", source: config.source },
-  schema: config.schema,
-  description: config.description,
-  grain: [],
-  target: "table", // not materialized — field is unused
-  audits: [],
-  fragment: { _tag: "SqlFragment", nodes: [] },
-  deps: new Set(),
-  refs: new Map(),
-})
+): Model<Fields> => {
+  const name = parseModelName(config.name)
+  requireSchema(name, config.schema)
+  validateExternalSource(name, config.source)
+  return {
+    _tag: "Model",
+    name,
+    kind: { _tag: "external", source: config.source },
+    schema: config.schema,
+    description: config.description,
+    grain: [],
+    target: "table", // not materialized — field is unused
+    audits: [],
+    fragment: { _tag: "SqlFragment", nodes: [] },
+    deps: new Set(),
+    refs: new Map(),
+  }
+}
 
 export interface SeedConfig<Fields extends Schema.Struct.Fields> {
   readonly name: string
@@ -459,10 +535,24 @@ export interface SeedConfig<Fields extends Schema.Struct.Fields> {
 export const defineSeed = <const Fields extends Schema.Struct.Fields>(
   config: SeedConfig<Fields>,
 ): Model<Fields> => {
+  const name = parseModelName(config.name)
+  requireSchema(name, config.schema)
+  if (typeof config.file !== "string" || config.file.trim() === "") {
+    throw new ModelDefinitionError({
+      model: name.full,
+      reason: "file is required — the path to the seed's csv/json",
+    })
+  }
+  if (config.format !== undefined && config.format !== "csv" && config.format !== "json") {
+    throw new ModelDefinitionError({
+      model: name.full,
+      reason: `format «${String(config.format)}» is not a seed format — csv or json`,
+    })
+  }
   const format = config.format ?? (config.file.endsWith(".json") ? "json" : "csv")
   return {
     _tag: "Model",
-    name: parseModelName(config.name),
+    name,
     kind: { _tag: "seed", file: config.file, format },
     schema: config.schema,
     description: config.description,

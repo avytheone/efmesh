@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { Schema } from "effect"
-import { defineExternal, defineModel, external, kind } from "../src/core/model.ts"
+import { defineExternal, defineModel, defineSeed, external, kind } from "../src/core/model.ts"
 import { render } from "../src/core/sql.ts"
 
 const rawMoves = defineExternal({
@@ -81,5 +81,71 @@ describe("kinds F1", () => {
     expect(incremental.deps.has("raw.moves")).toBe(true)
     expect(rawMoves.deps.size).toBe(0)
     expect(rawMoves.kind._tag).toBe("external")
+  })
+})
+
+/**
+ * #51: Bun does not typecheck and the CLI imports the user's config, so a
+ * project with no `tsc` in the loop reaches these functions with fields simply
+ * missing. `as any` is how that arrives — the point is that the refusal happens
+ * here, naming the model and the field, instead of degrading into malformed SQL
+ * that fails later in the engine's catalog.
+ */
+describe("definition-time validation of an unchecked config (#51)", () => {
+  const shape = Schema.Struct({ id: Schema.String })
+
+  const reasonOf = (define: () => unknown): string => {
+    try {
+      define()
+    } catch (error) {
+      expect((error as { _tag?: string })._tag).toBe("ModelDefinitionError")
+      return (error as { message: string }).message
+    }
+    throw new Error("expected the definition to be refused")
+  }
+
+  test("external.files without a format is refused, not rendered as FROM undefined(…)", () => {
+    const reason = reasonOf(() =>
+      defineExternal({
+        name: "raw.events",
+        source: (external.files as any)("lake/raw/*.csv"),
+        schema: shape,
+      }),
+    )
+    expect(reason).toContain("raw.events")
+    expect(reason).toContain("needs a format")
+    expect(reason).toContain("lake/raw/*.csv")
+  })
+
+  test("a missing source names the constructors to use", () => {
+    const reason = reasonOf(() => defineExternal({ name: "raw.events", schema: shape } as any))
+    expect(reason).toContain("external.table")
+    expect(reason).toContain("external.files")
+  })
+
+  test("an empty table name is refused", () => {
+    const reason = reasonOf(() =>
+      defineExternal({ name: "raw.events", source: external.table("  "), schema: shape }),
+    )
+    expect(reason).toContain("non-empty table name")
+  })
+
+  test("a missing schema is refused — it is the data-shape contract", () => {
+    const reason = reasonOf(() =>
+      defineExternal({ name: "raw.events", source: external.table("src.events") } as any),
+    )
+    expect(reason).toContain("schema is required")
+  })
+
+  test("a seed without a file is refused", () => {
+    const reason = reasonOf(() => defineSeed({ name: "ref.depts", schema: shape } as any))
+    expect(reason).toContain("file is required")
+  })
+
+  test("a missing kind is refused before the body is assembled", () => {
+    const reason = reasonOf(() =>
+      defineModel({ name: "mart.rollup", schema: shape } as any, (ctx) => ctx.sql`SELECT 1 AS id`),
+    )
+    expect(reason).toContain("kind is required")
   })
 })
