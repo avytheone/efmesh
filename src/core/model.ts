@@ -83,6 +83,52 @@ export interface ExternalFileOptions {
   readonly hivePartitioning?: boolean
 }
 
+/**
+ * Opt-in compaction policy for a FOREIGN lake (#40) — one written by some other
+ * process, which efmesh otherwise only ever reads.
+ *
+ * The declaration IS the scope boundary. Compacting efmesh's own parquet
+ * materializations needs no policy (the project already describes them); a lake
+ * efmesh does not own is touched only where its `defineExternal` says so here.
+ * Without that rule `efmesh compact` degenerates into a utility that merges
+ * files under any directory it is pointed at — a lake manager, which is an
+ * explicit non-goal.
+ */
+export interface CompactPolicy {
+  /**
+   * Hive partition key whose value dates the partition (`arrival_date=2026-03-01`).
+   * Compaction never touches a partition dated today or later, so it needs to
+   * know which path segment carries the date.
+   */
+  readonly partitionKey: string
+  /**
+   * Rows surviving the merge are one per this key. Omitted, the merge only
+   * concatenates — legitimate for a lake whose writer is exactly-once.
+   */
+  readonly uniqueKey?: ReadonlyArray<string>
+  /**
+   * Ascending tie-breaker inside a key group — first row wins. Without it the
+   * surviving copy is whichever the scan happened to produce first, which is
+   * stable only by accident.
+   */
+  readonly orderBy?: ReadonlyArray<string>
+  /**
+   * Minutes to wait past the newest file's mtime before touching a partition:
+   * a micro-batch may still be landing files into a partition whose date has
+   * already rolled over. Defaults to 10.
+   */
+  readonly graceMinutes?: number
+  /** Name the merged file is published under; defaults to `compacted.parquet`. */
+  readonly fileName?: string
+  /** Partitions holding fewer files than this are left alone; defaults to 2. */
+  readonly minFiles?: number
+}
+
+/** Maintenance a model opts into. Declaration-only: it never enters the fingerprint. */
+export interface ModelMaintenance {
+  readonly compact?: CompactPolicy
+}
+
 export interface IncrementalByTimeRangeOptions {
   readonly timeColumn: string
   readonly start: string
@@ -214,6 +260,12 @@ export interface Model<Fields extends Schema.Struct.Fields = Schema.Struct.Field
   /** The source models themselves, by name — schemas for fixture validation in testModel. */
   readonly refs: ReadonlyMap<string, AnyModel>
   readonly export?: { readonly attach: string; readonly table: string }
+  /**
+   * Opt-in maintenance (#40). Deliberately outside `kind`: the fingerprint
+   * payload carries `kind` verbatim, and a maintenance policy changes nothing
+   * about what the data means — declaring one must not rebuild a warehouse.
+   */
+  readonly maintenance?: ModelMaintenance
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -295,6 +347,57 @@ const validateExternalSource = (name: ModelName, source: ExternalSource | undefi
     model: name.full,
     reason: `unknown external source «${String((source as { _tag?: unknown })._tag)}» — use external.table(…) or external.files(…)`,
   })
+}
+
+// Compaction rewrites and deletes files, so it is confined to what it can do
+// safely: local parquet, published by an atomic rename. A remote object store
+// has no rename, and csv/json are not what the small-files problem is about.
+const REMOTE_PATH = /^[a-z][a-z0-9+.-]*:\/\//
+
+const validateCompactPolicy = <Fields extends Schema.Struct.Fields>(
+  name: ModelName,
+  source: ExternalSource,
+  schema: Schema.Struct<Fields>,
+  policy: CompactPolicy,
+): void => {
+  const refuse = (reason: string): never => {
+    throw new ModelDefinitionError({ model: name.full, reason })
+  }
+  if (source._tag !== "files" || source.format !== "parquet") {
+    refuse("maintenance.compact needs external.files(…, «parquet») — it merges parquet files")
+  }
+  const path = (source as Extract<ExternalSource, { _tag: "files" }>).path
+  if (REMOTE_PATH.test(path)) {
+    refuse(
+      `maintenance.compact needs a local path; «${path}» is remote — publishing a merged partition relies on an atomic rename`,
+    )
+  }
+  if (typeof policy.partitionKey !== "string" || policy.partitionKey.trim() === "") {
+    refuse("maintenance.compact needs partitionKey — the hive key whose value dates a partition")
+  }
+  // uniqueKey/orderBy become SQL identifiers in the merge; requiring them to be
+  // declared columns is both a typo check and what keeps the rendering safe
+  for (const [option, columns] of [
+    ["uniqueKey", policy.uniqueKey],
+    ["orderBy", policy.orderBy],
+  ] as const) {
+    for (const column of columns ?? []) {
+      if (!(column in schema.fields)) {
+        refuse(`maintenance.compact ${option} column «${column}» is not in the model schema`)
+      }
+    }
+  }
+  for (const [option, value] of [
+    ["graceMinutes", policy.graceMinutes],
+    ["minFiles", policy.minFiles],
+  ] as const) {
+    if (value !== undefined && (!Number.isFinite(value) || value < 0)) {
+      refuse(`maintenance.compact ${option} must be a non-negative number; got ${String(value)}`)
+    }
+  }
+  if (policy.fileName !== undefined && (policy.fileName.includes("/") || policy.fileName === "")) {
+    refuse(`maintenance.compact fileName «${policy.fileName}» must be a bare file name`)
+  }
 }
 
 /** Shared model-kind config checks — for defineModel and defineSqlModel. */
@@ -522,6 +625,8 @@ export interface ExternalConfig<Fields extends Schema.Struct.Fields> {
   readonly source: ExternalSource
   readonly schema: Schema.Struct<Fields>
   readonly description?: string
+  /** Opt-in maintenance efmesh may perform on a lake it does not own (#40). */
+  readonly maintenance?: ModelMaintenance
 }
 
 /**
@@ -536,6 +641,9 @@ export const defineExternal = <const Fields extends Schema.Struct.Fields>(
   const name = parseModelName(config.name)
   requireSchema(name, config.schema)
   validateExternalSource(name, config.source)
+  if (config.maintenance?.compact !== undefined) {
+    validateCompactPolicy(name, config.source, config.schema, config.maintenance.compact)
+  }
   return {
     _tag: "Model",
     name,
@@ -548,6 +656,7 @@ export const defineExternal = <const Fields extends Schema.Struct.Fields>(
     fragment: { _tag: "SqlFragment", nodes: [] },
     deps: new Set(),
     refs: new Map(),
+    ...(config.maintenance !== undefined ? { maintenance: config.maintenance } : {}),
   }
 }
 

@@ -4,7 +4,7 @@ description: >-
   Keep efmesh environments clean and verify a dev environment before promoting
   it to prod. Use before promoting/deploying dev → prod, when asked to compare
   two environments, to reclaim disk from orphaned physics, or to set up backups.
-  Covers diff / diff --data, janitor cadence, and what to back up.
+  Covers diff / diff --data, janitor and compact cadence, and what to back up.
 ---
 
 # efmesh environment-hygiene
@@ -85,6 +85,38 @@ Shape: `{ "removed": ["fp…"], "kept": ["fp…"] }` — `removed` were deleted;
 - The janitor holds its **own** lock (separate from apply/run), so it is safe to
   schedule alongside ticks. Exit `0` on success.
 
+## Compact — merge a partition's small files
+
+A micro-batch writer leaves hundreds of tiny files per partition; the query
+planner pays for every one of them long before disk does.
+
+```
+efmesh compact --dry-run --json     # what would be merged
+efmesh compact --json               # merge it
+```
+
+Shape: `{ "dryRun": bool, "compacted": [{model, partition, files, rows,
+published}], "skipped": [{model, partition, reason}] }`. `reason` is a closed
+set — `current-day`, `grace-period`, `already-compact`, `undated`.
+
+- Scope is the project: efmesh's own parquet partitions, plus `defineExternal`
+  sources whose declaration carries `maintenance: { compact: {…} }`. There is no
+  flag that points it at a directory; if a lake is not being compacted, the
+  declaration is missing, not the flag.
+- **Cooperative, NOT transactional — the difference from janitor.** Janitor
+  claims a snapshot in the state store; compact has no claim. It relies on
+  conventions: it never touches a partition dated today or later, waits a grace
+  period past the newest file's mtime (`--grace N` overrides), publishes via
+  `.tmp` + atomic rename, and deletes only the files it listed before merging.
+  Safe against an appending writer; NOT safe against one that rewrites files in
+  place, and it does not serialize two concurrent compactors — schedule one.
+- Cadence: daily, off the hour a writer is busiest. Run `--dry-run` first on a
+  lake you have not compacted before, and read the `skipped` reasons: "all
+  `undated`" means the declared `partitionKey` does not match the layout.
+- A `uniqueKey` in the policy means compaction de-duplicates *within* a
+  partition, so raw row counts drop. That is the point, but say so before
+  running it against a lake someone counts rows in.
+
 ## What to back up
 
 State lives in two places (SPEC §6, §3.3) — back up both together so they stay
@@ -107,7 +139,8 @@ change; that is not a substitute for your own backups.
 ## Guard rails
 
 - Never delete files under the lake / physics directory by hand to "clean up" —
-  the janitor is the only safe reclaimer (it checks the ttl and env references).
+  `janitor` (ttl + env references) and `compact` (settled partitions only) are
+  the only two writers that may remove anything there.
 - Never hand-edit or hand-restore only one of the two stores; a state store
   restored without its matching physics (or vice versa) points views at data
   that isn't there.

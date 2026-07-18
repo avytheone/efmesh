@@ -49,6 +49,31 @@ export const rawEvents = defineExternal({
     "parquet",
     { unionByName: true, hivePartitioning: true },
   ),
+  /**
+   * The archive is a FOREIGN lake — efmesh reads it, the archiver writes it —
+   * so `efmesh compact` touches it only because this declaration says so. An
+   * at-least-once micro-batch writer leaves a partition full of tiny files, and
+   * hundreds of them cost the planner far more than they cost disk.
+   *
+   * The concurrency model is cooperative, not transactional (README §
+   * Compaction): the archiver keeps writing while this runs, and the only
+   * things standing between the two are the rules compaction obeys — today's
+   * partition is never touched, a partition is left alone until its newest file
+   * has been still for the grace period, the merged file appears by rename, and
+   * only the files listed before the merge are deleted.
+   *
+   * `orderBy` matters as much as `uniqueKey`: keeping the FIRST arrival makes
+   * compaction agree with the canonical layer below, which resolves duplicates
+   * the same way. A dedup that kept an arbitrary copy would quietly disagree
+   * with the table built on top of it.
+   */
+  maintenance: {
+    compact: {
+      partitionKey: "arrival_date",
+      uniqueKey: ["event_id"],
+      orderBy: ["arrived_at", "archiver_offset"],
+    },
+  },
   schema: Schema.Struct({
     event_id: Schema.String,
     event_type: Schema.String,

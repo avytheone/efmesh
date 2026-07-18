@@ -95,8 +95,24 @@ bunx efmesh plan dev           # what would be done
 bunx efmesh apply dev --yes    # backfill by arrival day, then the views
 bunx efmesh audit dev          # green, with the two cross-horizon warnings
 bunx efmesh run dev            # cron tick: catch up on new arrival days
+bunx efmesh compact --dry-run  # which archive partitions have small files to merge
 bun seed.ts                    # rewrite archive/ from the readable source data
 ```
+
+## Compaction of the archive
+
+`raw.events` opts into `maintenance.compact`, which is what lets `efmesh
+compact` touch a lake efmesh does not own. The shipped fixture has one file per
+partition, so a run here reports `already-compact` and changes nothing — the
+declaration is there to show the shape a real archive needs, where a micro-batch
+writer leaves hundreds of files per day and the planner pays for every one.
+
+Read the concurrency note in the main README before pointing it at a live
+archive: compaction is **cooperative**, not transactional. It never touches
+today's partition, waits out a grace period on the newest file's mtime,
+publishes by atomic rename, and deletes only what it listed before merging —
+which is safe against an appending archiver and is *not* the transactional
+claim `janitor` takes.
 
 Things worth playing with: widen `HORIZON_DAYS` in `models.ts` and watch
 `ops.cross_horizon_duplicates` go empty (a `plan` will call it a breaking change

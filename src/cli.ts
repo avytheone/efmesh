@@ -13,6 +13,7 @@ export { decideApply, EXIT_AWAITING_HUMAN, isAffirmative, parseReclassify } from
 export {
   API_VERSION,
   applyToJson,
+  compactToJson,
   graphToJson,
   janitorToJson,
   lineageToJson,
