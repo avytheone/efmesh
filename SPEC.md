@@ -704,6 +704,50 @@ sample stays aligned and produces no false only-in rows (row counts remain
 full). Works on DuckDB and Postgres; ducklake marts are visible via the same
 ATTACH `apply` uses.
 
+### 11.1 Versioning policy (0.x)
+
+SemVer declines to help while the major is `0` — "anything may change at any
+time" — so the rule is ours, and it is written here because its absence already
+cost us once: the BREAKING switch to a y/yes-only prompt shipped in **0.2.1**, a
+patch, not by decision but because nothing said how to decide.
+
+`0.x` is the steady state, not a waiting room. `1.0` means there is genuinely
+nothing left to do, so this policy is a long-lived working rule rather than a
+bridge to a release that may never come.
+
+**A minor (`0.N.0`) may break** — CLI flags and their semantics, `--json`
+shapes, the public API whitelist in `src/index.ts`, the config shape, the
+model-definition surface. Every break is a `BREAKING` bullet in the CHANGELOG
+carrying its migration in the same bullet.
+
+**A patch (`0.N.M`) may not break any of those.** It carries defect fixes, docs,
+internals, performance. A fix whose *correct* form breaks a contract waits for
+the next minor, or ships as one.
+
+**Additive is minor, not patch.** A new flag, a new field in a `--json` payload,
+a new export in the whitelist — all new functionality. "Small and safe" is not
+the test; "fixes a defect, or touches only docs" is. Without this line the
+boundary drifts on the first convenient case.
+
+**Repairing an unreachable state is a patch.** #48 — a `FINGERPRINT_VERSION`
+bump wedged an environment with no way out — changed observable behavior (exit 1
+became exit 2) and still shipped as 0.3.1, because nothing usable could have
+depended on a dead end. The test is whether a working setup could have relied on
+the old behavior, not whether the behavior moved.
+
+**The internal contracts are orthogonal to the package number** and carry the
+guarantees a consumer actually pins on: `apiVersion` (§11), `STATE_VERSION` (§6,
+with a migration), `FINGERPRINT_VERSION` (§4, with a re-plan path). Each has its
+own bump ritual; the package version says nothing about them. Exit codes (`0` ok,
+`1` error, `2` awaiting a human) are frozen regardless of version — changing one
+is a minor at minimum and a loud CHANGELOG entry.
+
+The `effect` beta pin (exact, peerDependency) is outside this policy: it is a
+peer contract with its own drift CI (#47).
+
+No test enforces any of this. The enforcement is the release checklist and
+review — stated plainly rather than pretended otherwise.
+
 ---
 
 ## 12. The user's project structure

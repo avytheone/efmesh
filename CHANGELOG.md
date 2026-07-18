@@ -7,6 +7,18 @@ the first version gathers them in full.
 
 ## [Unreleased]
 
+### Documentation
+
+- A written versioning policy for `0.x` (#50): what a minor may break, what a
+  patch may not, and why additive counts as minor rather than patch. `0.x` is
+  the steady state here — `1.0` would mean nothing is left to do — so SemVer,
+  which promises nothing below `1.0`, needed a rule of our own. It also records
+  that the guarantees worth pinning on are the separately versioned contracts
+  (`apiVersion`, `STATE_VERSION`, `FINGERPRINT_VERSION`, frozen exit codes),
+  not the package number. Full rule in SPEC §11.1, summary in both READMEs.
+  Written because its absence already cost us: the BREAKING y/yes-only prompt
+  shipped in 0.2.1, a patch, for want of anything saying how to decide.
+
 ## [0.3.1] — 2026-07-18
 
 ### Fixed

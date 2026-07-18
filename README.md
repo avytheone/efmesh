@@ -349,6 +349,26 @@ The architectural non-goals (heavy ingest, general orchestration, BI) live in [S
 
 The 0.3.0 milestone — making efmesh legible, developable and operable by an AI agent (complete `--json` coverage with a pinnable `apiVersion`, in-repo and packaged skills, honest contracts) — is done. Further work is driven by dogfood needs from real adopters rather than a fixed roadmap. Known limitation: a single `bun build --compile` binary builds, but standalone Bun executables can't resolve the `"efmesh"` import from a runtime-loaded config — distribution is via the package (SPEC §10).
 
+## Versioning
+
+The major is `0` and stays there for a while: `1.0` will mean there is nothing
+left to do, not that we started feeling serious. SemVer says nothing useful
+below `1.0`, so here is what we actually promise:
+
+- **a minor (`0.N.0`) may break** CLI flags, `--json` shapes, the public API
+  whitelist, the config shape or the model-definition surface — always as a
+  `BREAKING` bullet in the [CHANGELOG](https://github.com/avytheone/efmesh/blob/main/CHANGELOG.md) with its migration alongside;
+- **a patch (`0.N.M`) breaks none of those** — defect fixes, docs, internals,
+  performance;
+- **additive is minor, not patch**: a new flag or a new `--json` field is new
+  functionality, however small.
+
+What you actually pin on is not the package number but the contracts that carry
+their own versions: `apiVersion` in every `--json` payload, `STATE_VERSION` (a
+store change ships an `efmesh migrate`), `FINGERPRINT_VERSION` (an algorithm
+change re-plans as breaking changes and rebuilds on the next apply). Exit codes
+are frozen regardless of version. The full rule is [SPEC.md §11.1](https://github.com/avytheone/efmesh/blob/main/SPEC.md).
+
 ## Documentation
 
 - [SPEC.md](https://github.com/avytheone/efmesh/blob/main/SPEC.md) — the architecture spec: decisions, invariants, open questions;

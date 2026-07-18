@@ -20,7 +20,9 @@ Where things are decided:
   decisions land here, not in chat history.
 - GitHub Issues + milestones — operational planning. One issue = one
   shippable concern; commits close them with `closes #N`.
-- `CHANGELOG.md` — Keep a Changelog, SemVer. User-visible changes only.
+- `CHANGELOG.md` — Keep a Changelog. User-visible changes only. Which release
+  a change belongs in is the versioning policy, SPEC §11.1 — while the major
+  is `0`, SemVer alone decides nothing.
 - `README.md` — the shopwindow; `README.ru.md` is its maintained Russian
   mirror. Keep them in sync when touching either.
 
@@ -71,7 +73,9 @@ class of bug this project can have:
   (`efmesh migrate`, with a file backup for SQLite). A fresh store
   bootstraps; an old one refuses to open until migrated.
 - **`--json` shapes and exit codes** (0 = ok, 1 = error, 2 = awaiting a
-  human) — a contract for CI and agents; changes are SemVer events.
+  human) — a contract for CI and agents. Breaking one is a minor at minimum,
+  never a patch; see the versioning policy (SPEC §11.1) for which release a
+  change belongs in — including why additive counts as minor.
 - **Locks**: `apply` and `run` of an environment share one cross-process
   lock; janitor has its own. Stale-lock reclaim is ttl-based and tested
   under a real `kill -9` — keep it that way.
