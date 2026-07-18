@@ -26,7 +26,7 @@ pre-commit:
       stage_fixed: true
 
     # Language gate: src/ and test/ are English-only (CLAUDE.md). The script
-    # names the offending file and line; README.ru.md is exempt.
+    # names the offending file and line.
     - name: no-cyrillic
       glob: "{src,test}/**/*"
       run: bun scripts/no-cyrillic.ts {staged_files}

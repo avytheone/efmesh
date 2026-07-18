@@ -1,6 +1,6 @@
 ---
 name: issue-workflow
-description: Land a change against a GitHub issue the efmesh way — atomic commit closing the issue, CHANGELOG for user-visible changes, README/README.ru.md kept in sync, green gates. Use when implementing an issue or any change destined for a commit in this repo.
+description: Land a change against a GitHub issue the efmesh way — atomic commit closing the issue, CHANGELOG for user-visible changes, README kept honest, green gates. Use when implementing an issue or any change destined for a commit in this repo.
 ---
 
 # Issue → commit workflow
@@ -19,9 +19,8 @@ and the docs honest.
 3. **CHANGELOG** (`CHANGELOG.md`): if the change is user-visible, add a bullet
    under `## [Unreleased]` (Keep a Changelog style, English, explains the *why*).
    Internal-only refactors need no entry.
-4. **README sync**: if you touch `README.md`, mirror the same change into
-   `README.ru.md` (the maintained Russian mirror) — and vice versa. They must
-   not drift.
+4. **README**: keep it honest if the change is user-visible — it is the
+   shopwindow, and the first stranger reads it before the code.
 5. **SPEC**: behavioral/architectural changes land in `SPEC.md` first (or an
    issue discussion), then code — mark implemented items in the spec.
 6. **English only** in `src/` and `test/` (the Cyrillic gate,

@@ -23,15 +23,17 @@ Where things are decided:
 - `CHANGELOG.md` — Keep a Changelog. User-visible changes only. Which release
   a change belongs in is the versioning policy, SPEC §11.1 — while the major
   is `0`, SemVer alone decides nothing.
-- `README.md` — the shopwindow; `README.ru.md` is its maintained Russian
-  mirror. Keep them in sync when touching either.
+- `README.md` — the shopwindow.
 
 ## Language
 
-All project documentation, source comments, commit messages, issues and
-user-facing output are **English**. `README.ru.md` is the only maintained
-Russian artifact. (Historical commits and comments predating this rule are
-being migrated — do not add new Russian text.)
+The repository is **English**, without exception: documentation, source
+comments, commit messages, issues, user-facing output. There is no translated
+artifact to keep in sync — the Russian README mirror was dropped once it became
+clear that maintaining it was a tax paid on every README edit, for a readership
+that is one bilingual author and AI agents that read English anyway.
+(Historical commits and comments predating this rule survive in git history —
+do not add new Russian text.)
 
 ## Code style
 

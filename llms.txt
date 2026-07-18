@@ -17,7 +17,7 @@ Scope, stated honestly so an evaluation does not mislead itself:
 
 ## Where things live
 
-- [README.md](https://github.com/avytheone/efmesh/blob/main/README.md): the shopwindow — why efmesh, who it is (and isn't) for, quickstart, CLI table, performance ([README.ru.md](https://github.com/avytheone/efmesh/blob/main/README.ru.md) is the Russian mirror).
+- [README.md](https://github.com/avytheone/efmesh/blob/main/README.md): the shopwindow — why efmesh, who it is (and isn't) for, quickstart, CLI table, performance.
 - [SPEC.md](https://github.com/avytheone/efmesh/blob/main/SPEC.md): the architecture contract — decisions and invariants. §13 is the build history (phases F0–F6), §14 the open questions with verdicts.
 - [src/index.ts](https://github.com/avytheone/efmesh/blob/main/src/index.ts): the public API — a deliberate whitelist (no `export *`). What is here is a versioning commitment (SPEC §11.1: a minor may break it, a patch may not); internals are not exported. `Efmesh.plan/apply/render`, `run`, `janitor`, plus schemas, layers and error types.
 - [examples/hospital](https://github.com/avytheone/efmesh/tree/main/examples/hospital): a live, runnable example — patient movements across hospital departments, exercising every model kind and materialization target.

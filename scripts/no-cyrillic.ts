@@ -2,13 +2,10 @@
 // Repo language gate: source and tests are English-only (see CLAUDE.md).
 // Rejects staged files under src/ and test/ that contain Cyrillic letters,
 // pointing at the exact file and line so the offender is trivial to fix.
-// README.ru.md is the single maintained Russian artifact and is exempt
-// (it lives at the repo root, not under src/ or test/, but we are explicit).
+// The whole repository is English now — no translated artifact is exempt.
 
 import { BunRuntime, BunServices } from "@effect/platform-bun"
 import { Console, Context, Data, Effect, FileSystem, Layer } from "effect"
-
-const ALLOWLIST = new Set(["README.ru.md"])
 
 // Script=Cyrillic covers the base block plus Supplement and Extended-A/B/C,
 // which a hand-written [U+0400-U+04FF] range misses — and it keeps this file
@@ -40,7 +37,7 @@ class CyrillicGateError extends Data.TaggedError("CyrillicGateError")<{
     return (
       `${found.join("\n")}\n\n` +
       `${this.offences.length} Cyrillic occurrence(s) in staged src/ or test/ files. ` +
-      `English-only there; README.ru.md is the sole Russian artifact.`
+      `The repository is English-only; opt a deliberate fixture out with a ${OPT_OUT} marker.`
     )
   }
 }
@@ -49,7 +46,6 @@ class CyrillicGateError extends Data.TaggedError("CyrillicGateError")<{
 const guarded = (paths: ReadonlyArray<string>): ReadonlyArray<string> =>
   paths.flatMap((path) => {
     const normalized = path.replace(/^\.\//, "")
-    if (ALLOWLIST.has(normalized)) return []
     const inScope = normalized.startsWith("src/") || normalized.startsWith("test/")
     return inScope ? [normalized] : []
   })

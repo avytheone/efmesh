@@ -49,7 +49,7 @@ follow the closest one (`scdType2` for a stateful table kind,
 7. **`src/plan/graph-html.ts`**: add a color to `KIND_COLOR` so the kind shows
    in `efmesh graph --html` and its legend.
 8. **Docs**: describe the kind in `SPEC.md` §3.1 (materialization kinds), and in
-   `README.md` — then mirror the README change into `README.ru.md` (kept in sync).
+   `README.md`.
 9. **Tests**: extend `test/kinds.test.ts` (definition/validation) and add a
    dedicated behavior test modeled on `test/scd.test.ts` (build + reconcile +
    audits), plus planner/executor coverage. A change without a failing-first

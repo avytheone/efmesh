@@ -7,6 +7,15 @@ the first version gathers them in full.
 
 ## [Unreleased]
 
+### Removed
+
+- `README.ru.md`, the Russian README mirror, is gone — and with it the last
+  translated artifact. It taxed every README edit with a second edit that had
+  to match, for a readership of one bilingual author and AI agents that read
+  English regardless; the drift risk was permanent and the benefit theoretical.
+  The repository is now English without exception. The file remains in git
+  history, and it no longer ships in the npm package.
+
 ### Documentation
 
 - A written versioning policy for `0.x` (#50): what a minor may break, what a
