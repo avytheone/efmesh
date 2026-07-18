@@ -8,6 +8,8 @@ the first version gathers them in full.
 
 ## [Unreleased]
 
+## [0.3.2] — 2026-07-18
+
 ### Fixed
 
 - A config whose *contents* refuse no longer hides behind `ConfigLoadError`
