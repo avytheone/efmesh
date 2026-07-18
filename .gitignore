@@ -16,8 +16,11 @@ coverage
 # lefthook per-developer overrides
 lefthook-local.yml
 
-# артефакты примеров/озера
+# example/lake artifacts
 examples/**/lake/
+
+# scratch space for spikes and handoff notes — never committed
+tmp/
 
 # Claude Code session-local data (skills in .claude/skills/ are versioned)
 .claude/worktrees/

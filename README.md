@@ -297,6 +297,35 @@ Embedding efmesh as a library? Logging is Effect's `Effect.log*` — provide you
 own `Logger` layer (sink, format, minimum level) and the CLI's choices do not
 apply. Row counts are not logged: efmesh never runs an extra query just to count.
 
+## Next to a codebase on a different Effect major
+
+efmesh pins Effect v4 exactly, as a peer dependency. Two Effect majors cannot
+share one process — `Schema` identity and the context registry are per-instance
+— so if your platform runs Effect v3, do not import efmesh into it. The failure
+is at least loud and immediate: the import throws (`Export named 'Semaphore' not
+found`), never a subtly wrong runtime.
+
+The recipe is to keep the warehouse a separate package and talk to it as a
+process:
+
+1. **Its own `package.json`** holding `@avytheone/efmesh` and its `effect` peer,
+   with your models and config beside them. A nested directory is fine, and so
+   is a workspace in a monorepo: bun and npm install incompatible versions
+   per-package rather than hoisting, so each side resolves its own Effect. Your
+   application cannot even import efmesh — the dependency is not in its tree.
+2. **Data crosses the boundary, never live objects.** Your platform writes files
+   (parquet, csv, json) into the lake; efmesh reads them as `external` models,
+   builds marts, and writes files back. No `Effect`, `Schema` or `Layer` value
+   is ever passed across.
+3. **Drive it by CLI and read `--json` plus the exit code.** Spawn
+   `efmesh apply <env> --yes --json` from your orchestrator; `0` is success, `1`
+   is a failure, and `2` means a human is needed — a plan awaiting review, or a
+   `run` blocked by structural changes, with `blockedBy` naming the models. Pin
+   on the `apiVersion` field, not on the package version.
+
+Nothing about efmesh needs to change for this: the isolation is a packaging
+property, and the machine-readable surface is the integration surface.
+
 ## Performance
 
 The framework overhead is negligible for any realistic project (in-memory DuckDB, `bun bench/plan-bench.ts N`):
