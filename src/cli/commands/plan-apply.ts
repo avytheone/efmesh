@@ -1,10 +1,11 @@
-import { Console, Effect } from "effect"
+import { Clock, Console, Effect } from "effect"
 import { Argument, Command } from "effect/unstable/cli"
 import { buildGraph } from "../../core/graph.ts"
 import { Efmesh } from "../../efmesh.ts"
 import { applyPlan } from "../../plan/executor.ts"
 import { envLockName, withStateLock } from "../../plan/lock.ts"
 import { planChanges } from "../../plan/planner.ts"
+import { recordCommandOutcome, writeMetricsFile } from "../../observe/report.ts"
 import { configLayers, loadConfig } from "../config.ts"
 import {
   configFlag,
@@ -15,8 +16,10 @@ import {
   isAffirmative,
   jobsFlag,
   jsonFlag,
+  metricsFlag,
   parseForwardOnly,
   parseJobs,
+  parseMetricsPath,
   parseReclassify,
   parseRetries,
   reclassifyFlag,
@@ -60,9 +63,12 @@ export const applyCommand = Command.make(
     retries: retriesFlag,
     yes: yesFlag,
     json: jsonFlag,
+    metrics: metricsFlag,
   },
-  ({ config, env, forwardOnly, jobs, json, reclassify, retries, yes }) =>
+  ({ config, env, forwardOnly, jobs, json, metrics, reclassify, retries, yes }) =>
     Effect.gen(function* () {
+      const startedAtMillis = yield* Clock.currentTimeMillis
+      const metricsPath = parseMetricsPath(metrics)
       const loaded = yield* loadConfig(config)
       const names = parseForwardOnly(forwardOnly)
       const overrides = yield* parseReclassify(reclassify)
@@ -91,6 +97,8 @@ export const applyCommand = Command.make(
               "the plan changes models but there is no one to confirm (non-TTY): add --yes",
             )
           }
+          yield* recordCommandOutcome({ outcome: "awaiting-human", startedAtMillis, plan })
+          if (metricsPath !== undefined) yield* writeMetricsFile(metricsPath)
           yield* Effect.sync(() => {
             process.exitCode = EXIT_AWAITING_HUMAN
           })
@@ -111,6 +119,8 @@ export const applyCommand = Command.make(
           ...(modelConcurrency !== undefined ? { modelConcurrency } : {}),
           ...(retry !== undefined ? { retry } : {}),
         })
+        yield* recordCommandOutcome({ outcome: "ok", startedAtMillis, plan: applied.plan })
+        if (metricsPath !== undefined) yield* writeMetricsFile(metricsPath)
         if (json) {
           yield* printJson(
             applyToJson({

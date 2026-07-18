@@ -297,6 +297,53 @@ Embedding efmesh as a library? Logging is Effect's `Effect.log*` — provide you
 own `Logger` layer (sink, format, minimum level) and the CLI's choices do not
 apply. Row counts are not logged: efmesh never runs an extra query just to count.
 
+## Metrics
+
+`apply` and `run` take `--metrics <path>` and write a Prometheus/OpenMetrics
+text file after the command — the dialect
+[node_exporter's textfile collector](https://github.com/prometheus/node_exporter#textfile-collector)
+parses, so a scraped host needs no wrapper around efmesh:
+
+```ini
+# efmesh-run@.service
+ExecStart=/usr/bin/env efmesh run %i --metrics /var/lib/node_exporter/efmesh.prom
+```
+
+```
+# HELP efmesh_intervals_done_total how many intervals were computed and marked done
+# TYPE efmesh_intervals_done_total counter
+efmesh_intervals_done_total{model="med.moves",env="dev"} 1
+# TYPE efmesh_model_build_duration_seconds gauge
+efmesh_model_build_duration_seconds{model="med.moves",env="dev"} 0.015
+# TYPE efmesh_last_run_timestamp_seconds gauge
+efmesh_last_run_timestamp_seconds{outcome="ok"} 1784367897
+```
+
+Series: intervals done/failed, snapshots built, audits passed/failed, per-model
+build duration, command duration, planned models by change category, and the
+timestamp of the last finished command by outcome. Per-model series carry
+`model` and `env` labels.
+
+The timestamp is the one to alert on, because it is what makes a *silent*
+process loud — a tick that never fired writes nothing, so the metric goes stale
+even though no error was ever reported:
+
+```promql
+time() - max(efmesh_last_run_timestamp_seconds) > 5400   # hourly tick, 90 min of grace
+```
+
+The file is written through a temp file and renamed, so a scraper reading it
+mid-write is impossible. It is written on every finished command — including a
+tick that found no work and an `apply` that exited `2` awaiting confirmation —
+because "ran and did nothing" and "did not run" must not look alike. An
+unwritable path is a warning, never a failed apply.
+
+Row counts are absent on purpose: efmesh never runs an extra query to count
+rows, and inventing the number would mean measuring something else. Embedding as
+a library? The metrics are Effect's `Metric` registry
+([SPEC §10.1](https://github.com/avytheone/efmesh/blob/main/SPEC.md)) — read it
+yourself with `Metric.snapshot` and ship it wherever you like.
+
 ## Next to a codebase on a different Effect major
 
 efmesh pins Effect v4 exactly, as a peer dependency. Two Effect majors cannot

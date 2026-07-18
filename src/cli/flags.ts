@@ -31,6 +31,20 @@ export const parseJobs = (value: string): number | undefined => {
   return value !== "" && Number.isFinite(jobs) && jobs >= 1 ? Math.floor(jobs) : undefined
 }
 
+/**
+ * Where to drop the scrape file (#39). Empty = no file: the default stays a
+ * command that writes nothing it was not asked to write.
+ */
+export const metricsFlag = Flag.string("metrics").pipe(
+  Flag.withDefault(""),
+  Flag.withDescription(
+    "write an OpenMetrics/Prometheus text file after the command (for node_exporter's textfile collector)",
+  ),
+)
+
+export const parseMetricsPath = (value: string): string | undefined =>
+  value.trim() === "" ? undefined : value
+
 export const retriesFlag = Flag.string("retries").pipe(
   Flag.withDefault(""),
   Flag.withDescription(

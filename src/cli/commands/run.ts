@@ -1,5 +1,6 @@
-import { Console, Effect } from "effect"
+import { Clock, Console, Effect } from "effect"
 import { Argument, Command } from "effect/unstable/cli"
+import { recordCommandOutcome, writeMetricsFile } from "../../observe/report.ts"
 import { run } from "../../plan/run.ts"
 import { configLayers, loadConfig } from "../config.ts"
 import {
@@ -7,11 +8,31 @@ import {
   EXIT_AWAITING_HUMAN,
   jobsFlag,
   jsonFlag,
+  metricsFlag,
   parseJobs,
+  parseMetricsPath,
   parseRetries,
   retriesFlag,
 } from "../flags.ts"
 import { printJson, runToJson } from "../json.ts"
+
+/**
+ * A tick that ran and did nothing is a different fact from a tick that did not
+ * run — so the outcome is recorded on every path, including exit 2, and the
+ * file is written even when nothing was built (#39).
+ */
+const report = (options: {
+  readonly outcome: "ok" | "awaiting-human"
+  readonly startedAtMillis: number
+  readonly path: string | undefined
+}) =>
+  Effect.gen(function* () {
+    yield* recordCommandOutcome({
+      outcome: options.outcome,
+      startedAtMillis: options.startedAtMillis,
+    })
+    if (options.path !== undefined) yield* writeMetricsFile(options.path)
+  })
 
 export const runCommand = Command.make(
   "run",
@@ -21,9 +42,12 @@ export const runCommand = Command.make(
     jobs: jobsFlag,
     retries: retriesFlag,
     json: jsonFlag,
+    metrics: metricsFlag,
   },
-  ({ config, env, jobs, json, retries }) =>
+  ({ config, env, jobs, json, metrics, retries }) =>
     Effect.gen(function* () {
+      const startedAtMillis = yield* Clock.currentTimeMillis
+      const metricsPath = parseMetricsPath(metrics)
       const loaded = yield* loadConfig(config)
       const modelConcurrency = parseJobs(jobs)
       const retry = parseRetries(retries)
@@ -53,6 +77,11 @@ export const runCommand = Command.make(
           }),
         ),
       )
+      yield* report({
+        outcome: result.blocked ? "awaiting-human" : "ok",
+        startedAtMillis,
+        path: metricsPath,
+      })
       if (result.blocked) {
         if (json) {
           yield* printJson(

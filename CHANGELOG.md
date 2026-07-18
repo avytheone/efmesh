@@ -8,6 +8,26 @@ the first version gathers them in full.
 
 ## [Unreleased]
 
+### Added
+
+- `--metrics <path>` on `apply` and `run` writes a Prometheus/OpenMetrics text
+  file — the dialect node_exporter's textfile collector parses (#39). A
+  deployment that treats a silent process as a defect can now scrape efmesh with
+  no wrapper around it. Series: intervals done/failed, snapshots built, audits
+  passed/failed, per-model build duration, command duration, planned models by
+  change category, and the timestamp of the last finished command by outcome —
+  per-model series labelled with `model` and `env`. The timestamp is the one to
+  alert on, because a tick that never fired writes nothing and goes stale
+  without ever reporting an error. Written through a temp file and renamed, so a
+  scraper cannot read it half-written; written on every finished command,
+  including a tick that found no work and an `apply` that exited 2, so "ran and
+  did nothing" and "did not run" do not look alike; an unwritable path warns
+  rather than failing the command. Row counts are deliberately absent — efmesh
+  never runs an extra query to count rows. The instrumentation layer is Effect's
+  own `Metric` registry (SPEC §10.1), so a library embedder reads the same facts
+  with `Metric.snapshot`, and lifecycle events (#29) would attach at the same
+  points rather than growing a second bus.
+
 ## [0.3.2] — 2026-07-18
 
 ### Fixed

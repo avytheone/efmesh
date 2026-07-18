@@ -15,7 +15,14 @@ import type { StateError, StateStoreShape } from "../state/store.ts"
 import { Metric } from "effect"
 import { checkContract, SchemaMismatchError } from "./contract.ts"
 import { FINGERPRINT_VERSION } from "./fingerprint.ts"
-import { auditFailuresTotal, intervalsDone, snapshotsBuilt } from "./metrics.ts"
+import {
+  auditFailuresTotal,
+  auditsPassed,
+  intervalsDone,
+  intervalsFailed,
+  modelBuildSeconds,
+  snapshotsBuilt,
+} from "./metrics.ts"
 import {
   ducklakeAttachSql,
   ducklakeRef,
@@ -205,7 +212,10 @@ const runAudits = (
       const violations = yield* engine.query(
         render(auditDef.fragment, { resolveRef: (ref) => ref, self }),
       )
-      if (violations.length === 0) continue
+      if (violations.length === 0) {
+        yield* Metric.update(auditsPassed, 1)
+        continue
+      }
       if (auditDef.blocking) {
         yield* Metric.update(auditFailuresTotal, 1)
         return yield* new AuditFailure({
@@ -302,7 +312,9 @@ const backfillIntoTable = (
         )
         yield* logSql(body)
         const markFailed = () =>
-          store.markIntervals(action.fingerprint, marks, "failed").pipe(Effect.ignore)
+          store
+            .markIntervals(action.fingerprint, marks, "failed")
+            .pipe(Effect.andThen(Metric.update(intervalsFailed, marks.length)), Effect.ignore)
         yield* transactional(engine, [
           `DELETE FROM ${target} WHERE ${quoteIdent(kind.timeColumn)} >= ${start} AND ${quoteIdent(kind.timeColumn)} < ${end}`,
           `INSERT INTO ${target} (${columns}) SELECT ${columns} FROM (${body}) q`,
@@ -359,7 +371,9 @@ const backfillIntoParquet = (
           yield* logSql(body)
           const mark = [{ startTs: toIso(interval.start), endTs: toIso(interval.end) }]
           const markFailed = () =>
-            store.markIntervals(action.fingerprint, mark, "failed").pipe(Effect.ignore)
+            store
+              .markIntervals(action.fingerprint, mark, "failed")
+              .pipe(Effect.andThen(Metric.update(intervalsFailed, 1)), Effect.ignore)
           // locally COPY writes to a temp file, rename is atomic (POSIX): a kill
           // mid-write leaves no broken partition, and a lookback recompute does
           // not hand the view reader an unfinished file; s3 — direct write
@@ -748,7 +762,9 @@ export const applyPlan = (
         const startedAt = yield* Clock.currentTimeMillis
         yield* Effect.logInfo("build start")
         yield* buildOne(action).pipe(attachModel(action.name))
-        yield* Effect.logInfo(`build done in ${(yield* Clock.currentTimeMillis) - startedAt} ms`)
+        const elapsed = (yield* Clock.currentTimeMillis) - startedAt
+        yield* Effect.logInfo(`build done in ${elapsed} ms`)
+        yield* Metric.update(modelBuildSeconds, elapsed / 1000)
         yield* Metric.update(snapshotsBuilt, 1)
         yield* Deferred.succeed(gates.get(action.name)!, undefined)
       }).pipe(
@@ -756,6 +772,13 @@ export const applyPlan = (
         // line the build emits (SQL at debug, backfill progress at info), so a
         // machine reader can group them without parsing the message text (#14)
         Effect.annotateLogs({ model: action.name, env: plan.env, change: action.change }),
+        // the same scope for metrics: every counter updated while building this
+        // model carries model/env, so an operator alerts per model without a
+        // second accounting path (#39)
+        Effect.provideService(Metric.CurrentMetricAttributes, {
+          model: action.name,
+          env: plan.env,
+        }),
       )
 
     // working is in topological order, and forEach starts elements in order —

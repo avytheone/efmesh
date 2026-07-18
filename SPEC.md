@@ -604,6 +604,44 @@ The target version is **Effect v4**: one `effect` package, services via
 surface is laid on the stable subset (Effect/Layer/Schema/Stream/
 Schedule/Metric/Scope), with point adaptations — at the finalization of v4.
 
+### 10.1 Instrumentation: one layer, several outputs
+
+A deployment that alerts treats a silent process as a defect, so efmesh has to
+be observable without a wrapper around it (#39). The rule that keeps this from
+sprawling: **facts are produced in exactly one place and read by many.**
+
+That place is Effect's own `Metric` registry — the instrumentation points in
+`plan/metrics.ts` that the executor updates as it works. Attributes come from
+the scope rather than the call site: the executor puts `model`/`env` into
+`Metric.CurrentMetricAttributes` around a model's build, exactly as it does with
+log annotations, so an event lands in exactly one series and `sum()` over a
+metric name stays correct.
+
+Everything else is a consumer of that registry, never a second accounting path:
+
+- **the scrape file** (`observe/openmetrics.ts`) — `--metrics <path>` on `apply`
+  and `run` renders the registry as Prometheus text exposition format, the
+  dialect node_exporter's textfile collector parses. Written to a temp file and
+  renamed, because a scraper reads on its own schedule with no lock between us
+  and half a file is a parse error on their side. Deliberately without
+  OpenMetrics' trailing `# EOF`: strict parsers accept the file either way,
+  while the textfile collector rejects the marker;
+- **lifecycle events** (#29, unbuilt) — a sink attaching at the same points,
+  not a bus of its own;
+- **`--json` payloads** — the third consumer, already built.
+
+A command records its outcome even when it did nothing: staleness alerting
+(`time() - efmesh_last_run_timestamp_seconds`) needs the timestamp to advance
+whenever the command *ran*, and a tick that ran and found no work is a different
+fact from a tick that never fired. An unwritable metrics path is a warning, not
+a failure — the warehouse is fine, only the observability is not.
+
+Deliberately absent in v1: rows written. efmesh never runs an extra query to
+count rows, and the engine adapter's `execute` returns no affected-row count, so
+the honest answer is to expose nothing rather than a number that means something
+else. A long-lived `/metrics` endpoint for the schedule daemon is v2 (#29's
+trigger is the same).
+
 ---
 
 ## 11. CLI
