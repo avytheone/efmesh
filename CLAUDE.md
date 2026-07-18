@@ -19,7 +19,13 @@ Where things are decided:
   §14 holds open questions with their current verdicts. Substantive design
   decisions land here, not in chat history.
 - GitHub Issues + milestones — operational planning. One issue = one
-  shippable concern; commits close them with `closes #N`.
+  shippable concern; commits close them with `closes #N`. **A milestone is
+  named by its theme, never by a version** (`dogfood: onto`, not
+  `0.4.0 — dogfood: onto`): it groups work, while a version is assigned at
+  release time by the policy in SPEC §11.1. One milestone may span several
+  releases and one release may draw from several milestones — the two were
+  only ever aligned by habit. (The closed `0.2.0`/`0.3.0` milestones keep their
+  names: they did ship as those versions, and that is a true record.)
 - `CHANGELOG.md` — Keep a Changelog. User-visible changes only. Which release
   a change belongs in is the versioning policy, SPEC §11.1 — while the major
   is `0`, SemVer alone decides nothing.
