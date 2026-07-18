@@ -30,6 +30,17 @@ export interface ModelManifest {
     readonly latestInterval: string | null
     readonly failedIntervals: number
   }
+  /**
+   * The declared limits narrowed by every ancestor (#43). Optional: manifests
+   * written before this field existed carry only the declared half, and a
+   * client that refused them would be refusing documents it used to read.
+   */
+  readonly effective?: {
+    readonly answerable: "full" | "sampled" | "unobservable"
+    readonly caveats: ReadonlyArray<{ readonly model: string; readonly text: string }>
+    readonly completeThrough: string | null
+    readonly limitedBy: string | null
+  }
   readonly redacted: ReadonlyArray<string>
 }
 
@@ -113,6 +124,12 @@ export const registerModel = async (
  * The limits of trust that came with the data (#43). A client that renders a
  * number should render this beside it — that is the entire point of carrying
  * the passport in the same document as the file list.
+ *
+ * Reports the EFFECTIVE limits when the manifest carries them: a model whose
+ * source is sampled is sampled, whatever it says about itself, and a client
+ * shown the declared value alone would present a narrower claim than the data
+ * supports. Older manifests have only the declared half, and those degrade to
+ * exactly what this helper used to return.
  */
 export const passportOf = (
   manifest: ModelManifest,
@@ -120,14 +137,26 @@ export const passportOf = (
   readonly answerable: ModelManifest["answerable"]
   readonly caveats: ReadonlyArray<string>
   readonly completeThrough: string | null
+  /** Which model bounds `completeThrough`; null when nothing does, or on an older manifest. */
+  readonly limitedBy: string | null
   readonly hasGaps: boolean
 } => ({
-  answerable: manifest.answerable,
-  caveats: manifest.caveats,
-  completeThrough: manifest.freshness.contiguousThrough,
+  answerable: manifest.effective?.answerable ?? manifest.answerable,
+  caveats:
+    manifest.effective === undefined
+      ? manifest.caveats
+      : manifest.effective.caveats.map((caveat) =>
+          caveat.model === manifest.model ? caveat.text : `${caveat.text} [from ${caveat.model}]`,
+        ),
+  completeThrough: manifest.effective?.completeThrough ?? manifest.freshness.contiguousThrough,
+  limitedBy: manifest.effective?.limitedBy ?? null,
   // a gap means the tail exists but the middle does not: a total over the whole
-  // range would silently omit rows, so a client must not present it as complete
+  // range would silently omit rows, so a client must not present it as complete.
+  // An ancestor's limit counts too — this model's own intervals can be gapless
+  // and still cover a range its source never filled.
   hasGaps:
     manifest.freshness.contiguousThrough !== manifest.freshness.latestInterval ||
-    manifest.freshness.failedIntervals > 0,
+    manifest.freshness.failedIntervals > 0 ||
+    (manifest.effective !== undefined &&
+      manifest.effective.completeThrough !== manifest.freshness.contiguousThrough),
 })

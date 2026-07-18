@@ -3,7 +3,8 @@ import { Effect, Layer, Schema } from "effect"
 import { defineExternal, defineModel, external, kind } from "../src/core/model.ts"
 import { Efmesh } from "../src/efmesh.ts"
 import { DuckDBEngineLive } from "../src/engine/duckdb.ts"
-import { buildManifest, freshnessOf, MANIFEST_VERSION } from "../src/plan/manifest.ts"
+import { buildManifest, MANIFEST_VERSION } from "../src/plan/manifest.ts"
+import { freshnessOf } from "../src/plan/passport.ts"
 import { redactModel } from "../src/plan/redact.ts"
 import { SqliteStateLive } from "../src/state/sqlite.ts"
 import { fetchManifest, passportOf, SUPPORTED_MANIFEST_VERSION } from "../src/browser/index.ts"
@@ -33,6 +34,14 @@ const model = defineModel(
   (ctx) => ctx.sql`SELECT ${ctx.cols(raw, "id", "at", "secret")} FROM ${ctx.ref(raw)}`,
 )
 
+/** A passport with nothing to inherit — the DAG walk has its own tests below. */
+const SELF_ONLY = {
+  answerable: "full",
+  caveats: [],
+  completeThrough: null,
+  limitedBy: null,
+} as const
+
 describe("manifest format (#41)", () => {
   test("the document is frozen", () => {
     expect(
@@ -46,6 +55,12 @@ describe("manifest format (#41)", () => {
         ],
         failed: 0,
         generatedAt: "2026-01-03T00:00:00.000Z",
+        effective: {
+          answerable: "sampled",
+          caveats: [{ model: "core.events", text: "observation starts on 2026-01-01" }],
+          completeThrough: "2026-01-03T00:00:00.000Z",
+          limitedBy: "core.events",
+        },
         redacted: ["secret"],
       }),
     ).toEqual({
@@ -72,6 +87,12 @@ describe("manifest format (#41)", () => {
         latestInterval: "2026-01-03T00:00:00.000Z",
         failedIntervals: 0,
       },
+      effective: {
+        answerable: "sampled",
+        caveats: [{ model: "core.events", text: "observation starts on 2026-01-01" }],
+        completeThrough: "2026-01-03T00:00:00.000Z",
+        limitedBy: "core.events",
+      },
       redacted: ["secret"],
     })
   })
@@ -84,6 +105,7 @@ describe("manifest format (#41)", () => {
       done: [],
       failed: 0,
       generatedAt: "2026-01-01T00:00:00.000Z",
+      effective: SELF_ONLY,
       redacted: [],
     })
     expect(manifest.schema.map((column) => column.type)).toEqual(["text", "temporal", "text"])
@@ -101,6 +123,7 @@ describe("manifest format (#41)", () => {
       done: [],
       failed: 0,
       generatedAt: "2026-01-01T00:00:00.000Z",
+      effective: SELF_ONLY,
       redacted: [],
     })
     expect(manifest.answerable).toBe("full")

@@ -232,6 +232,7 @@ export default defineConfig({
 | `efmesh restate <env> --model m --from t --to t` | replay a past range for a model and its descendants; `--dry-run`, `--json` |
 | `efmesh status <env>` | what is going on: last plan, interval lag, recent run ticks; `--json`, `--check` |
 | `efmesh audit <env>` | audit the environment's view layer — catches after-the-fact degradation |
+| `efmesh passport <env>` | what the environment's data can be trusted to answer; `--json` |
 | `efmesh diff <envA> <envB>` | how two environments differ; `--data` compares the actual data |
 | `efmesh render <model> [--env] [--json]` | the final SQL of a model |
 | `efmesh lineage <model[.col]> [--json]` | column lineage down to the raw sources |
@@ -262,8 +263,8 @@ history). `--dry-run` prints what would be recomputed and changes nothing;
 `--json` for CI.
 
 Every command with something to report speaks `--json` — `plan`, `apply`,
-`run`, `audit`, `status`, `diff`, `graph`, `janitor`, `compact`, `migrate`,
-`lineage`, `render` and `schedule --list` — a stable machine-readable shape (a contract
+`run`, `audit`, `status`, `passport`, `diff`, `graph`, `janitor`, `compact`,
+`migrate`, `lineage`, `render` and `schedule --list` — a stable machine-readable shape (a contract
 under semver) for CI and bots; exit codes are unchanged, stdout stays pure
 JSON (logs go to stderr). `apply --json` returns `{env, applied, plan, built,
 promoted}` and `run --json` returns `{env, outcome, processed, blockedBy?}` —
@@ -438,6 +439,8 @@ A parquet materialization writes a `manifest.json` beside each version:
   "answerable": "sampled",
   "caveats": ["observation starts on 2026-03-01"],
   "freshness": { "contiguousThrough": "…", "latestInterval": "…", "failedIntervals": 0 },
+  "effective": { "answerable": "sampled", "caveats": [{ "model": "raw.events", "text": "…" }],
+                 "completeThrough": "…", "limitedBy": "raw.events" },
   "redacted": []
 }
 ```
@@ -455,7 +458,7 @@ const manifest = await fetchManifest(url)
 const relation = await registerModel(db, url, manifest)     // read_parquet([...], union_by_name = true)
 await connection.query(`SELECT count(*) FROM ${relation}`)
 
-passportOf(manifest)   // { answerable, caveats, completeThrough, hasGaps }
+passportOf(manifest)   // { answerable, caveats, completeThrough, limitedBy, hasGaps }
 ```
 
 It is a subpath, not a separate package, on purpose: the helper and the format
@@ -467,7 +470,45 @@ no Effect, no DuckDB bindings, no node builtins.
 `contiguousThrough` stops at the first gap even when later intervals exist, so a
 client cannot present a partial total as complete. `answerable` and `caveats` are
 yours to declare on the model — the limits of trust travel with the data instead
-of living in someone's dashboard note.
+of living in someone's dashboard note. `effective` is that passport narrowed by
+the model's ancestry; see below.
+
+## The answer honesty passport
+
+A schema contract says what a column *is*. The passport says what an answer may
+be **believed** — the thing a consumer actually needs before rendering a number.
+
+```ts
+defineModel({
+  name: "mart.stays",
+  answerable: "sampled",
+  caveats: ["observation starts on 2026-03-01 — earlier stays are partly visible"],
+  // …
+})
+```
+
+Freshness is not yours to declare: it comes from the interval ledger, because a
+hand-maintained badge drifts from the data the moment one backfill fails.
+
+Both halves then travel the DAG, which is the part a hand-written convention
+always gets wrong. A mart whose source is complete only through Tuesday is
+complete only through Tuesday, whatever its own ledger says — it computed
+Wednesday over data that was not there yet. So the effective passport is the
+worst value over the model and its ancestors, and it names the one that imposed
+the limit:
+
+```console
+$ efmesh passport dev
+environment "dev": what its data can be trusted to answer
+  ✓ med.moves  full, complete through 2026-07-18T00:00:00.000Z
+  ~ mart.stays  sampled — declared full, complete through 2026-07-17T00:00:00.000Z (limited by med.moves)
+      · observation starts on 2026-03-01 [from raw.moves]
+```
+
+`--json` carries `declared` and `effective` side by side: a client renders the
+effective value, and a human debugging why it degraded needs the difference.
+Read it for every model an environment serves — not only the parquet ones, which
+are the only models a `manifest.json` can reach.
 
 ## Redacted environments
 

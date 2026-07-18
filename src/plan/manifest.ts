@@ -1,10 +1,13 @@
 import { renameSync, writeFileSync } from "node:fs"
 import { Clock, Effect } from "effect"
-import { fromIso, mergeIntervals, toIso } from "../core/interval.ts"
-import type { AnyModel } from "../core/model.ts"
+import type { ModelGraph } from "../core/graph.ts"
+import { toIso } from "../core/interval.ts"
+import type { AnyModel, Answerable } from "../core/model.ts"
 import { columnNames } from "../core/model.ts"
 import type { StateStoreShape } from "../state/store.ts"
 import { familyOfAst } from "./contract.ts"
+import type { EffectivePassport, ManifestFreshness } from "./passport.ts"
+import { freshnessOf, passportsOver } from "./passport.ts"
 
 /**
  * The model manifest (#41): what a client needs to read a materialized model
@@ -25,23 +28,6 @@ import { familyOfAst } from "./contract.ts"
  * badge drifts, the ledger cannot.
  */
 
-/** How much of the question this model's data can answer (#43). */
-export type Answerable = "full" | "sampled" | "unobservable"
-
-export interface ManifestFreshness {
-  /**
-   * End of contiguous coverage from the model's start: the point up to which
-   * the data is known to be complete. A gap in the middle stops the clock here
-   * even when later intervals exist — which is the honest reading, and stricter
-   * than "the newest interval we happen to have".
-   */
-  readonly contiguousThrough: string | null
-  /** The newest interval end that exists at all; equals contiguousThrough when there are no gaps. */
-  readonly latestInterval: string | null
-  /** Intervals that ran and failed — data that is missing on purpose, not merely absent. */
-  readonly failedIntervals: number
-}
-
 export interface Manifest {
   readonly manifestVersion: number
   readonly model: string
@@ -50,9 +36,22 @@ export interface Manifest {
   readonly intervals: ReadonlyArray<{ readonly start: string; readonly end: string }>
   readonly schema: ReadonlyArray<{ readonly name: string; readonly type: string }>
   readonly files: ReadonlyArray<string>
+  /** As DECLARED on this model — what its author claims about it alone. */
   readonly answerable: Answerable
   readonly caveats: ReadonlyArray<string>
+  /** From this model's OWN ledger — what it computed, not what it may claim. */
   readonly freshness: ManifestFreshness
+  /**
+   * What the DAG permits (#43): the declared values narrowed by every ancestor,
+   * plus the ancestor that narrowed them. Additive, so a manifest written before
+   * this field existed still parses — a client falls back to the declared half,
+   * which is what it read anyway.
+   *
+   * The declared fields are kept beside it rather than overwritten: "this model
+   * claims full, its source makes it sampled" is a diagnosis, and collapsing the
+   * two into one number throws it away.
+   */
+  readonly effective: EffectivePassport
   /** Columns this materialization deliberately omits (§ redacted materialization). */
   readonly redacted: ReadonlyArray<string>
 }
@@ -62,29 +61,6 @@ export interface Manifest {
  * it — a client pins on this the way CI pins on `apiVersion`.
  */
 export const MANIFEST_VERSION = 1
-
-/**
- * Freshness from the ledger. `contiguousThrough` walks merged done-intervals
- * from the earliest one and stops at the first gap: coverage a consumer can
- * trust is the prefix, not the maximum.
- */
-export const freshnessOf = (
-  done: ReadonlyArray<{ readonly startTs: string; readonly endTs: string }>,
-  failed: number,
-): ManifestFreshness => {
-  if (done.length === 0) {
-    return { contiguousThrough: null, latestInterval: null, failedIntervals: failed }
-  }
-  const sorted = [...done]
-    .map((row) => ({ start: fromIso(row.startTs), end: fromIso(row.endTs) }))
-    .sort((a, b) => a.start - b.start)
-  const merged = mergeIntervals(sorted)
-  return {
-    contiguousThrough: toIso(merged[0]!.end),
-    latestInterval: toIso(Math.max(...sorted.map((interval) => interval.end))),
-    failedIntervals: failed,
-  }
-}
 
 /**
  * Column types as TYPE FAMILIES — the same vocabulary the schema contract
@@ -105,6 +81,12 @@ export const buildManifest = (options: {
   readonly done: ReadonlyArray<{ readonly startTs: string; readonly endTs: string }>
   readonly failed: number
   readonly generatedAt: string
+  /**
+   * Required, not defaulted: a manifest that quietly carried a DAG-blind
+   * passport because a caller forgot to compute one would be exactly the
+   * dishonest document this field exists to prevent.
+   */
+  readonly effective: EffectivePassport
   readonly redacted: ReadonlyArray<string>
 }): Manifest => ({
   manifestVersion: MANIFEST_VERSION,
@@ -121,6 +103,7 @@ export const buildManifest = (options: {
   answerable: options.model.answerable ?? "full",
   caveats: options.model.caveats ?? [],
   freshness: freshnessOf(options.done, options.failed),
+  effective: options.effective,
   redacted: [...options.redacted].sort(),
 })
 
@@ -137,20 +120,43 @@ export const writeManifest = (path: string, manifest: Manifest): Effect.Effect<v
     renameSync(temporary, path)
   })
 
+/**
+ * `fingerprints` covers the whole plan, not just this model: the effective
+ * passport is a property of the model's ancestry, so writing it needs every
+ * ancestor's ledger. Reading them again per manifest is a handful of indexed
+ * lookups against a store the apply already holds open — cheap next to the
+ * parquet write it follows, and it keeps the manifest a function of state at the
+ * moment of publication rather than of whatever was cached earlier in the apply.
+ */
 export const manifestFor = (options: {
   readonly store: StateStoreShape
+  readonly graph: ModelGraph
   readonly model: AnyModel
   readonly fingerprint: string
+  readonly fingerprints: ReadonlyArray<{ readonly name: string; readonly fingerprint: string }>
   readonly files: ReadonlyArray<string>
   readonly redacted: ReadonlyArray<string>
 }): Effect.Effect<Manifest, never, never> =>
   Effect.gen(function* () {
-    const ledger = yield* options.store
-      .listIntervals(options.fingerprint)
-      .pipe(Effect.orElseSucceed(() => []))
+    const ledgerOf = (fingerprint: string) =>
+      options.store.listIntervals(fingerprint).pipe(Effect.orElseSucceed(() => []))
+    const own = new Map<string, ManifestFreshness>()
+    for (const entry of options.fingerprints) {
+      const rows = yield* ledgerOf(entry.fingerprint)
+      own.set(
+        entry.name,
+        freshnessOf(
+          rows.filter((row) => row.status === "done"),
+          rows.filter((row) => row.status === "failed").length,
+        ),
+      )
+    }
+    const ledger = yield* ledgerOf(options.fingerprint)
     const done = ledger.filter((row) => row.status === "done")
     const failed = ledger.filter((row) => row.status === "failed")
     const generatedAt = toIso(yield* Clock.currentTimeMillis)
+    // invariant: the model being materialized comes from this same graph
+    const passport = passportsOver(options.graph, own).get(options.model.name.full)!
     return buildManifest({
       model: options.model,
       fingerprint: options.fingerprint,
@@ -158,6 +164,7 @@ export const manifestFor = (options: {
       done,
       failed: failed.length,
       generatedAt,
+      effective: passport.effective,
       redacted: options.redacted,
     })
   })

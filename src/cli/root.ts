@@ -7,6 +7,7 @@ import { initCommand } from "./commands/init.ts"
 import { janitorCommand } from "./commands/janitor.ts"
 import { lineageCommand } from "./commands/lineage.ts"
 import { migrateCommand } from "./commands/migrate.ts"
+import { passportCommand } from "./commands/passport.ts"
 import { applyCommand, planCommand } from "./commands/plan-apply.ts"
 import { renderCommand } from "./commands/render.ts"
 import { restateCommand } from "./commands/restate.ts"
@@ -22,7 +23,7 @@ export const rootCommand = Command.make("efmesh").pipe(
     "sqlmesh on bun, typescript and Effect\n\n" +
       "Exit codes: 0 = ok, 1 = error, 2 = awaiting a human (non-TTY apply without --yes, " +
       "or run hitting unapplied changes). Full table: README § Exit codes.\n" +
-      "plan/apply/audit/status/diff/janitor/compact/migrate/lineage/render/schedule --list take --json " +
+      "plan/apply/audit/status/passport/diff/janitor/compact/migrate/lineage/render/schedule --list take --json " +
       "(stable shapes for CI and agents).",
   ),
   Command.withSubcommands([
@@ -36,6 +37,7 @@ export const rootCommand = Command.make("efmesh").pipe(
     renderCommand,
     graphCommand,
     lineageCommand,
+    passportCommand,
     diffCommand,
     scheduleCommand,
     janitorCommand,

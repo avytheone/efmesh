@@ -220,6 +220,52 @@ declared fields, marts are clean by construction and the policy shrinks to that
 single model. A full per-column policy over arbitrary models is a possible
 extension, not v1.
 
+### 3.5 The answer honesty passport
+
+A schema contract says what a column *is*. The passport says what an answer may
+be *believed*, which is the harder and rarer contract — and the one a consumer
+actually needs before rendering a number. It has two halves with different
+provenance, and both then travel the DAG.
+
+**Declared** — `answerable` (`full` | `sampled` | `unobservable`) and `caveats`,
+written on the model. These state limits no query can discover for itself
+("observation starts on 2026-01-01; earlier admissions are only partly visible,
+so the median is biased down"). They are documentation: changing them
+re-fingerprints nothing.
+
+**Derived** — freshness, from the interval ledger, never declared. A
+hand-maintained badge drifts from the data the moment one backfill fails; the
+ledger cannot.
+
+**Both are narrowed by the ancestry**, which is the part a hand-written
+convention always gets wrong. A mart whose source is complete only through
+Tuesday is itself complete only through Tuesday, whatever its own ledger says —
+it computed Wednesday over data that was not there yet. So the *effective*
+passport is the worst value over the model and all its ancestors, and it names
+the model that imposed the limit: "stale" without "because of whom" is a puzzle,
+not an answer. The declared values are reported beside the effective ones rather
+than replaced by them — "this model claims `full`, its source makes it `sampled`"
+is a diagnosis, and collapsing the two throws it away.
+
+Two rules keep the derivation honest:
+
+- **Only a time-range model carries a coverage claim of its own.** A
+  full-refresh model has no intervals and is not thereby incomplete; it is
+  exactly as complete as what it reads. Giving it a null limit would invent a
+  staleness that does not exist and poison every descendant with it.
+- **Two different nulls.** `completeThrough: null` with a `limitedBy` means that
+  model has computed nothing yet. `completeThrough: null` with `limitedBy: null`
+  means nothing in the subgraph has time-range semantics at all — there is no
+  freshness claim to make, which a client must not render as staleness.
+
+The passport reaches consumers two ways: in `manifest.json` under `effective`
+(additive — a manifest written before the field existed still parses, and a
+client falls back to the declared half), and through `efmesh passport <env>
+[--json]`, which reports it for *every* model an environment serves rather than
+only the parquet ones. It reads through the environment's promoted pointers, not
+the project's local fingerprints, for the same reason `status` does: a consumer
+queries the view, so the honest passport describes the physics behind that view.
+
 ---
 
 ## 4. Snapshots and fingerprint

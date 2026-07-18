@@ -3,6 +3,7 @@ import type { ModelGraph } from "../core/graph.ts"
 import type { CompactReport } from "../plan/compact.ts"
 import type { JanitorReport } from "../plan/janitor.ts"
 import type { LineageNode } from "../plan/lineage.ts"
+import type { PassportReport } from "../plan/passport.ts"
 import type { Plan } from "../plan/planner.ts"
 import type { RestatePlan } from "../plan/restate.ts"
 import type { StatusReport } from "../plan/status.ts"
@@ -121,6 +122,39 @@ export const statusToJson = (report: StatusReport): unknown => ({
     finishedAt: tick.finishedAt,
     outcome: tick.outcome,
     detail: parseDetail(tick.detail),
+  })),
+})
+
+/**
+ * `passport --json` (#43): what a consumer may believe about each model an
+ * environment serves. `declared` is what the model's author claims about it
+ * alone; `effective` is that claim narrowed by every ancestor, with the
+ * ancestor that narrowed it named. Both are on the wire on purpose — a client
+ * that renders a number needs the effective value, and a human debugging why it
+ * degraded needs the difference.
+ */
+export const passportToJson = (report: PassportReport): unknown => ({
+  env: report.env,
+  models: report.models.map((passport) => ({
+    model: passport.model,
+    declared: {
+      answerable: passport.declared.answerable,
+      caveats: passport.declared.caveats,
+    },
+    freshness: {
+      contiguousThrough: passport.freshness.contiguousThrough,
+      latestInterval: passport.freshness.latestInterval,
+      failedIntervals: passport.freshness.failedIntervals,
+    },
+    effective: {
+      answerable: passport.effective.answerable,
+      caveats: passport.effective.caveats.map((caveat) => ({
+        model: caveat.model,
+        text: caveat.text,
+      })),
+      completeThrough: passport.effective.completeThrough,
+      limitedBy: passport.effective.limitedBy,
+    },
   })),
 })
 

@@ -352,6 +352,8 @@ const backfillIntoTable = (
  */
 const publishManifest = (
   store: StateStoreShape,
+  graph: ModelGraph,
+  fingerprints: ReadonlyArray<{ readonly name: string; readonly fingerprint: string }>,
   model: AnyModel,
   action: PlanAction,
   prefix: string,
@@ -367,6 +369,8 @@ const publishManifest = (
     }).pipe(Effect.orElseSucceed(() => []))
     const manifest = yield* manifestFor({
       store,
+      graph,
+      fingerprints,
       model,
       fingerprint: action.fingerprint,
       files,
@@ -463,6 +467,10 @@ export const applyPlan = (
     // a model's physics — what its consumers and the environment views will
     // see; the key is physicalFingerprint: under forward-only it is the old version's physics
     const physicalFpOf = new Map(plan.actions.map((a) => [a.name, a.physicalFingerprint]))
+    // the ledger is keyed by the LOGICAL fingerprint, so this is the map a
+    // manifest's effective passport walks — it needs every ancestor, not just
+    // the models this apply happens to rebuild
+    const ledgerFpOf = plan.actions.map((a) => ({ name: a.name, fingerprint: a.fingerprint }))
     const physicalFor = (model: AnyModel, fingerprint: string): string => {
       if (model.kind._tag === "external") return externalSourceRef(model.kind.source)
       // embedded is not materialized — it is inlined into the consumer as a
@@ -692,7 +700,15 @@ export const applyPlan = (
               yield* engine.execute(
                 `COPY (${body}) TO '${prefix.replaceAll(`'`, `''`)}/data.parquet' (FORMAT PARQUET)`,
               )
-              yield* publishManifest(store, model, action, prefix, options?.redacted === true)
+              yield* publishManifest(
+                store,
+                graph,
+                ledgerFpOf,
+                model,
+                action,
+                prefix,
+                options?.redacted === true,
+              )
             } else {
               const target = tableRef(model, action.physicalFingerprint)
               if (model.kind._tag === "view") {
@@ -755,7 +771,15 @@ export const applyPlan = (
                 resolveRef,
                 options?.retry,
               )
-              yield* publishManifest(store, model, action, prefix, options?.redacted === true)
+              yield* publishManifest(
+                store,
+                graph,
+                ledgerFpOf,
+                model,
+                action,
+                prefix,
+                options?.redacted === true,
+              )
             } else {
               // an empty skeleton with the query's shape; on resume it already exists
               const target = tableRef(model, action.physicalFingerprint)

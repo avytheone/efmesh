@@ -8,6 +8,34 @@ the first version gathers them in full.
 
 ## [Unreleased]
 
+### Added
+
+- **The answer honesty passport travels the DAG** (#43). `answerable` and
+  `caveats` were already declared on a model and passed through to its manifest;
+  they now describe an *answer* rather than a table. A model's effective limits
+  are the worst over itself and all of its ancestors, and the passport names the
+  ancestor that imposed them: a mart whose source is complete only through
+  Tuesday is complete only through Tuesday, whatever its own interval ledger
+  says, because it computed Wednesday over data that was not there yet. The
+  declared values are reported beside the effective ones — "claims `full`, its
+  source makes it `sampled`" is a diagnosis, and collapsing them throws it away.
+  Freshness stays derived from the ledger and is never declared.
+- `efmesh passport <env> [--json]` — the limits of trust an environment's data
+  carries, for *every* model it serves. Until now the passport reached only
+  parquet models, through their `manifest.json`; a table-target model had no way
+  to state what may be believed about it.
+- `manifest.json` gains an `effective` block (the DAG-narrowed passport plus the
+  model that limits it). Additive, so `MANIFEST_VERSION` stays 1 and a client
+  reading a manifest written by 0.4.0 keeps working; `passportOf` in the
+  `efmesh/browser` helper now reports the effective values when they are present
+  and falls back to the declared half when they are not.
+
+### Fixed
+
+- `Answerable` was declared twice — once in the model API, once in the manifest
+  module. The two happened to be identical, so nothing ever broke; a contract
+  type with two definitions is one careless edit away from breaking silently.
+
 ## [0.4.0] — 2026-07-18
 
 ### Fixed

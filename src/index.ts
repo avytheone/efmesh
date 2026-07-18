@@ -175,4 +175,16 @@ export {
 // — intervals: bounds for options.now and report parsing —
 export { fromIso, toIso, type Interval, type IntervalUnit } from "./core/interval.ts"
 
-export { MANIFEST_VERSION, type Manifest, type ManifestFreshness } from "./plan/manifest.ts"
+export { MANIFEST_VERSION, type Manifest } from "./plan/manifest.ts"
+
+// — the answer honesty passport (#43): declared limits, derived freshness, both
+// narrowed by the DAG —
+export {
+  environmentPassport,
+  freshnessOf,
+  type EffectivePassport,
+  type ManifestFreshness,
+  type ModelPassport,
+  type PassportCaveat,
+  type PassportReport,
+} from "./plan/passport.ts"
