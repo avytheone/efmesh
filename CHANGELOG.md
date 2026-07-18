@@ -8,6 +8,8 @@ the first version gathers them in full.
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-07-18
+
 ### Added
 
 - **The answer honesty passport travels the DAG** (#43). `answerable` and
