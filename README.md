@@ -66,7 +66,7 @@ Honestly placed: the **core** is the same class of system as sqlmesh — snapsho
 
 **Plans and versions.** Fingerprints over canonical ASTs (reformatting SQL never triggers a rebuild — frozen by golden tests), change categorization breaking / non-breaking / indirect / forward-only with `plan --explain` reasoning and a `--reclassify` operator override, indirect physics reuse (descendants of a non-breaking change are not rebuilt — scdType2 keeps its history), `--forward-only` applies a change without replaying history (the new version inherits physical storage and done-intervals; new columns via `ALTER`), plan confirmation in a TTY, an applied-plans journal with `applied_by`.
 
-**Data quality.** A schema contract before every build (`DESCRIBE` of the query against the declared Schema), `notNull` / `unique` / `accepted` audits (blocking fails the apply, `warn` logs), a standalone `efmesh audit` over an environment's view layer, and `testModel` — unit tests for models on fixtures in in-memory DuckDB.
+**Data quality.** A schema contract before every build (`DESCRIBE` of the query against the declared Schema), `notNull` / `unique` / `accepted` audits (blocking fails the apply, `warn` logs), a declared scope so an audit means the same thing to `apply` and to the standalone `efmesh audit` over an environment's view layer, and `testModel` — unit tests for models on fixtures in in-memory DuckDB.
 
 **Operations.** `run` — an idempotent scheduler tick for cron/systemd; `apply` and `run` of an environment share one cross-process lock (stale locks of crashed processes are reclaimed by ttl); DAG concurrency `--jobs` (a model starts as soon as its parents are ready); batch retries `--retries`; a janitor for orphaned physical storage (removal is a transactional claim — the race against a concurrent apply is closed); `efmesh compact` for the small files a micro-batch writer leaves in a settled partition; `--metrics <path>` writes an OpenMetrics file node_exporter scrapes without a wrapper; a versioned state-store schema + `efmesh migrate` (with a store file backup).
 
@@ -135,6 +135,19 @@ test("stays", () =>
 ```
 
 The declared `schema` is a contract, not documentation: before every build efmesh runs `DESCRIBE` on the query and fails with `SchemaMismatchError` if column names or types diverge. NULL guarantees are expressed with the `notNull` audit.
+
+An audit is evaluated at two different scopes: `apply` checks the interval it just wrote, `efmesh audit` checks the whole environment view. For a row-wise predicate those agree. For an aggregate one they can disagree on correct data — uniqueness that holds inside every written interval and legitimately fails across the table is exactly what a de-duplication window produces. Say which you meant:
+
+```ts
+audits: [
+  // a windowed guarantee: true of each interval, not of the table
+  audit.perInterval(audit.unique("event_id")),
+  // a cross-interval invariant: checked before promotion, never against a slice
+  audit.whole(audit.unique("case_id", "valid_from")),
+]
+```
+
+`efmesh audit` reports a `perInterval` audit as skipped rather than answering a question it was never asked, so a clean run is not mistaken for full coverage. An unscoped audit runs everywhere, which is what audits did before scopes existed. One edge: the interval pass audits the batch as rendered, and with the default `batchSize` a fresh backfill is a single wide window — a model whose invariant depends on that width must pin `batchSize: 1`.
 
 ## Event-lake canonical table
 

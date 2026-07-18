@@ -34,7 +34,7 @@ export const auditCommand = Command.make(
         }
         return
       }
-      if (report.results.length === 0) {
+      if (report.results.length === 0 && report.skipped.length === 0) {
         yield* Console.log("no audits — nothing to check")
         return
       }
@@ -46,12 +46,22 @@ export const auditCommand = Command.make(
             : ""
         yield* Console.log(`  ${mark} ${result.model}  ${result.audit}${tail}`)
       }
+      // printed before the verdict, so "clean" is never read as "everything was
+      // checked" — this command sees the environment view, and a perInterval
+      // audit is about a window it cannot reconstruct (#53)
+      for (const entry of report.skipped) {
+        yield* Console.log(`  · ${entry.model}  ${entry.audit}  skipped: interval-scoped`)
+      }
       if (report.blockingViolations > 0) {
         return yield* new EnvironmentAuditError({
           env,
           blockingViolations: report.blockingViolations,
         })
       }
-      yield* Console.log(`blocking audits of environment "${env}" are clean`)
+      const caveat =
+        report.skipped.length === 0
+          ? ""
+          : ` (${report.skipped.length} interval-scoped audit(s) not checked here — apply checks those)`
+      yield* Console.log(`blocking audits of environment "${env}" are clean${caveat}`)
     }),
 ).pipe(Command.withDescription("run audits over an environment's view layer, changing nothing"))

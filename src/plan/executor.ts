@@ -209,14 +209,23 @@ const logSql = (sql: string): Effect.Effect<void> =>
  * Runs a model's audits (SPEC §8): `self` is the snapshot's physics or a
  * subquery of the just-loaded interval. The audit query returns violations:
  * blocking → AuditFailure, warn → log and continue.
+ *
+ * `scope` selects which audits belong to this pass (#53) — an interval pass
+ * must not evaluate an invariant that was only ever about the complete
+ * relation, and vice versa. `any` on either side means "no distinction here":
+ * an audit declaring it is scope-free, and a PASS declaring it is one over a
+ * kind that materializes in a single shot, where the interval and the whole
+ * relation are the same rows and every audit belongs.
  */
 const runAudits = (
   engine: Engine,
   model: AnyModel,
   self: string,
+  scope: "any" | "interval" | "whole",
 ): Effect.Effect<void, EngineError | AuditFailure> =>
   Effect.gen(function* () {
     for (const auditDef of model.audits) {
+      if (auditDef.scope !== "any" && scope !== "any" && auditDef.scope !== scope) continue
       const violations = yield* engine.query(
         render(auditDef.fragment, { resolveRef: (ref) => ref, self }),
       )
@@ -332,6 +341,7 @@ const backfillIntoTable = (
           engine,
           model,
           `(SELECT * FROM ${target} WHERE ${quoteIdent(kind.timeColumn)} >= ${start} AND ${quoteIdent(kind.timeColumn)} < ${end})`,
+          "interval",
         ).pipe(Effect.tapError(markFailed))
         yield* store.markIntervals(action.fingerprint, marks, "done")
         yield* Metric.update(intervalsDone, marks.length)
@@ -436,9 +446,12 @@ const backfillIntoParquet = (
           }
           const file = target.replaceAll(`'`, `''`)
           // audit of the written partition — before marking done; failure = not done → rewrite
-          yield* runAudits(engine, model, `(SELECT * FROM read_parquet('${file}'))`).pipe(
-            Effect.tapError(markFailed),
-          )
+          yield* runAudits(
+            engine,
+            model,
+            `(SELECT * FROM read_parquet('${file}'))`,
+            "interval",
+          ).pipe(Effect.tapError(markFailed))
           yield* store.markIntervals(action.fingerprint, mark, "done")
           yield* Metric.update(intervalsDone, 1)
         }),
@@ -563,7 +576,7 @@ export const applyPlan = (
             const body = render(model.fragment, { resolveRef })
             yield* logSql(body)
             yield* checkContract(engine, model, body)
-            yield* runAudits(engine, model, `(${body})`)
+            yield* runAudits(engine, model, `(${body})`, "any")
             yield* store.upsertSnapshot({
               name: action.name,
               fingerprint: action.fingerprint,
@@ -582,7 +595,7 @@ export const applyPlan = (
             yield* checkContract(engine, model, body)
             const target = tableRef(model, action.physicalFingerprint)
             yield* engine.execute(`CREATE OR REPLACE TABLE ${target} AS ${body}`)
-            yield* runAudits(engine, model, target)
+            yield* runAudits(engine, model, target, "any")
             yield* store.upsertSnapshot({
               name: action.name,
               fingerprint: action.fingerprint,
@@ -608,7 +621,7 @@ export const applyPlan = (
               `DELETE FROM ${target} WHERE (${keys}) IN (SELECT ${keys} FROM (${body}) q)`,
               `INSERT INTO ${target} ${body}`,
             ])
-            yield* runAudits(engine, model, target)
+            yield* runAudits(engine, model, target, "any")
             yield* store.upsertSnapshot({
               name: action.name,
               fingerprint: action.fingerprint,
@@ -660,7 +673,7 @@ export const applyPlan = (
                SELECT 1 FROM ${target} t WHERE t.${to} IS NULL AND ${sameAsOpen}
              )`,
             ])
-            yield* runAudits(engine, model, target)
+            yield* runAudits(engine, model, target, "any")
             yield* store.upsertSnapshot({
               name: action.name,
               fingerprint: action.fingerprint,
@@ -682,7 +695,7 @@ export const applyPlan = (
             // non-breaking/forward-only, own body unchanged) — the rebuild is
             // skipped, audits run against the inherited physics
             if (model.kind._tag === "full" && action.reusedFrom !== undefined) {
-              yield* runAudits(engine, model, physicalFor(model, action.physicalFingerprint))
+              yield* runAudits(engine, model, physicalFor(model, action.physicalFingerprint), "any")
               yield* store.upsertSnapshot({
                 name: action.name,
                 fingerprint: action.fingerprint,
@@ -724,7 +737,7 @@ export const applyPlan = (
               }
             }
             // audits of the built snapshot — before promotion (SPEC §8)
-            yield* runAudits(engine, model, physicalFor(model, action.physicalFingerprint))
+            yield* runAudits(engine, model, physicalFor(model, action.physicalFingerprint), "any")
             yield* store.upsertSnapshot({
               name: action.name,
               fingerprint: action.fingerprint,
@@ -859,6 +872,21 @@ export const applyPlan = (
       discard: true,
     })
     const built = working.map((action) => action.name)
+
+    // 1b. Whole-relation audits of time-range models (#53). Every other kind
+    // materializes in one shot and has already checked all of its audits; a
+    // time-range model only ever saw one interval at a time, so an invariant
+    // about the complete relation has no other moment to be checked. Before
+    // promotion, so a violation stops the environment from serving it — the
+    // same guarantee the interval audits give, at the scope they cannot reach.
+    for (const action of working) {
+      const model = graph.models.get(action.name)!
+      if (model.kind._tag !== "incrementalByTimeRange") continue
+      if (!model.audits.some((auditDef) => auditDef.scope === "whole")) continue
+      yield* runAudits(engine, model, physicalFor(model, action.physicalFingerprint), "whole").pipe(
+        attachModel(action.name),
+      )
+    }
 
     // 2. Promotion: the environment's view layer
     for (const action of plan.actions) {

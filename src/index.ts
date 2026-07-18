@@ -30,7 +30,7 @@ export {
   type ModelMaintenance,
   type ModelName,
 } from "./core/model.ts"
-export { audit, type Audit, type AuditCtx } from "./core/audit.ts"
+export { audit, type Audit, type AuditCtx, type AuditScope } from "./core/audit.ts"
 export { defineConfig, type EfmeshConfig } from "./config.ts"
 export { discoverModels, DiscoveryConflictError, DiscoveryError } from "./discovery.ts"
 
@@ -71,6 +71,7 @@ export {
   EnvironmentAuditError,
   type AuditRunReport,
   type AuditRunResult,
+  type AuditSkipped,
 } from "./plan/audit-run.ts"
 export {
   dataDiffEnvironments,

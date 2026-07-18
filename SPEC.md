@@ -578,6 +578,42 @@ freshly loaded interval. It catches after-the-fact degradation (late data,
 edits to physical storage bypassing efmesh, external drift); it changes and marks nothing,
 the report is complete, a non-zero exit on blocking violations.
 
+### 8.1 An audit's scope is declared, not inferred from who runs it
+
+Those two runners see different relations, which for years was an unstated
+ambiguity: `apply` evaluates a model's audits over the interval it just wrote,
+`efmesh audit` over the whole environment view. For a **row-wise** predicate
+(`notNull`, `accepted`) the two agree by construction — a row either violates it
+or it does not, and the neighbouring rows are irrelevant. For an **aggregate**
+one (`unique`, and anything that counts or windows) the same declaration can
+return opposite verdicts on correct data: uniqueness holds inside every written
+interval and fails across the table, which is precisely what a de-duplication
+window produces. The author had no way to say which they meant, so a correct
+model could pass every apply and exit 1 under the standalone command.
+
+Scope is therefore part of the declaration (#53):
+
+- `audit.perInterval(a)` — about one written interval. Checked by `apply`;
+  `efmesh audit` reports it as **skipped** rather than answering a question it
+  was never asked. The skip is in the report and in `--json`, so a clean run is
+  never mistaken for full coverage.
+- `audit.whole(a)` — about the complete relation. Checked **before promotion**
+  (for a time-range model, in its own pass after all intervals are written) and
+  by `efmesh audit`. Being pre-promotion matters: an environment must not serve
+  data that failed its own invariant, and an interval pass can never catch a
+  cross-interval one.
+- unscoped (the default) — scope-free, checked by every runner. This is what
+  audits did before scopes existed, so a project that says nothing is unchanged.
+  `unique` keeps this default deliberately: making it `whole` would silently
+  stop apply from checking uniqueness in existing projects.
+
+One sharp edge, worth stating rather than discovering: the interval pass audits
+the batch **as rendered**, and a batch may span several intervals
+(`batchSize`, §5.3). With the default `batchSize` a fresh backfill is one wide
+window, so `perInterval` effectively means "per batch". A model whose invariant
+depends on the width of that window must pin `batchSize: 1` — the same
+constraint that makes windowed correctness chunking-dependent in general.
+
 A **test** is a unit test of the query on fixtures, living in `bun test`:
 
 ```ts

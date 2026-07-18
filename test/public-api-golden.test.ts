@@ -138,6 +138,8 @@ const FROZEN_TYPES: ReadonlyArray<string> = [
   "AuditCtx",
   "AuditRunReport",
   "AuditRunResult",
+  "AuditScope",
+  "AuditSkipped",
   "ChangeCategory",
   "ChangeExplanation",
   "ColumnDrift",

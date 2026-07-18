@@ -13,6 +13,10 @@ import { externalSourceRef, viewRef } from "./naming.ts"
  * as in apply. Catches degradation after the fact: late data via lookback,
  * physical storage edited by hand, drift of external sources.
  *
+ * That difference in scope is the reason audits carry one (#53): an audit
+ * declared `perInterval` is about a window this command cannot see, so it is
+ * reported as skipped instead of being answered wrongly.
+ *
  * Changes and marks nothing; the report is complete — a failed blocking audit
  * does not hide the ones that follow it.
  */
@@ -24,10 +28,23 @@ export interface AuditRunResult {
   readonly violations: number
 }
 
+/** An audit this scope was never about — reported, never silently dropped (#53). */
+export interface AuditSkipped {
+  readonly model: string
+  readonly audit: string
+  readonly reason: "interval-scoped"
+}
+
 export interface AuditRunReport {
   readonly results: ReadonlyArray<AuditRunResult>
   /** Total blocking-audit violations — nonzero ⇒ the environment cannot be trusted. */
   readonly blockingViolations: number
+  /**
+   * Audits declared `perInterval`, which this command cannot evaluate: it sees
+   * the environment view, and their invariant was only ever about one written
+   * interval. Reported so a clean run is not mistaken for full coverage.
+   */
+  readonly skipped: ReadonlyArray<AuditSkipped>
 }
 
 /** The requested model is not in the project (or has no audits — nothing to run). */
@@ -82,12 +99,19 @@ export const auditEnvironment = (
     const wanted = only === undefined ? undefined : new Set(only)
 
     const results: Array<AuditRunResult> = []
+    const skipped: Array<AuditSkipped> = []
     for (const name of graph.order) {
       if (wanted !== undefined && !wanted.has(name)) continue
       const model = graph.models.get(name)!
       if (model.audits.length === 0) continue
       const self = selfFor(graph, env, model)
       for (const auditDef of model.audits) {
+        // an interval-scoped invariant evaluated over the whole view would
+        // return a verdict about a question it was never asked (#53)
+        if (auditDef.scope === "interval") {
+          skipped.push({ model: name, audit: auditDef.name, reason: "interval-scoped" })
+          continue
+        }
         const violations = yield* engine.query(
           render(auditDef.fragment, { resolveRef: (ref) => ref, self }),
         )
@@ -105,5 +129,6 @@ export const auditEnvironment = (
       blockingViolations: results
         .filter((result) => result.blocking)
         .reduce((sum, result) => sum + result.violations, 0),
+      skipped,
     }
   }).pipe(Effect.withSpan("efmesh.audit", { attributes: { env } }))

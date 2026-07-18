@@ -30,6 +30,22 @@ the first version gathers them in full.
   `efmesh/browser` helper now reports the effective values when they are present
   and falls back to the declared half when they are not.
 
+- **An audit now declares its scope** (#53). The same declaration used to be
+  evaluated at two scopes with nothing in the API to say which the author meant:
+  `apply` checks the interval it just wrote, `efmesh audit` checks the whole
+  environment view. Row-wise predicates agree at both; aggregates need not —
+  uniqueness can hold inside every written interval and legitimately fail across
+  the table, so a correct model could pass every apply and exit 1 under the
+  standalone command. `audit.perInterval(a)` and `audit.whole(a)` say which
+  invariant was meant. An unscoped audit runs everywhere, exactly as before, so
+  nothing changes for a project that says nothing.
+- `efmesh audit` reports interval-scoped audits it skipped, in the human output
+  and in `--json` (additive `skipped`). Silence about what was not checked reads
+  as coverage, which is the failure mode the scope was introduced to end.
+- A whole-scoped audit on a time-range model is checked in its own pass **before
+  promotion**, so an environment never serves data that failed a cross-interval
+  invariant — an interval pass cannot catch one by construction.
+
 ### Fixed
 
 - `Answerable` was declared twice — once in the model API, once in the manifest
