@@ -37,7 +37,16 @@ export const envSchema = (env: string, modelSchema: string): string =>
  * source of truth is the interval bookkeeping, so a non-atomic rewrite is harmless.
  */
 export const parquetPrefix = (lakePath: string, name: ModelName, fingerprint: string): string =>
-  `${lakePath.replace(/\/+$/, "")}/${name.schema}/${name.table}/fp=${fp8(fingerprint)}`
+  `${parquetModelPrefix(lakePath, name)}/fp=${fp8(fingerprint)}`
+
+/**
+ * Everything a model owns in the lake, across versions — the `fp=` level and
+ * below. Maintenance (#40) works from the directory tree rather than from the
+ * store: what physically exists is the honest input, and janitor is what
+ * removes the prefixes of dead versions.
+ */
+export const parquetModelPrefix = (lakePath: string, name: ModelName): string =>
+  `${lakePath.replace(/\/+$/, "")}/${name.schema}/${name.table}`
 
 /**
  * union_by_name: partitions of one prefix may differ in schema after

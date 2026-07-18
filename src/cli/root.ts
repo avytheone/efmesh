@@ -1,5 +1,6 @@
 import { Command } from "effect/unstable/cli"
 import { auditCommand } from "./commands/audit.ts"
+import { compactCommand } from "./commands/compact.ts"
 import { diffCommand } from "./commands/diff.ts"
 import { graphCommand } from "./commands/graph.ts"
 import { initCommand } from "./commands/init.ts"
@@ -21,7 +22,7 @@ export const rootCommand = Command.make("efmesh").pipe(
     "sqlmesh on bun, typescript and Effect\n\n" +
       "Exit codes: 0 = ok, 1 = error, 2 = awaiting a human (non-TTY apply without --yes, " +
       "or run hitting unapplied changes). Full table: README § Exit codes.\n" +
-      "plan/apply/audit/status/diff/janitor/migrate/lineage/render/schedule --list take --json " +
+      "plan/apply/audit/status/diff/janitor/compact/migrate/lineage/render/schedule --list take --json " +
       "(stable shapes for CI and agents).",
   ),
   Command.withSubcommands([
@@ -38,6 +39,7 @@ export const rootCommand = Command.make("efmesh").pipe(
     diffCommand,
     scheduleCommand,
     janitorCommand,
+    compactCommand,
     migrateCommand,
   ]),
 )

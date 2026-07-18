@@ -16,6 +16,7 @@ export {
   columnNames,
   parseModelName,
   type AnyModel,
+  type CompactPolicy,
   type ExternalConfig,
   type Answerable,
   type ExternalFileOptions,
@@ -26,6 +27,7 @@ export {
   type ModelConfig,
   type ModelCtx,
   type ModelKind,
+  type ModelMaintenance,
   type ModelName,
 } from "./core/model.ts"
 export { audit, type Audit, type AuditCtx } from "./core/audit.ts"
@@ -54,6 +56,15 @@ export {
   type RestateTarget,
 } from "./plan/restate.ts"
 export { janitor, type JanitorOptions, type JanitorReport } from "./plan/janitor.ts"
+export {
+  compact,
+  COMPACT_GRACE_MINUTES,
+  type CompactedPartition,
+  type CompactOptions,
+  type CompactReport,
+  type CompactSkipReason,
+  type SkippedPartition,
+} from "./plan/compact.ts"
 export {
   auditEnvironment,
   AuditTargetError,

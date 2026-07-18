@@ -237,6 +237,7 @@ export default defineConfig({
 | `efmesh lineage <model[.col]> [--json]` | column lineage down to the raw sources |
 | `efmesh graph [--html] [--json]` | the model DAG as text, an HTML page, or JSON |
 | `efmesh janitor [--ttl 7] [--json]` | remove orphaned physical storage older than ttl |
+| `efmesh compact [--dry-run] [--json]` | merge a settled partition's small files into one |
 | `efmesh migrate [--json]` | bring the state-store schema up to the current version |
 | `efmesh schedule <env>` | register `run <env>` in the OS scheduler via `Bun.cron` (`--list [--json]`) |
 
@@ -261,8 +262,8 @@ history). `--dry-run` prints what would be recomputed and changes nothing;
 `--json` for CI.
 
 Every command with something to report speaks `--json` — `plan`, `apply`,
-`run`, `audit`, `status`, `diff`, `graph`, `janitor`, `migrate`, `lineage`,
-`render` and `schedule --list` — a stable machine-readable shape (a contract
+`run`, `audit`, `status`, `diff`, `graph`, `janitor`, `compact`, `migrate`,
+`lineage`, `render` and `schedule --list` — a stable machine-readable shape (a contract
 under semver) for CI and bots; exit codes are unchanged, stdout stays pure
 JSON (logs go to stderr). `apply --json` returns `{env, applied, plan, built,
 promoted}` and `run --json` returns `{env, outcome, processed, blockedBy?}` —
@@ -294,6 +295,66 @@ runs, and Arch-family Linux ships no cron daemon at all — `--print-systemd`
 emits user-unit files instead (`Persistent=true` catches up). Overlapping
 ticks are safe by construction: `run` takes the env lock and exits `2` when
 changes await a human.
+
+### Compaction
+
+A micro-batch writer leaves hundreds of tiny files in a partition, and a
+partition of hundreds of tiny files is what destroys the query planner — the
+small-files problem, the second universal event-lake pain after duplicates.
+`efmesh compact` merges each settled partition into one file, de-duplicating by
+the declared key on the way through.
+
+**What it will touch.** Targets come from the project and from nowhere else:
+efmesh's own parquet partitions (a `target: "parquet"` model incremented by time
+range — its `grain` is the dedup key), plus the `defineExternal` sources that
+opted in explicitly. There is no way to point `compact` at a directory; a lake
+efmesh does not own is compacted only where its declaration says so:
+
+```ts
+export const rawEvents = defineExternal({
+  name: "raw.events",
+  source: external.files(`${archive}/**/*.parquet`, "parquet", { unionByName: true }),
+  schema: Schema.Struct({ event_id: Schema.String, arrived_at: Schema.DateTimeUtc }),
+  maintenance: {
+    compact: {
+      partitionKey: "arrival_date", // the hive key whose value dates a partition
+      uniqueKey: ["event_id"],      // one row per key survives the merge
+      orderBy: ["arrived_at"],      // …and it is the first arrival, not an arbitrary copy
+      graceMinutes: 10,             // wait past the newest file's mtime
+    },
+  },
+})
+```
+
+The policy is declaration-only: it never enters the fingerprint, so adopting
+compaction does not rebuild anything.
+
+**Concurrency: cooperative, not transactional.** This is the difference to read
+before trusting it. `janitor` takes a **transactional claim** through the state
+store — two janitors cannot remove the same snapshot, because the claim and the
+delete are one atomic step. `compact` has **no such claim**. It coordinates with
+the lake's writer through file conventions and timing alone:
+
+- it never touches a partition dated today or later (the live writer owns it);
+- it waits out a grace period measured from the newest file's mtime, because a
+  batch may still be landing;
+- it publishes through a `.tmp` and an atomic rename, so a reader sees either
+  the old files or the merged one, never a partial write;
+- it deletes only the files it listed *before* the merge, so a file that arrives
+  mid-run is left in place rather than lost.
+
+Those rules make compaction safe against a well-behaved **appending** writer.
+They do not make it safe against a writer that rewrites or deletes files in
+place, and they do not serialize two concurrent compactors. Do not ascribe
+janitor's guarantees here — the mechanism does not deliver them.
+
+The merge is `SELECT * EXCLUDE (_rn)` over `read_parquet(…, union_by_name =
+true)` — never an explicit column list, so a column the writer started emitting
+after the policy was declared survives, and a transition-day partition holding
+two schema generations merges instead of failing. `--dry-run` reports what would
+be merged and writes nothing; `--model` narrows to one model; `--grace`
+overrides the declared wait. `--json` reports every partition left alone with
+the reason (`current-day`, `grace-period`, `already-compact`, `undated`).
 
 ### Exit codes
 

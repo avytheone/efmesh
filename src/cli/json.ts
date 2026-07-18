@@ -1,5 +1,6 @@
 import { Console } from "effect"
 import type { ModelGraph } from "../core/graph.ts"
+import type { CompactReport } from "../plan/compact.ts"
 import type { JanitorReport } from "../plan/janitor.ts"
 import type { LineageNode } from "../plan/lineage.ts"
 import type { Plan } from "../plan/planner.ts"
@@ -146,6 +147,28 @@ export const graphToJson = (graph: ModelGraph): unknown => ({
 export const janitorToJson = (report: JanitorReport): unknown => ({
   removed: report.removed,
   kept: report.kept,
+})
+
+/**
+ * `compact --json` (#40): the partitions merged and the ones left alone, each
+ * with the reason it was left. The reasons are a closed vocabulary
+ * (`current-day` / `grace-period` / `already-compact` / `undated`) so a CI job
+ * can assert on them; `rows` is null under `--dry-run`, where nothing is read.
+ */
+export const compactToJson = (report: CompactReport): unknown => ({
+  dryRun: report.dryRun,
+  compacted: report.compacted.map((entry) => ({
+    model: entry.model,
+    partition: entry.partition,
+    files: entry.files,
+    rows: entry.rows,
+    published: entry.published,
+  })),
+  skipped: report.skipped.map((entry) => ({
+    model: entry.model,
+    partition: entry.partition,
+    reason: entry.reason,
+  })),
 })
 
 export const migrateToJson = (report: MigrationReport): unknown => ({

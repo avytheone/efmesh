@@ -403,6 +403,32 @@ and clears when it returns (a rollback resets the counter). Physical storage sha
 several versions (forward-only) is removed only together with the last
 snapshot using it.
 
+### 5.5 Compaction
+
+`efmesh compact` merges the many small files a micro-batch writer leaves in a
+partition into one — the small-files problem, which destroys the query planner
+long before it costs disk. Targets are derived from the project only: efmesh's
+own parquet partitions (dedup key = the model's `grain`, published under the
+executor's own `data.parquet`, so a lookback recompute still owns the whole
+partition), plus `defineExternal` sources that opted in with
+`maintenance: { compact: {…} }`. Compacting an arbitrary directory is not
+offered — that is lake management, a non-goal (§1).
+
+The concurrency model is **cooperative**, not transactional, and is documented
+as such: unlike janitor, which claims a snapshot transactionally in the state
+store, compaction coordinates with the lake's writer through file conventions
+and timing — it skips any partition dated today or later, waits a grace period
+past the newest file's mtime, publishes via `.tmp` + atomic rename, and deletes
+only the files snapshotted before the merge. Safe against an appending writer;
+not a substitute for a claim, and not a serialization between two compactors.
+
+The merge is `SELECT * EXCLUDE (_rn)` over `read_parquet(…, union_by_name =
+true, hive_partitioning = false)`, de-duplicating by the declared key with
+`row_number()`: an explicit column list would drop columns added after the
+policy was written, `union_by_name` reconciles a transition-day partition that
+holds two schema generations, and the partition key stays in the directory name
+rather than being baked into the merged file.
+
 ---
 
 ## 6. State
