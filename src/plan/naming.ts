@@ -54,7 +54,11 @@ export const parquetModelPrefix = (lakePath: string, name: ModelName): string =>
  * read with NULL).
  */
 export const parquetRef = (lakePath: string, name: ModelName, fingerprint: string): string =>
-  `read_parquet('${parquetPrefix(lakePath, name, fingerprint).replaceAll(`'`, `''`)}/**/*.parquet', union_by_name=true)`
+  // `hive_partitioning = false` because the lake's layout is OUR bookkeeping, not
+  // the model's data (#55): left on, DuckDB reads `fp=`/`interval=` off the path
+  // and hands the consumer two columns no schema declared. `union_by_name` stays
+  // — partitions of one version may still differ additively.
+  `read_parquet('${parquetPrefix(lakePath, name, fingerprint).replaceAll(`'`, `''`)}/**/*.parquet', union_by_name = true, hive_partitioning = false)`
 
 /**
  * DuckLake target (SPEC §14.5): the catalog is attached under a fixed alias,

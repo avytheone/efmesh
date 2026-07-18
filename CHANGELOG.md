@@ -8,6 +8,22 @@ the first version gathers them in full.
 
 ## [Unreleased]
 
+### Fixed
+
+- A parquet model's view no longer serves phantom `fp` and `interval` columns
+  (#55). The lake's directory layout (`fp=<fp8>/interval=<key>/`) is efmesh's
+  bookkeeping, but `read_parquet` was rendered with hive detection left on, so
+  DuckDB read those path segments as data and handed every consumer two columns
+  no schema declared. The declared schema stopped being the whole truth about
+  what a model serves — the exact promise the DESCRIBE contract exists to keep —
+  and a model legitimately declaring a column named `interval` or `fp` collided
+  with the injected one. `union_by_name` stays on, so partitions with additively
+  different schemas still reconcile. Note this *removes* columns a consumer may
+  have been reading by accident; a model that wants the partition key as data
+  should compute it in its own SELECT, where it is declared and typed like
+  everything else. Found while building `efmesh compact`, which had to disable
+  the same detection for the same reason.
+
 ### Added
 
 - **`efmesh compact`** (#40) — merges the many small files a micro-batch writer

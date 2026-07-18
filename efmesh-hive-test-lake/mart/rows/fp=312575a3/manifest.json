@@ -1,0 +1,31 @@
+{
+  "manifestVersion": 1,
+  "model": "mart.rows",
+  "fingerprint": "312575a36f802b7ca3f91cc6b95d199a4131a0feb6ca729d7edb6a7e1ad76a85",
+  "generatedAt": "2026-07-18T12:12:56.796Z",
+  "intervals": [
+    {
+      "start": "2026-01-01T00:00:00.000Z",
+      "end": "2026-01-02T00:00:00.000Z"
+    }
+  ],
+  "schema": [
+    {
+      "name": "id",
+      "type": "text"
+    },
+    {
+      "name": "happened_at",
+      "type": "temporal"
+    }
+  ],
+  "files": ["./interval=2026-01-01/data.parquet"],
+  "answerable": "full",
+  "caveats": [],
+  "freshness": {
+    "contiguousThrough": "2026-01-02T00:00:00.000Z",
+    "latestInterval": "2026-01-02T00:00:00.000Z",
+    "failedIntervals": 0
+  },
+  "redacted": []
+}
