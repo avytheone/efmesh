@@ -10,6 +10,12 @@ the first version gathers them in full.
 
 ### Fixed
 
+- `plan` on a redacted environment now diffs against that environment's own
+  physics, as `apply` already did. The flag was read from the config and then
+  not passed on, so `plan safe` compared the unredacted graph against redacted
+  snapshots and reported changes that `apply` would not make. Caught by the lint
+  rule for an unused binding, which is a fair reminder that a value computed and
+  dropped is usually a missing wire rather than dead code.
 - A parquet model's view no longer serves phantom `fp` and `interval` columns
   (#55). The lake's directory layout (`fp=<fp8>/interval=<key>/`) is efmesh's
   bookkeeping, but `read_parquet` was rendered with hive detection left on, so

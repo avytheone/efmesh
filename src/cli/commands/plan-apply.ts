@@ -51,6 +51,9 @@ export const planCommand = Command.make(
       const plan = yield* Efmesh.plan(env, loaded.models, {
         ...(names !== undefined ? { forwardOnly: names } : {}),
         ...(overrides !== undefined ? { reclassify: overrides } : {}),
+        // plan must show what apply will do: a redacted environment diffs
+        // against its own physics, not against the plain one (#41)
+        ...(redacting ? { redacted: true } : {}),
       }).pipe(Effect.provide(configLayers(loaded)))
       yield* json ? printJson(planToJson(plan)) : printPlan(plan, explain)
     }),
