@@ -118,7 +118,7 @@ describe("golden fingerprints — canonicalization as a contract (SPEC §4)", ()
     expect(sha256(canon)).toBe(GOLDEN.postgresCanonSha256)
   })
 
-  test("a snapshot from another algorithm version — the plan honestly halts", async () => {
+  test("a snapshot from a NEWER algorithm version — the plan honestly halts", async () => {
     const failure = await Effect.runPromise(
       Effect.gen(function* () {
         const store = yield* StateStore
@@ -138,6 +138,36 @@ describe("golden fingerprints — canonicalization as a contract (SPEC §4)", ()
     )
     expect(failure._tag).toBe("FingerprintVersionError")
     expect(failure).toMatchObject({ model: "golden.daily", wanted: FINGERPRINT_VERSION })
+  })
+
+  // #48: halting on an OLDER snapshot wedged the environment — plan was the only
+  // route to the re-apply that rewrites snapshots, and `efmesh migrate` cannot
+  // touch snapshot payloads. An algorithm bump must stay escapable.
+  test("a snapshot from an OLDER algorithm version — breaking, and the plan still renders", async () => {
+    const plan = await Effect.runPromise(
+      Effect.gen(function* () {
+        const store = yield* StateStore
+        yield* store.upsertSnapshot({
+          name: "golden.events",
+          fingerprint: "v1fp",
+          renderedSql: "SELECT 1",
+          canonicalAst: "{}",
+          physicalFp: "v1physics",
+          kind: "incrementalByTimeRange",
+          fingerprintVersion: FINGERPRINT_VERSION - 1,
+        })
+        yield* store.promote("dev", [{ name: "golden.events", fingerprint: "v1fp" }])
+        // forward-only asks to inherit the old physics: refused here, because the
+        // payload behind v1physics was composed differently
+        return yield* Efmesh.plan("dev", [raw, incremental, mart], {
+          forwardOnly: ["golden.events"],
+        })
+      }).pipe(Effect.provide(Layer.mergeAll(DuckDBEngineLive(), SqliteStateLive()))),
+    )
+    const action = plan.actions.find((candidate) => candidate.name === "golden.events")
+    expect(action?.change).toBe("breaking")
+    expect(action?.physicalFingerprint).not.toBe("v1physics")
+    expect(action?.explain?.reason).toContain(`v${FINGERPRINT_VERSION - 1}`)
   })
 })
 

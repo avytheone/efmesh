@@ -8,7 +8,9 @@ import { Cause } from "effect"
  */
 const FAILURE_HINTS: Readonly<Record<string, (error: Record<string, unknown>) => string>> = {
   StateSchemaError: () => "run `efmesh migrate` to bring the state store up to date",
-  FingerprintVersionError: () => "run `efmesh migrate` or upgrade efmesh, then re-apply",
+  // Never `efmesh migrate` here: it moves the store schema, not snapshot
+  // payloads, and this failure only fires when the store is from a newer efmesh.
+  FingerprintVersionError: () => "upgrade efmesh to the version that wrote this store",
   LockHeldError: (error) =>
     `wait for the other apply/run to finish, or clear the stale lock «${String(error["name"])}»`,
   LockLostError: () => "nothing was left half-written; check `efmesh status`, then re-run",

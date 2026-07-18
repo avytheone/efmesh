@@ -213,18 +213,32 @@ by golden tests (`test/fingerprint-golden.test.ts`) — a red test on an
 upgrade of `@duckdb/node-api`/`libpg-query` means canon drift, and that is
 grounds for a decision, not for updating the hashes; (2) a snapshot carries
 `fingerprint_version` (state store schema version 3); (3) a deliberate change
-of the algorithm = an increment of `FINGERPRINT_VERSION` + a migration history — a plan,
-on encountering a snapshot of another version, honestly stops
-(`FingerprintVersionError`), rather than showing "everything breaking".
+of the algorithm = an increment of `FINGERPRINT_VERSION` + a migration history,
+and the two directions of a version mismatch are **not** symmetric (#48):
+
+- **older snapshot** (written by an earlier algorithm) — its canonical form is
+  incomparable with the current one, exactly like a snapshot that stored no AST:
+  the model categorizes as `breaking`, with an explain reason naming the version
+  gap, and it may not inherit physics (no forward-only or indirect reuse — the
+  payload behind the old `physicalFp` was composed differently). The plan
+  renders, the apply re-fingerprints. This is the migration path, and it is the
+  only one: `efmesh migrate` moves the store *schema*, never snapshot payloads,
+  so an environment must never depend on it to escape an algorithm bump.
+- **newer snapshot** (written by a later efmesh than the one reading) — nothing
+  can be inferred from a canonical form this binary does not know:
+  `FingerprintVersionError`, cured by upgrading efmesh.
 
 `FINGERPRINT_VERSION` is **2** (bumped from 1 for #17, which folded column type
-families into the payload). Migration is by the same honest-halt path: an
-environment whose snapshots were fingerprinted under v1 will not silently
-re-diff against v2 fingerprints — the first changed model raises
-`FingerprintVersionError` (model named, found vs wanted), and the operator
-re-plans and re-applies to rebuild physics under the v2 fingerprints. There are
-no persisted v1 stores in the wild (zero users), so the re-fingerprint costs
-nobody.
+families into the payload). An environment fingerprinted under v1 therefore
+re-plans as a set of breaking changes and rebuilds physics under v2 on the next
+apply. There are no persisted v1 stores in the wild (zero users), so the
+re-fingerprint costs nobody.
+
+Note that `FINGERPRINT_VERSION` itself is *not* part of the fingerprint payload
+(it keys the canon cache only). Bumps so far changed the payload, so v1 and v2
+fingerprints cannot collide; a future bump that leaves the payload untouched
+(e.g. pure canonicalization drift) would need to enter the payload, or an
+unchanged model would read as `unchanged` across versions.
 
 ---
 

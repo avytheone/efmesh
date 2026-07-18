@@ -7,6 +7,22 @@ the first version gathers them in full.
 
 ## [Unreleased]
 
+### Fixed
+
+- A `FINGERPRINT_VERSION` bump no longer wedges an environment (#48). A snapshot
+  written by an *older* algorithm now categorizes as `breaking` — the same
+  treatment as a snapshot with no stored AST — instead of halting the plan, so
+  the documented cure (re-plan, re-apply, physics rebuilt under the new
+  fingerprints) is actually reachable. Previously `plan` raised
+  `FingerprintVersionError` on the first changed model and the hint sent the
+  operator to `efmesh migrate`, which cannot help: it moves the store schema,
+  not snapshot payloads. The only way out was deleting the state store by hand.
+  Such a model may not inherit physics (forward-only and indirect reuse are
+  refused for it) — the payload behind the old `physicalFp` was composed
+  differently. `FingerprintVersionError` remains for the opposite direction, a
+  store written by a *newer* efmesh, where the hint is now "upgrade efmesh".
+  Caught by the dogfood timer, which had been red for a day after #17.
+
 ## [0.3.0] — 2026-07-17
 
 Theme: the first stranger is an AI agent. The whole surface an agent

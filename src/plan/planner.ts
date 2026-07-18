@@ -46,10 +46,13 @@ export class ReclassifyError extends Data.TaggedError("ReclassifyError")<{
 }
 
 /**
- * The snapshot was computed by a different version of the fingerprint
- * algorithm (SPEC §4): fingerprints of different versions are incomparable —
- * the plan honestly stops instead of showing "everything breaking". Cured by
- * migrating to the version of efmesh that changed the algorithm.
+ * The snapshot was computed by a LATER version of the fingerprint algorithm
+ * (SPEC §4) — the store was written by a newer efmesh than the one reading it.
+ * Nothing can be inferred from a canonical form this binary does not know, so
+ * the plan halts; the cure is upgrading efmesh, never a store migration.
+ *
+ * The opposite direction (an older snapshot) is not an error: it categorizes as
+ * breaking and the apply re-fingerprints the model (#48).
  */
 export class FingerprintVersionError extends Data.TaggedError("FingerprintVersionError")<{
   readonly model: string
@@ -57,7 +60,7 @@ export class FingerprintVersionError extends Data.TaggedError("FingerprintVersio
   readonly wanted: number
 }> {
   override get message(): string {
-    return `model «${this.model}» was fingerprinted by algorithm v${this.found}, but this efmesh expects v${this.wanted}`
+    return `model «${this.model}» was fingerprinted by algorithm v${this.found}, newer than the v${this.wanted} this efmesh understands`
   }
 }
 
@@ -230,14 +233,23 @@ export const planChanges = (
         // categorization by AST against the last known snapshot (SPEC §5.2);
         // old records without an AST and external — conservatively breaking
         const previous = yield* store.getSnapshot(name, known)
-        if (previous !== undefined && previous.fingerprintVersion !== FINGERPRINT_VERSION) {
+        // A snapshot from a LATER algorithm is a downgrade: this efmesh cannot
+        // read what a newer one wrote, and guessing would corrupt the environment.
+        if (previous !== undefined && previous.fingerprintVersion > FINGERPRINT_VERSION) {
           return yield* new FingerprintVersionError({
             model: name,
             found: previous.fingerprintVersion,
             wanted: FINGERPRINT_VERSION,
           })
         }
-        const oldAst = previous?.canonicalAst ?? ""
+        // An EARLIER algorithm (#48): its canonical AST is incomparable with
+        // ours — the same "nothing to compare against" situation as a snapshot
+        // with no AST, so it categorizes as breaking. Halting here instead
+        // would wedge the environment: plan is the only route to the re-apply
+        // that rewrites snapshots at the current version, and `efmesh migrate`
+        // cannot help (it owns the store schema, not snapshot payloads).
+        const stale = previous !== undefined && previous.fingerprintVersion < FINGERPRINT_VERSION
+        const oldAst = stale ? "" : (previous?.canonicalAst ?? "")
         const changedParents = [...model.deps].filter((dep) => {
           const parent = changeOf.get(dep)
           return parent !== undefined && parent !== "unchanged"
@@ -246,8 +258,9 @@ export const planChanges = (
           change = "breaking"
           explain = {
             diverged: [],
-            reason:
-              ast === null
+            reason: stale
+              ? `the previous snapshot was fingerprinted by algorithm v${previous?.fingerprintVersion} and this efmesh uses v${FINGERPRINT_VERSION} — the canonical forms are incomparable, conservatively breaking; the apply re-fingerprints the model`
+              : ast === null
                 ? "model has no SQL body (external/seed) — the version was shifted by source/file, schema or parents; there is no AST to compare against"
                 : "the previous snapshot did not store a canonical AST — nothing to compare against, conservatively breaking",
           }
@@ -319,7 +332,10 @@ export const planChanges = (
             const parent = changeOf.get(dep)
             return parent === undefined || parent === "unchanged" || parent === "forward-only"
           })
-        if (previous !== undefined && (forwardOnly.has(name) || cascaded)) {
+        // `!stale`: physics from a snapshot of another algorithm version cannot
+        // be inherited — the payload that produced its physicalFp had different
+        // composition, so "reuse the old physics" would not mean what it says (#48).
+        if (previous !== undefined && !stale && (forwardOnly.has(name) || cascaded)) {
           change = "forward-only"
           reusedFrom = known
           physicalFingerprint = previous.physicalFp
