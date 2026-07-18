@@ -145,6 +145,7 @@ const FROZEN_TYPES: ReadonlyArray<string> = [
   "EnvDiff",
   "EnvironmentRecord",
   "ExternalConfig",
+  "ExternalFileOptions",
   "ExternalSource",
   "GraphError",
   "IncrementalByTimeRangeOptions",

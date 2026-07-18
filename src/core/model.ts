@@ -64,7 +64,24 @@ export type ExternalSource =
       readonly _tag: "files"
       readonly path: string
       readonly format: "parquet" | "csv" | "json"
+      readonly options?: ExternalFileOptions
     }
+
+/**
+ * Reader options for `external.files` — the two a partitioned lake cannot do
+ * without. Both are omitted from the rendered call when unset, so a source
+ * that does not ask for them keeps the fingerprint it already had.
+ */
+export interface ExternalFileOptions {
+  /**
+   * Reconcile partitions whose schemas differ additively: a column that only
+   * newer files carry reads as NULL for the history instead of failing the
+   * scan. The archiver appends columns; the reader must not care when.
+   */
+  readonly unionByName?: boolean
+  /** Expose the `key=value` path segments of a hive layout as columns (partition pruning). */
+  readonly hivePartitioning?: boolean
+}
 
 export interface IncrementalByTimeRangeOptions {
   readonly timeColumn: string
@@ -104,10 +121,16 @@ export const kind = {
 
 export const external = {
   table: (table: string): ExternalSource => ({ _tag: "table", table }),
-  files: (path: string, format: "parquet" | "csv" | "json"): ExternalSource => ({
+  files: (
+    path: string,
+    format: "parquet" | "csv" | "json",
+    options?: ExternalFileOptions,
+  ): ExternalSource => ({
     _tag: "files",
     path,
     format,
+    // absent, not `{}`: the fingerprint payload carries the source verbatim
+    ...(options === undefined ? {} : { options }),
   }),
 } as const
 
@@ -254,6 +277,17 @@ const validateExternalSource = (name: ModelName, source: ExternalSource | undefi
         model: name.full,
         reason: `external.files(«${source.path}», …) needs a format — one of ${[...FILE_FORMATS].join(", ")}; got ${String(source.format)}`,
       })
+    }
+    if (source.options !== undefined) {
+      for (const flag of ["unionByName", "hivePartitioning"] as const) {
+        const value = source.options[flag]
+        if (value !== undefined && typeof value !== "boolean") {
+          throw new ModelDefinitionError({
+            model: name.full,
+            reason: `external.files(«${source.path}», …) option «${flag}» must be a boolean; got ${String(value)}`,
+          })
+        }
+      }
     }
     return
   }

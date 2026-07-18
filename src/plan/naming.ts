@@ -80,10 +80,20 @@ const READERS = { parquet: "read_parquet", csv: "read_csv", json: "read_json" } 
  * (of the engine or an ATTACH database) as is, files/URLs — via read_*.
  * external is not materialized, consumers read the source directly.
  */
-export const externalSourceRef = (source: ExternalSource): string =>
-  source._tag === "table"
-    ? source.table
-    : `${READERS[source.format]}('${source.path.replaceAll(`'`, `''`)}')`
+export const externalSourceRef = (source: ExternalSource): string => {
+  if (source._tag === "table") return source.table
+  // an unset flag is not rendered as `= false`: the reader's own default stays
+  // in force and sources defined before the options existed render unchanged
+  const flags: Array<string> = []
+  if (source.options?.unionByName !== undefined) {
+    flags.push(`union_by_name = ${source.options.unionByName}`)
+  }
+  if (source.options?.hivePartitioning !== undefined) {
+    flags.push(`hive_partitioning = ${source.options.hivePartitioning}`)
+  }
+  const args = [`'${source.path.replaceAll(`'`, `''`)}'`, ...flags].join(", ")
+  return `${READERS[source.format]}(${args})`
+}
 
 export const viewRef = (env: string, name: ModelName): string =>
   `"${envSchema(env, name.schema)}"."${name.table}"`
