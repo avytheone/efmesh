@@ -22,6 +22,10 @@ examples/**/lake/
 # scratch space for spikes and handoff notes — never committed
 tmp/
 
+# lakes and stores a test writes beside itself (must live in the repo for
+# module resolution, must never be committed)
+efmesh-*-test-*/
+
 # Claude Code session-local data (skills in .claude/skills/ are versioned)
 .claude/worktrees/
 .claude/settings.local.json

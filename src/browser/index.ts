@@ -97,7 +97,7 @@ export const registerModel = async (
   options?: { readonly protocol?: number },
 ): Promise<string> => {
   const urls = fileUrls(manifestUrl, manifest)
-  const names = urls.map((url, index) => `${manifest.model}/${manifest.fingerprint}/${index}`)
+  const names = urls.map((_, index) => `${manifest.model}/${manifest.fingerprint}/${index}`)
   await Promise.all(
     urls.map((url, index) =>
       options?.protocol === undefined
