@@ -17,6 +17,7 @@ export {
   parseModelName,
   type AnyModel,
   type ExternalConfig,
+  type ExternalFileOptions,
   type ExternalSource,
   type IncrementalByTimeRangeOptions,
   type MaterializationTarget,

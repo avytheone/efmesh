@@ -535,6 +535,12 @@ DuckDB covers the three scenarios for which it was chosen as the first engine:
 - **Reading other systems.** `external` models over `read_parquet`/`read_csv`/
   `read_json` — including over HTTPS, so "hit a REST API returning JSON"
   fits here too — and over the tables of ATTACH databases (Postgres, MySQL, SQLite).
+  A file source takes the two reader options a partitioned lake cannot do
+  without — `external.files(path, format, { unionByName, hivePartitioning })`:
+  partitions whose schemas differ additively read as one relation (a column only
+  newer files carry is NULL for the history), and `key=value` path segments
+  become columns a predicate can prune on. Both render only when set, so a
+  source that does not ask for them keeps the fingerprint it already had.
   On determinism: an external source changes between runs, and that is normal
   (like any raw material) — only the *definition* of the source enters the fingerprint,
   not its content; freshness is governed by intervals and cron.
@@ -903,6 +909,21 @@ object is not a duplicate, two different definitions with one name —
    global lock; in the CLI the lock spans plan→confirmation→application.
    The janitor↔apply race (resurrecting an orphaned snapshot at the moment of removal)
    is mitigated by the ttl of the orphaned physical storage.
+7. **De-duplication under incremental materialization.** *Decided (#38) in
+   favour of the windowed guarantee.* A canonical layer over an at-least-once
+   lake must drop redelivered rows, but an `incrementalByTimeRange` tick renders
+   one `[start, end)` and DELETE+INSERTs exactly that range — a window function
+   sees only what its own query reads. The recipe
+   (`examples/eventlake`) therefore reads a fixed horizon back beyond `start`,
+   keeps the FIRST copy of a key and emits only rows arriving inside the
+   interval: suppression works across intervals without ever rewriting a settled
+   one. The guarantee is explicitly partial — a duplicate whose original arrived
+   before the horizon enters the table a second time — and the residual is
+   surfaced by a view with a warn-level audit rather than hidden. A *global*
+   guarantee needs a time-range scan combined with an upsert by key, i.e. a
+   hybrid of `incrementalByTimeRange` and `incrementalByUniqueKey`; it stays a
+   candidate kind, to be built only if practice produces cross-horizon
+   redeliveries a wider horizon cannot absorb.
 
 ---
 

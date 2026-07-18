@@ -90,7 +90,7 @@ bunx efmesh apply prod --yes     # promotion: view swap, no recomputation
 bunx efmesh run prod             # cron tick: catch up on new intervals
 ```
 
-Live example: [examples/hospital](https://github.com/avytheone/efmesh/tree/main/examples/hospital) — patient movements across hospital departments, every model kind and target.
+Live examples: [examples/hospital](https://github.com/avytheone/efmesh/tree/main/examples/hospital) — patient movements across hospital departments, every model kind and target; [examples/eventlake](https://github.com/avytheone/efmesh/tree/main/examples/eventlake) — the [canonical table over an event lake](#event-lake-canonical-table).
 
 ## How it works
 
@@ -133,6 +133,72 @@ test("stays", () =>
 ```
 
 The declared `schema` is a contract, not documentation: before every build efmesh runs `DESCRIBE` on the query and fails with `SchemaMismatchError` if column names or types diverge. NULL guarantees are expressed with the `notNull` audit.
+
+## Event-lake canonical table
+
+An at-least-once archiver writing into a partitioned lake makes duplicates
+**legal** there. `count(*)` over the raw files then counts redeliveries as data
+— in the incident this recipe comes from, by 3.8× (179 095 rows against 46 875
+distinct event ids). Every reader needs a canonical layer above the lake: one
+row per event id, typed columns, derived values computed once.
+
+```ts
+export const rawEvents = defineExternal({
+  name: "raw.events",
+  // partitions may hold additively different schemas — a positional scan would shear them
+  source: external.files("archive/**/*.parquet", "parquet", {
+    unionByName: true,
+    hivePartitioning: true,
+  }),
+  schema: Schema.Struct({ event_id: Schema.String, arrived_at: Schema.DateTimeUtc /* … */ }),
+})
+
+export const events = defineModel(
+  {
+    name: "core.events",
+    // increment by ARRIVAL time: the only clock the archiver controls
+    kind: kind.incrementalByTimeRange({ timeColumn: "arrived_at", start: "…", batchSize: 1 }),
+    schema: Schema.Struct({ event_id: Schema.String /* … */ }),
+    grain: ["event_id"],
+  },
+  (ctx) => ctx.sql`
+    SELECT event_id, occurred_at, arrived_at, metric_value FROM (
+      SELECT
+        ${ctx.cols(rawEvents, "event_id", "occurred_at", "arrived_at")},
+        CAST(metric_value AS DOUBLE) AS metric_value,
+        -- the dedup key and its tie-breakers, declared: first arrival wins
+        row_number() OVER (
+          PARTITION BY event_id ORDER BY arrived_at ASC, archiver_offset ASC
+        ) AS copy_rank
+      FROM ${ctx.ref(rawEvents)}
+      -- read three days BEYOND the interval, write only the interval
+      WHERE arrived_at >= ${ctx.start} - INTERVAL 3 DAY AND arrived_at < ${ctx.end}
+    ) horizon
+    WHERE copy_rank = 1 AND arrived_at >= ${ctx.start}
+  `,
+)
+```
+
+**What this guarantees, exactly.** An incremental tick renders one `[start,
+end)` and DELETE+INSERTs that range, so a window function only ever sees what
+its own query reads. Reading a horizon back beyond `start` and keeping the
+*first* copy makes the suppression work across intervals without rewriting a
+settled one — the original stays put, the late copy is dropped in the interval
+it arrived in. Hence:
+
+> Duplicates are eliminated when the original arrived within the horizon. A
+> duplicate that arrives after the horizon has passed is **not** eliminated —
+> it enters the canonical table as a second row. Cross-horizon redeliveries are
+> the source's responsibility.
+
+That residual is surfaced, not hidden: a view over the canonical table listing
+ids with more than one row, carrying a warn-level audit, puts any occurrence in
+the log of every apply. A globally unique guarantee would need a time-range scan
+combined with an upsert by key — a materialization efmesh does not have today.
+
+Full recipe, with a committed dirty fixture and the numbers asserted in
+`test/eventlake.test.ts`:
+[examples/eventlake](https://github.com/avytheone/efmesh/tree/main/examples/eventlake).
 
 ## Configuration
 
@@ -448,6 +514,7 @@ are frozen regardless of version. The full rule is [SPEC.md §11.1](https://gith
 - [SPEC.md](https://github.com/avytheone/efmesh/blob/main/SPEC.md) — the architecture spec: decisions, invariants, open questions;
 - [CHANGELOG.md](https://github.com/avytheone/efmesh/blob/main/CHANGELOG.md) — release history;
 - [examples/hospital](https://github.com/avytheone/efmesh/tree/main/examples/hospital) — a live example with every model kind;
+- [examples/eventlake](https://github.com/avytheone/efmesh/tree/main/examples/eventlake) — the [canonical table](#event-lake-canonical-table) over an at-least-once event lake: dedup, typing, and the guarantee stated exactly;
 - [CONTRIBUTING.md](https://github.com/avytheone/efmesh/blob/main/CONTRIBUTING.md) — build, test and PR guide;
 - [llms.txt](https://github.com/avytheone/efmesh/blob/main/llms.txt) — a machine-oriented map of the repo for an evaluating AI agent.
 
