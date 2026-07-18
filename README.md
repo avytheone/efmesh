@@ -363,6 +363,83 @@ Embedding efmesh as a library? Logging is Effect's `Effect.log*` — provide you
 own `Logger` layer (sink, format, minimum level) and the CLI's choices do not
 apply. Row counts are not logged: efmesh never runs an extra query just to count.
 
+## Serving a lake to a browser
+
+A parquet materialization writes a `manifest.json` beside each version:
+
+```json
+{
+  "manifestVersion": 1,
+  "model": "core.events", "fingerprint": "fdf6b3cc",
+  "files": ["./interval=2026-03-01/data.parquet", "…"],
+  "schema": [{ "name": "event_id", "type": "text" }, { "name": "arrived_at", "type": "temporal" }],
+  "intervals": [{ "start": "…", "end": "…" }],
+  "answerable": "sampled",
+  "caveats": ["observation starts on 2026-03-01"],
+  "freshness": { "contiguousThrough": "…", "latestInterval": "…", "failedIntervals": 0 },
+  "redacted": []
+}
+```
+
+Browsers cannot glob over HTTP, so without it a client walks a web server's
+directory listings — fragile, slow, and able to catch a partition mid-rewrite.
+With it, one fetch names the file set. `@avytheone/efmesh/browser` turns that
+into a duckdb-wasm relation:
+
+```ts
+import { fetchManifest, registerModel, passportOf } from "@avytheone/efmesh/browser"
+
+const url = "https://lake.example.com/core/events/fp=fdf6b3cc/manifest.json"
+const manifest = await fetchManifest(url)
+const relation = await registerModel(db, url, manifest)     // read_parquet([...], union_by_name = true)
+await connection.query(`SELECT count(*) FROM ${relation}`)
+
+passportOf(manifest)   // { answerable, caveats, completeThrough, hasGaps }
+```
+
+It is a subpath, not a separate package, on purpose: the helper and the format
+are one contract, and two packages would let a client pin versions that disagree
+about the document they exchange. The subpath imports nothing else from efmesh —
+no Effect, no DuckDB bindings, no node builtins.
+
+`freshness` is **derived from the interval ledger, never declared**:
+`contiguousThrough` stops at the first gap even when later intervals exist, so a
+client cannot present a partial total as complete. `answerable` and `caveats` are
+yours to declare on the model — the limits of trust travel with the data instead
+of living in someone's dashboard note.
+
+## Redacted environments
+
+Once clients read the files directly, a masking view protects nothing — a view
+is not a security boundary. So a redacted environment gets **its own physics**,
+in which the redacted columns were never written:
+
+```ts
+// the model declares what is sensitive
+defineModel({ name: "core.people", redact: ["ssn"], /* … */ }, …)
+
+// the config declares which environments materialize redacted
+export default defineConfig({
+  environments: { safe: { redacted: true } },
+})
+```
+
+```sh
+efmesh apply dev --yes     # dev__core.people  → id, name, ssn
+efmesh apply safe --yes    # safe__core.people → id, name
+```
+
+Two physical tables, and `ssn` is absent from the second — not filtered out of a
+view over the first. Models that declare no policy are untouched and keep sharing
+physics across environments, so this costs storage only where it buys something.
+
+> **What this is not.** A redacted environment is *safe defaults* — agents and
+> dev environments see clean data unless someone deliberately points them
+> elsewhere. It is **not** access control over the physical storage: anyone who
+> can read the unredacted environment's files can read the unredacted data. That
+> boundary belongs to your bucket policy and filesystem permissions. efmesh
+> guarantees the redacted physics does not contain the columns; nothing more.
+
 ## Metrics
 
 `apply` and `run` take `--metrics <path>` and write a Prometheus/OpenMetrics

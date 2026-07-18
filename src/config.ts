@@ -39,6 +39,13 @@ export interface EfmeshConfig {
   }
   /** ATTACH databases by alias (SPEC §9.3): url + options (`TYPE postgres` etc.). */
   readonly attach?: Readonly<Record<string, { readonly url: string; readonly options?: string }>>
+  /**
+   * Per-environment settings (#41). `redacted` environments materialize their
+   * own physics with every model's `redact` columns absent — a view mask is no
+   * boundary once clients read the files. Safe defaults, not access control:
+   * see SPEC §3.4 for the threat model.
+   */
+  readonly environments?: Readonly<Record<string, { readonly redacted?: boolean }>>
 }
 
 export const defineConfig = (config: EfmeshConfig): EfmeshConfig => config

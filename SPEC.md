@@ -171,6 +171,55 @@ interval tracking (§6) remains the source of truth here too, so the non-atomici
 of overwriting an S3 prefix is not scary — an under-written interval is simply not marked
 `done` and will be recomputed.
 
+### 3.4 The manifest, and what it forces about masking
+
+A parquet materialization writes `manifest.json` beside the version it belongs
+to (`<lake>/<schema>/<table>/fp=<fp8>/manifest.json`). A browser cannot glob
+over HTTP; without this document a client enumerates files by walking a web
+server's directory listings — fragile (listing formats differ), slow (many round
+trips before the first byte), and non-atomic (a listing can catch a partition
+mid-rewrite). The manifest names the file set of one version, so a client fetches
+one document and then the data. It is published temp-file-then-rename, like
+everything else a reader can catch mid-write.
+
+The format carries the answer passport (`answerable`, `caveats`, `freshness`)
+from the outset, ahead of the issue that consumes it (#43): a document that
+clients and agents parse should change once, not twice. `answerable`/`caveats`
+are declared on the model and are documentation — changing them re-fingerprints
+nothing. **`freshness` is derived, never declared**: `contiguousThrough` is the
+end of contiguous coverage in the interval ledger and stops at the first gap even
+when later intervals exist, which is stricter than any hand-maintained badge and
+cannot drift from the data. Column types are reported as the contract's type
+FAMILIES (`text`/`numeric`/`temporal`/`boolean`), not Effect's AST tags — a
+client cares what a value is. `MANIFEST_VERSION` is bumped when a field changes
+meaning; additive fields do not bump it.
+
+**Redacted materialization follows from that manifest, not from taste.** Once
+clients read the physical files directly, a view-level mask protects nothing —
+a view is not a security boundary. So a redacted environment does not hide
+columns: it materializes *different physics* in which the redacted columns were
+never written. The mechanism reuses what already exists — redaction rewrites the
+model's body as a projection of the surviving declared columns and drops them
+from its schema, which changes the canonical AST, hence the fingerprint, hence
+the physical table and the lake prefix. Models declaring no policy are untouched
+and keep sharing physics across environments. Declared per model
+(`redact: ["col"]`), switched on per environment
+(`environments: { safe: { redacted: true } }`).
+
+> **Threat model, stated plainly.** A redacted environment is *safe defaults* —
+> agents and dev environments see clean data unless someone deliberately points
+> them elsewhere. It is **not** access control over the physical storage. Anyone
+> who can read the unredacted environment's files can read the unredacted data;
+> that boundary belongs to the storage layer (bucket policy, filesystem
+> permissions), not to this feature. efmesh guarantees the redacted physics does
+> not contain the columns — nothing more.
+
+The base variant deliberately leans on the canonical-table shape (§14.7): when
+the sensitive payload lives in one canonical model and marts are projections of
+declared fields, marts are clean by construction and the policy shrinks to that
+single model. A full per-column policy over arbitrary models is a possible
+extension, not v1.
+
 ---
 
 ## 4. Snapshots and fingerprint

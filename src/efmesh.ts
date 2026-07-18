@@ -1,5 +1,6 @@
 import { Effect } from "effect"
 import { buildGraph } from "./core/graph.ts"
+import { redactGraph } from "./plan/redact.ts"
 import type { AnyModel } from "./core/model.ts"
 import { render } from "./core/sql.ts"
 import type { EngineError, SqlParseError } from "./engine/adapter.ts"
@@ -51,7 +52,11 @@ export const Efmesh = {
     | SqlParseError
     | SeedReadError,
     StateStore | EngineAdapter
-  > => buildGraph(models).pipe(Effect.flatMap((graph) => planChanges(env, graph, options))),
+  > =>
+    buildGraph(models).pipe(
+      Effect.map((graph) => (options?.redacted === true ? redactGraph(graph) : graph)),
+      Effect.flatMap((graph) => planChanges(env, graph, options)),
+    ),
 
   /**
    * Plan + apply: physics, interval backfill, view layer, state.
@@ -69,7 +74,11 @@ export const Efmesh = {
     EngineAdapter | StateStore
   > =>
     Effect.gen(function* () {
-      const graph = yield* buildGraph(models)
+      const built = yield* buildGraph(models)
+      // redaction is applied to the graph, not to the plan: the projected body
+      // is what gets fingerprinted, so a redacted environment lands on its own
+      // physics by construction rather than by a rule someone must enforce
+      const graph = options?.redacted === true ? redactGraph(built) : built
       const plan = yield* planChanges(env, graph, options)
       return yield* applyPlan(plan, graph, options)
     }).pipe(withStateLock(envLockName(env), options?.lockTtlMs)),

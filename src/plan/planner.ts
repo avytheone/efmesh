@@ -148,6 +148,14 @@ export interface PlanOptions {
    * added/removed/indirect it silently has no effect.
    */
   readonly reclassify?: Readonly<Record<string, "breaking" | "non-breaking">>
+  /**
+   * Materialize this environment redacted (#41): every model's `redact`
+   * columns are projected away before fingerprinting, so the environment gets
+   * its own physics in which those columns were never written. Models that
+   * declare no policy are untouched and keep sharing physics with plain
+   * environments.
+   */
+  readonly redacted?: boolean
 }
 
 /**

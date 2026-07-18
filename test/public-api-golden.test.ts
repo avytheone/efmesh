@@ -69,6 +69,7 @@ const FROZEN_VALUES: ReadonlyArray<string> = [
   "LineageError",
   "LockHeldError",
   "LockLostError",
+  "MANIFEST_VERSION",
   "ModelDefinitionError",
   "PostgresEngineLive",
   "PostgresStateLive",
@@ -124,6 +125,7 @@ const FROZEN_VALUES: ReadonlyArray<string> = [
 ]
 
 const FROZEN_TYPES: ReadonlyArray<string> = [
+  "Answerable",
   "AnyModel",
   "AppliedPlan",
   "ApplyError",
@@ -156,6 +158,8 @@ const FROZEN_TYPES: ReadonlyArray<string> = [
   "JanitorReport",
   "LineageNode",
   "LockOptions",
+  "Manifest",
+  "ManifestFreshness",
   "MaterializationTarget",
   "MigrationReport",
   "Model",

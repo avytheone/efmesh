@@ -15,6 +15,8 @@ import type { StateError, StateStoreShape } from "../state/store.ts"
 import { Metric } from "effect"
 import { checkContract, SchemaMismatchError } from "./contract.ts"
 import { FINGERPRINT_VERSION } from "./fingerprint.ts"
+import { manifestFor, writeManifest } from "./manifest.ts"
+import { redactedColumns } from "./redact.ts"
 import {
   auditFailuresTotal,
   auditsPassed,
@@ -91,6 +93,12 @@ export interface ApplyOptions {
   readonly now?: number
   /** Root of the parquet lake — a local directory or s3://… (httpfs). */
   readonly lakePath?: string
+  /**
+   * The environment materializes redacted (#41). Only affects what the
+   * manifest reports as omitted — the projection itself already happened to the
+   * graph, before fingerprinting.
+   */
+  readonly redacted?: boolean
   /** ATTACH databases by alias (SPEC §9.3) — for export models. */
   readonly attach?: Readonly<Record<string, { readonly url: string; readonly options?: string }>>
   /** DuckLake catalog for target: "ducklake" (SPEC §14.5). DuckDB-only. */
@@ -334,6 +342,42 @@ const backfillIntoTable = (
       discard: true,
     })
   })
+
+/**
+ * The manifest next to a materialized version (#41): a client that cannot glob
+ * over HTTP reads one document and then the files. Written after the data, so a
+ * manifest never advertises a partition that is not there yet; a failure to
+ * write it is logged and does not fail the apply — the warehouse is correct
+ * either way and the next apply rewrites it.
+ */
+const publishManifest = (
+  store: StateStoreShape,
+  model: AnyModel,
+  action: PlanAction,
+  prefix: string,
+  redacting: boolean,
+): Effect.Effect<void> =>
+  Effect.gen(function* () {
+    const files = yield* Effect.try({
+      try: () =>
+        [...new Bun.Glob("**/*.parquet").scanSync({ cwd: prefix })]
+          .sort()
+          .map((file) => `./${file}`),
+      catch: (cause) => cause,
+    }).pipe(Effect.orElseSucceed(() => []))
+    const manifest = yield* manifestFor({
+      store,
+      model,
+      fingerprint: action.fingerprint,
+      files,
+      redacted: redactedColumns(model, redacting),
+    })
+    yield* writeManifest(`${prefix}/manifest.json`, manifest)
+  }).pipe(
+    Effect.catchCause((cause) =>
+      Effect.logWarning(`could not publish the manifest for ${model.name.full}: ${cause}`),
+    ),
+  )
 
 /**
  * Backfill into the parquet lake (SPEC §3.3): interval = partition, a
@@ -648,6 +692,7 @@ export const applyPlan = (
               yield* engine.execute(
                 `COPY (${body}) TO '${prefix.replaceAll(`'`, `''`)}/data.parquet' (FORMAT PARQUET)`,
               )
+              yield* publishManifest(store, model, action, prefix, options?.redacted === true)
             } else {
               const target = tableRef(model, action.physicalFingerprint)
               if (model.kind._tag === "view") {
@@ -710,6 +755,7 @@ export const applyPlan = (
                 resolveRef,
                 options?.retry,
               )
+              yield* publishManifest(store, model, action, prefix, options?.redacted === true)
             } else {
               // an empty skeleton with the query's shape; on resume it already exists
               const target = tableRef(model, action.physicalFingerprint)

@@ -17,6 +17,7 @@ export {
   parseModelName,
   type AnyModel,
   type ExternalConfig,
+  type Answerable,
   type ExternalFileOptions,
   type ExternalSource,
   type IncrementalByTimeRangeOptions,
@@ -162,3 +163,5 @@ export {
 
 // — intervals: bounds for options.now and report parsing —
 export { fromIso, toIso, type Interval, type IntervalUnit } from "./core/interval.ts"
+
+export { MANIFEST_VERSION, type Manifest, type ManifestFreshness } from "./plan/manifest.ts"

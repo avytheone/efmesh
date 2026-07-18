@@ -83,6 +83,9 @@ export interface ExternalFileOptions {
   readonly hivePartitioning?: boolean
 }
 
+/** How much of a question a model's data can answer (#43); passthrough to the manifest. */
+export type Answerable = "full" | "sampled" | "unobservable"
+
 export interface IncrementalByTimeRangeOptions {
   readonly timeColumn: string
   readonly start: string
@@ -168,6 +171,22 @@ export interface ModelConfig<Fields extends Schema.Struct.Fields> {
   readonly kind: ModelKind
   readonly schema: Schema.Struct<Fields>
   readonly description?: string
+  /**
+   * How much of a question this model's data can answer (#41, #43) — passed
+   * through into the manifest so a client reads the limits of trust along with
+   * the data. Documentation, not physics: changing it does not re-fingerprint
+   * the model or rebuild anything.
+   */
+  readonly answerable?: Answerable
+  /** Human-readable limits that a schema cannot express ("observation starts on X"). */
+  readonly caveats?: ReadonlyArray<string>
+  /**
+   * Columns a redacted environment must not materialize (#41). The physics of
+   * such an environment is separate and these columns never exist in it — a
+   * view-level mask protects nothing once a client reads the files directly.
+   * Unlike `answerable`, this DOES change the fingerprint: it is different data.
+   */
+  readonly redact?: ReadonlyArray<Extract<keyof Fields, string>>
   /** Logical primary key; metadata only for now (unique audit — F2). */
   readonly grain?: ReadonlyArray<Extract<keyof Fields, string>>
   /** Materialization target; defaults to a native engine table. */
@@ -204,6 +223,9 @@ export interface Model<Fields extends Schema.Struct.Fields = Schema.Struct.Field
   readonly kind: ModelKind
   readonly schema: Schema.Struct<Fields>
   readonly description: string | undefined
+  readonly answerable: Answerable | undefined
+  readonly caveats: ReadonlyArray<string> | undefined
+  readonly redact: ReadonlyArray<string>
   readonly grain: ReadonlyArray<string>
   readonly target: MaterializationTarget
   readonly audits: ReadonlyArray<Audit>
@@ -418,6 +440,9 @@ const assembleModel = <Fields extends Schema.Struct.Fields>(
     kind: config.kind,
     schema: config.schema,
     description: config.description,
+    answerable: config.answerable,
+    caveats: config.caveats,
+    redact: config.redact ?? [],
     grain: config.grain ?? [],
     target: config.target ?? "table",
     audits: config.audits ?? [],
@@ -522,6 +547,9 @@ export interface ExternalConfig<Fields extends Schema.Struct.Fields> {
   readonly source: ExternalSource
   readonly schema: Schema.Struct<Fields>
   readonly description?: string
+  /** Passthrough to the manifest of anything downstream (#41, #43). */
+  readonly answerable?: Answerable
+  readonly caveats?: ReadonlyArray<string>
 }
 
 /**
@@ -542,6 +570,11 @@ export const defineExternal = <const Fields extends Schema.Struct.Fields>(
     kind: { _tag: "external", source: config.source },
     schema: config.schema,
     description: config.description,
+    answerable: config.answerable,
+    caveats: config.caveats,
+    // external is not ours to materialize and a seed is reference data: neither
+    // has physics we could redact
+    redact: [],
     grain: [],
     target: "table", // not materialized — field is unused
     audits: [],
@@ -558,6 +591,9 @@ export interface SeedConfig<Fields extends Schema.Struct.Fields> {
   readonly format?: "csv" | "json"
   readonly schema: Schema.Struct<Fields>
   readonly description?: string
+  /** Passthrough to the manifest of anything downstream (#41, #43). */
+  readonly answerable?: Answerable
+  readonly caveats?: ReadonlyArray<string>
   readonly audits?: ReadonlyArray<Audit>
 }
 
@@ -590,6 +626,11 @@ export const defineSeed = <const Fields extends Schema.Struct.Fields>(
     kind: { _tag: "seed", file: config.file, format },
     schema: config.schema,
     description: config.description,
+    answerable: config.answerable,
+    caveats: config.caveats,
+    // external is not ours to materialize and a seed is reference data: neither
+    // has physics we could redact
+    redact: [],
     grain: [],
     target: "table",
     audits: config.audits ?? [],

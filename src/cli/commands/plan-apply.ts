@@ -6,6 +6,7 @@ import { applyPlan } from "../../plan/executor.ts"
 import { envLockName, withStateLock } from "../../plan/lock.ts"
 import { planChanges } from "../../plan/planner.ts"
 import { recordCommandOutcome, writeMetricsFile } from "../../observe/report.ts"
+import { redactGraph } from "../../plan/redact.ts"
 import { configLayers, loadConfig } from "../config.ts"
 import {
   configFlag,
@@ -42,6 +43,9 @@ export const planCommand = Command.make(
   ({ config, env, explain, forwardOnly, json, reclassify }) =>
     Effect.gen(function* () {
       const loaded = yield* loadConfig(config)
+      // a redacted environment materializes its own physics (#41): the graph is
+      // projected before fingerprinting, so nothing downstream needs to know
+      const redacting = loaded.environments?.[env]?.redacted === true
       const names = parseForwardOnly(forwardOnly)
       const overrides = yield* parseReclassify(reclassify)
       const plan = yield* Efmesh.plan(env, loaded.models, {
@@ -70,6 +74,8 @@ export const applyCommand = Command.make(
       const startedAtMillis = yield* Clock.currentTimeMillis
       const metricsPath = parseMetricsPath(metrics)
       const loaded = yield* loadConfig(config)
+      // a redacted environment materializes its own physics (#41)
+      const redacting = loaded.environments?.[env]?.redacted === true
       const names = parseForwardOnly(forwardOnly)
       const overrides = yield* parseReclassify(reclassify)
       const modelConcurrency = parseJobs(jobs)
@@ -80,7 +86,7 @@ export const applyCommand = Command.make(
       // the cost — the lock is held even while the human ponders confirmation
       yield* Effect.gen(function* () {
         const graph = yield* buildGraph(loaded.models)
-        const plan = yield* planChanges(env, graph, {
+        const plan = yield* planChanges(env, redacting ? redactGraph(graph) : graph, {
           ...(names !== undefined ? { forwardOnly: names } : {}),
           ...(overrides !== undefined ? { reclassify: overrides } : {}),
         })
@@ -112,7 +118,8 @@ export const applyCommand = Command.make(
           }
           return
         }
-        const applied = yield* applyPlan(plan, graph, {
+        const applied = yield* applyPlan(plan, redacting ? redactGraph(graph) : graph, {
+          ...(redacting ? { redacted: true } : {}),
           ...(loaded.lake !== undefined ? { lakePath: loaded.lake.path } : {}),
           ...(loaded.ducklake !== undefined ? { ducklake: loaded.ducklake } : {}),
           ...(loaded.attach !== undefined ? { attach: loaded.attach } : {}),
