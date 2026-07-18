@@ -10,6 +10,45 @@ the first version gathers them in full.
 
 ### Added
 
+- **`efmesh compact`** (#40) — merges the many small files a micro-batch writer
+  leaves in a partition into one, de-duplicating by the declared key. A
+  partition of hundreds of tiny files is what destroys the query planner. Scope
+  is the project and nothing else: efmesh's own parquet partitions, plus
+  `defineExternal` sources that opt in with `maintenance: { compact: {…} }` — it
+  cannot be pointed at an arbitrary directory. **The concurrency model is
+  cooperative, not transactional**, unlike `janitor`: it never touches today's
+  partition, waits a grace period past the newest file's mtime, publishes via
+  `.tmp` and an atomic rename, and deletes only the files it listed before
+  merging. Those rules are safe against a well-behaved appending writer; they do
+  not serialize two compactors and do not survive a writer that rewrites files
+  in place (README § Compaction, SPEC §5.5). `--dry-run`, `--model`, `--grace`,
+  `--json`.
+- **`manifest.json` beside every parquet materialization** (#41). Browsers
+  cannot glob over HTTP, so a client otherwise walks a web server's directory
+  listings — fragile, slow, and able to catch a partition mid-rewrite. The
+  manifest names one version's file set, schema (as contract type families),
+  intervals, and the answer passport: declared `answerable`/`caveats`, plus
+  `freshness` **derived from the interval ledger** — `contiguousThrough` stops
+  at the first gap even when later intervals exist, so a client cannot present a
+  partial total as complete. Published temp-file-then-rename. `MANIFEST_VERSION`
+  is bumped when a field changes meaning; additive fields do not bump it.
+- **`@avytheone/efmesh/browser`** (#41) — `fetchManifest`, `registerModel`,
+  `passportOf`: one fetch and a duckdb-wasm relation. A subpath rather than a
+  separate package on purpose — the helper and the format are one contract, and
+  two packages would let a client pin versions that disagree about the document
+  they exchange. It imports nothing else from efmesh and refuses a
+  `manifestVersion` newer than it understands.
+- **Redacted environments** (#41). Once clients read the files directly, a
+  masking view protects nothing — a view is not a security boundary. A model
+  declares `redact: ["col"]`, an environment switches it on
+  (`environments: { safe: { redacted: true } }`), and that environment
+  materializes **its own physics** in which those columns were never written:
+  redaction projects the body to the surviving declared columns, which changes
+  the AST, the fingerprint and therefore the physical table. Models declaring no
+  policy are untouched and keep sharing physics. This is *safe defaults, not
+  access control over the storage* — the threat model is stated verbatim in the
+  README and SPEC §3.4.
+
 - **Event-lake canonical table recipe** (`examples/eventlake`, #38): a shipped
   example for the first model anyone with an at-least-once archive has to
   write — de-duplication by an explicitly declared key and tie-breakers, typed
