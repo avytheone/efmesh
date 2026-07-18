@@ -7,6 +7,8 @@ the first version gathers them in full.
 
 ## [Unreleased]
 
+## [0.3.1] — 2026-07-18
+
 ### Fixed
 
 - A `FINGERPRINT_VERSION` bump no longer wedges an environment (#48). A snapshot
