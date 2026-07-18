@@ -1,7 +1,8 @@
 # Changelog
 
 Format — [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-versioning — [SemVer](https://semver.org/).
+versioning — [SemVer](https://semver.org/) shaped by the `0.x` policy in
+[SPEC.md](SPEC.md) §11.1: a minor may break, a patch may not, additive is minor.
 Internal development history was tracked in phases F0–F6 (SPEC.md §13);
 the first version gathers them in full.
 
