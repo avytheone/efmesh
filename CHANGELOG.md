@@ -10,6 +10,24 @@ the first version gathers them in full.
 
 ### Added
 
+- **Event-lake canonical table recipe** (`examples/eventlake`, #38): a shipped
+  example for the first model anyone with an at-least-once archive has to
+  write — de-duplication by an explicitly declared key and tie-breakers, typed
+  casts and derived columns over hive-partitioned parquet. The guarantee is
+  **windowed** and stated exactly rather than implied: a duplicate whose
+  original arrived within the model's horizon is eliminated, a later
+  redelivery is not, and that residual is surfaced by an ops view with a
+  warn-level audit instead of hidden. A global guarantee would need a
+  scan-plus-upsert kind and stays a follow-up (SPEC §14.7). The incident that
+  motivated it is the test fixture: 950 archived rows against 250 unique ids —
+  a 3.8× inflation, the same shape as the 179 095 / 46 875 that was paid for
+  in production.
+- `external.files(path, format, { unionByName, hivePartitioning })` — the two
+  reader options a partitioned lake cannot do without: partitions with
+  additively different schemas read as one relation, and `key=value` path
+  segments become prunable columns. Both render only when set, so every
+  external source defined before them keeps its fingerprint. `ExternalFileOptions`
+  joins the public API whitelist.
 - `--metrics <path>` on `apply` and `run` writes a Prometheus/OpenMetrics text
   file — the dialect node_exporter's textfile collector parses (#39). A
   deployment that treats a silent process as a defect can now scrape efmesh with
