@@ -8,6 +8,8 @@ the first version gathers them in full.
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-07-18
+
 ### Fixed
 
 - `plan` on a redacted environment now diffs against that environment's own
