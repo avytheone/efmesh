@@ -9,6 +9,13 @@ the first version gathers them in full.
 
 ### Fixed
 
+- A config whose *contents* refuse no longer hides behind `ConfigLoadError`
+  (#52). Importing the config executes your model definitions, so a `define*`
+  refusal used to be wrapped as a load failure and rendered with advice to check
+  the `--config` path and the default export — both dead ends when the path and
+  the export are fine. Definition-time errors now propagate as themselves, with
+  their own message and no misleading hint; `ConfigLoadError` keeps the failures
+  it was meant for (unresolvable path, missing or malformed default export).
 - Model definitions are validated at definition time (#51). Bun executes
   TypeScript without checking it and the CLI loads your config by `import()`, so
   a project with no `tsc` in the loop — an agent-authored config, a plain
