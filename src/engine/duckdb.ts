@@ -3,6 +3,7 @@ import { Effect, Layer, Semaphore } from "effect"
 import type { Engine, EngineColumn } from "./adapter.ts"
 import { EngineAdapter, EngineError, SqlParseError } from "./adapter.ts"
 import { extension, identifier, literal, settingName, type EngineInit } from "./init.ts"
+import { s3ObjectStore } from "./object-store.ts"
 
 /**
  * The AST from json_serialize_sql contains token positions (query_location) —
@@ -104,9 +105,11 @@ export const DuckDBEngineLive = (
       // single connection: parallel transactions are serialized by a semaphore
       // so fibers do not interleave each other's BEGIN/COMMIT
       const transactionLock = yield* Semaphore.make(1)
+      const objectStore = s3ObjectStore(options?.init?.credentials ?? [])
 
       const service: Engine = {
         dialect: "duckdb",
+        ...(objectStore !== undefined ? { objectStore } : {}),
         query,
         execute: (sqlText) => Effect.asVoid(run(sqlText)),
         transaction: (statements) =>

@@ -284,6 +284,19 @@ SQL and driver error never enter `EngineError`, the run journal, `status
 are intentionally unavailable; use fingerprinted `embedded` models for reusable
 SQL fragments.
 
+For an S3-compatible lake, the same explicit S3 credential also powers manifest
+publication and janitor deletion; credentials sourced only through DuckDB's
+ambient credential chain can read/write parquet, but cannot be reused by those
+two operational paths. A MinIO integration test exercises apply, promotion,
+querying, another interval, restate, manifest readback, aborted-upload
+visibility, and janitor deletion against a real endpoint.
+
+`efmesh compact` does **not** compact S3 partitions yet. It says so on stderr and
+in `compact --json` under `warnings`; it never silently reports an S3 lake as
+maintained. Janitor does remove S3 prefixes when the explicit credential above
+is available, and otherwise returns the corresponding warning in human and JSON
+output.
+
 ## CLI
 
 | Command | What it does |

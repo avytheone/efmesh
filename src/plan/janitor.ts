@@ -42,6 +42,8 @@ export interface JanitorReport {
   readonly removed: ReadonlyArray<string>
   /** Orphaned but younger than ttl — kept until next time. */
   readonly kept: ReadonlyArray<string>
+  /** Operational limitations encountered while removing physical storage. */
+  readonly warnings: ReadonlyArray<string>
 }
 
 const DAY_MS = 86_400_000
@@ -70,9 +72,17 @@ export const janitor = (
     const referenced = yield* store.listReferencedFingerprints()
     const removed: Array<string> = []
     const kept: Array<string> = []
+    const warnings: Array<string> = []
 
     const snapshots = yield* store.listSnapshots()
     const deadline = new Date(now - ttlMs).toISOString()
+    const s3WithoutMaintenance =
+      options?.lakePath?.startsWith("s3://") === true && engine.objectStore === undefined
+    if (s3WithoutMaintenance) {
+      warnings.push(
+        "S3 lake cleanup was not attempted: an explicit S3 credential is required; snapshot records were preserved",
+      )
+    }
     const isDoomed = (snapshot: (typeof snapshots)[number]): boolean =>
       !referenced.has(snapshot.fingerprint) &&
       (snapshot.orphanedAt ?? snapshot.createdAt) <= deadline
@@ -87,6 +97,12 @@ export const janitor = (
       if (referenced.has(snapshot.fingerprint)) continue
       const label = `${snapshot.name}@${snapshot.fingerprint.slice(0, 8)}`
       if (!isDoomed(snapshot)) {
+        kept.push(label)
+        continue
+      }
+      // Do not throw away the only durable pointer to objects we could not
+      // delete. A later run with an explicit credential must still find them.
+      if (s3WithoutMaintenance) {
         kept.push(label)
         continue
       }
@@ -121,13 +137,16 @@ export const janitor = (
       if (ducklake !== undefined && engine.dialect === "duckdb" && snapshot.kind !== "view") {
         yield* engine.execute(`DROP TABLE IF EXISTS ${ducklakeRef(name, snapshot.physicalFp)}`)
       }
-      if (options?.lakePath !== undefined && !options.lakePath.startsWith("s3://")) {
+      if (options?.lakePath?.startsWith("s3://")) {
+        const prefix = parquetPrefix(options.lakePath, name, snapshot.physicalFp)
+        yield* engine.objectStore!.deletePrefix(`${prefix}/`)
+      } else if (options?.lakePath !== undefined) {
         const prefix = parquetPrefix(options.lakePath, name, snapshot.physicalFp)
         yield* Effect.sync(() => rmSync(prefix, { recursive: true, force: true }))
       }
     }
 
-    return { removed, kept }
+    return { removed, kept, warnings }
   }).pipe(
     // two janitors from different processes must not race to remove the same
     // thing; the janitor↔apply race is guarded by ttl (the window for an instant rollback)

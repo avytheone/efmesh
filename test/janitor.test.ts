@@ -7,7 +7,7 @@ import { EngineAdapter } from "../src/engine/adapter.ts"
 import { DuckDBEngineLive } from "../src/engine/duckdb.ts"
 import { janitor } from "../src/plan/janitor.ts"
 import { SqliteStateLive } from "../src/state/sqlite.ts"
-import type { StateStore } from "../src/state/store.ts"
+import { StateStore } from "../src/state/store.ts"
 
 const testLayer = Layer.mergeAll(DuckDBEngineLive(), SqliteStateLive())
 
@@ -59,6 +59,31 @@ describe("janitor (SPEC §5.4)", () => {
         // a repeated run — already clean
         const again = yield* janitor({ ttlDays: 1, now: farFuture })
         expect(again.removed).toEqual([])
+      }),
+    )
+  })
+
+  test("without an explicit S3 credential, warns and preserves the cleanup pointer", async () => {
+    await scenario(
+      Effect.gen(function* () {
+        const store = yield* StateStore
+        const v1 = srcOf("s3-one")
+        const v2 = srcOf("s3-two")
+        yield* Efmesh.apply("dev", [v1])
+        const oldFp = (yield* Efmesh.plan("dev", [v1])).actions[0]!.fingerprint
+        yield* Efmesh.apply("dev", [v2])
+
+        const report = yield* janitor({
+          ttlDays: 0,
+          now: fromIso("2027-01-01T00:00:00Z"),
+          lakePath: "s3://lake/project",
+        })
+        expect(report.removed).toEqual([])
+        expect(report.kept).toContain(`med.src@${oldFp.slice(0, 8)}`)
+        expect(report.warnings).toEqual([
+          "S3 lake cleanup was not attempted: an explicit S3 credential is required; snapshot records were preserved",
+        ])
+        expect(yield* store.getSnapshot("med.src", oldFp)).toBeDefined()
       }),
     )
   })

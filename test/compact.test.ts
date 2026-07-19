@@ -428,9 +428,33 @@ describe("compact --json (#40)", () => {
               reason: "current-day",
             },
           ],
+          warnings: [],
         })
         expect(parquetIn(`${root}/arrival_date=2026-03-08`)).toEqual(["a.parquet", "b.parquet"])
       }),
     )
+  })
+
+  test("an S3 own lake is refused loudly in the report and --json", async () => {
+    const own = defineModel(
+      {
+        name: "mart.s3_events",
+        kind: kind.incrementalByTimeRange({
+          timeColumn: "arrived_at",
+          start: "2026-01-01T00:00:00Z",
+        }),
+        target: "parquet",
+        schema: Schema.Struct({ event_id: Schema.String, arrived_at: Schema.DateTimeUtc }),
+      },
+      (ctx) => ctx.sql`SELECT 'e1' AS event_id, ${ctx.start} AS arrived_at`,
+    )
+    const report = await scenario(
+      compact({ models: [own], lakePath: "s3://lake/project", now: NOW }),
+    )
+    expect(report.compacted).toEqual([])
+    expect(report.warnings).toEqual([
+      "S3 compaction is not implemented; no S3 partitions were listed, merged, or deleted: mart.s3_events",
+    ])
+    expect(compactToJson(report)).toMatchObject({ warnings: report.warnings })
   })
 })

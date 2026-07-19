@@ -1,5 +1,6 @@
 import { Context, Data, type Effect } from "effect"
 import { causeText, sqlSnippet } from "../error-text.ts"
+import type { ObjectStore } from "./object-store.ts"
 
 /**
  * The engine rejected a statement (SPEC §9.1). `cause` is the engine's own
@@ -42,6 +43,8 @@ export type Dialect = "duckdb" | "postgres"
 
 export interface Engine {
   readonly dialect: Dialect
+  /** Object-store maintenance using the same redacted credential seam as DuckDB. */
+  readonly objectStore?: ObjectStore
   readonly query: (
     sql: string,
   ) => Effect.Effect<ReadonlyArray<Record<string, unknown>>, EngineError>

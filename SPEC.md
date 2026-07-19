@@ -156,6 +156,13 @@ Where to put the physical layer is a property of the model (by default taken fro
 - **`target: "parquet"`** — a lake: the snapshot is materialized into parquet files
   (`<lake>/med/stays/fp=a3f9c1/interval=2026-01-01/*.parquet`), a view over
   `read_parquet('…/fp=a3f9c1/**')`. The lake path is a local directory or S3 (httpfs).
+  The S3 claim is covered by a live MinIO test: apply, promotion and view reads,
+  interval append, restate, manifest readback, an aborted upload remaining
+  invisible, and janitor prefix deletion. S3 manifest and janitor operations use
+  the same explicit credential declaration as DuckDB; an ambient-only DuckDB
+  credential cannot be reused outside the engine and produces an operational
+  warning rather than a false cleanup claim. S3 compaction is not implemented;
+  both human and JSON command output state that no S3 partitions were touched.
 - **`target: "ducklake"`** *(F4, §14.5)* — a table-per-fingerprint in a DuckLake catalog
   (`ATTACH 'ducklake:sqlite:<catalog>'` under the alias `_efmesh_ducklake`,
   config `ducklake: { catalog, dataPath? }`). Versioning stays ours

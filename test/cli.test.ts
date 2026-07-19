@@ -128,9 +128,16 @@ describe("plan --json — the shape contract (#3)", () => {
 
 describe("--json shapes for headless commands (#16)", () => {
   test("janitor — { removed, kept }, nothing else leaks", () => {
-    expect(janitorToJson({ removed: ["med.a@abc12345"], kept: ["med.b@def67890"] })).toEqual({
+    expect(
+      janitorToJson({
+        removed: ["med.a@abc12345"],
+        kept: ["med.b@def67890"],
+        warnings: [],
+      }),
+    ).toEqual({
       removed: ["med.a@abc12345"],
       kept: ["med.b@def67890"],
+      warnings: [],
     })
   })
 

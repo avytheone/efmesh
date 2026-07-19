@@ -35,5 +35,6 @@ export const janitorCommand = Command.make(
       if (report.kept.length > 0) {
         yield* Console.log(`orphaned but younger than ttl: ${report.kept.join(", ")}`)
       }
+      for (const warning of report.warnings) yield* Console.error(`warning: ${warning}`)
     }),
 ).pipe(Command.withDescription("remove physics no environment references (--json for CI)"))

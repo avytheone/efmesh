@@ -189,6 +189,7 @@ export const graphToJson = (graph: ModelGraph): unknown => ({
 export const janitorToJson = (report: JanitorReport): unknown => ({
   removed: report.removed,
   kept: report.kept,
+  warnings: report.warnings,
 })
 
 /**
@@ -211,6 +212,7 @@ export const compactToJson = (report: CompactReport): unknown => ({
     partition: entry.partition,
     reason: entry.reason,
   })),
+  warnings: report.warnings,
 })
 
 export const migrateToJson = (report: MigrationReport): unknown => ({

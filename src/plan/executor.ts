@@ -370,6 +370,7 @@ const backfillIntoTable = (
  * either way and the next apply rewrites it.
  */
 const publishManifest = (
+  engine: Engine,
   store: StateStoreShape,
   graph: ModelGraph,
   fingerprints: ReadonlyArray<{ readonly name: string; readonly fingerprint: string }>,
@@ -379,13 +380,21 @@ const publishManifest = (
   redacting: boolean,
 ): Effect.Effect<void> =>
   Effect.gen(function* () {
-    const files = yield* Effect.try({
-      try: () =>
-        [...new Bun.Glob("**/*.parquet").scanSync({ cwd: prefix })]
-          .sort()
-          .map((file) => `./${file}`),
-      catch: (cause) => cause,
-    }).pipe(Effect.orElseSucceed(() => []))
+    const files = prefix.startsWith("s3://")
+      ? engine.objectStore === undefined
+        ? []
+        : (yield* engine.objectStore.list(`${prefix}/`))
+            .map((object) => object.path)
+            .filter((path) => path.endsWith(".parquet"))
+            .sort()
+            .map((path) => `./${path.slice(prefix.length + 1)}`)
+      : yield* Effect.try({
+          try: () =>
+            [...new Bun.Glob("**/*.parquet").scanSync({ cwd: prefix })]
+              .sort()
+              .map((file) => `./${file}`),
+          catch: (cause) => cause,
+        }).pipe(Effect.orElseSucceed(() => []))
     const manifest = yield* manifestFor({
       store,
       graph,
@@ -395,7 +404,7 @@ const publishManifest = (
       files,
       redacted: redactedColumns(model, redacting),
     })
-    yield* writeManifest(`${prefix}/manifest.json`, manifest)
+    yield* writeManifest(`${prefix}/manifest.json`, manifest, engine.objectStore)
   }).pipe(
     Effect.catchCause((cause) =>
       Effect.logWarning(`could not publish the manifest for ${model.name.full}: ${cause}`),
@@ -723,6 +732,7 @@ export const applyPlan = (
                 `COPY (${body}) TO '${prefix.replaceAll(`'`, `''`)}/data.parquet' (FORMAT PARQUET)`,
               )
               yield* publishManifest(
+                engine,
                 store,
                 graph,
                 ledgerFpOf,
@@ -794,6 +804,7 @@ export const applyPlan = (
                 options?.retry,
               )
               yield* publishManifest(
+                engine,
                 store,
                 graph,
                 ledgerFpOf,

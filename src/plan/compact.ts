@@ -109,6 +109,8 @@ export interface CompactReport {
   readonly dryRun: boolean
   readonly compacted: ReadonlyArray<CompactedPartition>
   readonly skipped: ReadonlyArray<SkippedPartition>
+  /** Whole-target limitations which cannot be represented as a partition skip. */
+  readonly warnings: ReadonlyArray<string>
 }
 
 /** A policy with every default resolved — what the merge actually runs on. */
@@ -184,7 +186,6 @@ const compactTargets = (options: CompactOptions): ReadonlyArray<CompactTarget> =
     }
     if (
       options.lakePath === undefined ||
-      options.lakePath.startsWith("s3://") ||
       model.target !== "parquet" ||
       model.kind._tag !== "incrementalByTimeRange"
     ) {
@@ -322,8 +323,15 @@ export const compact = (
 
     const compacted: Array<CompactedPartition> = []
     const skipped: Array<SkippedPartition> = []
+    const s3Targets = targets.filter((target) => target.root.startsWith("s3://"))
+    const warnings =
+      s3Targets.length === 0
+        ? []
+        : [
+            `S3 compaction is not implemented; no S3 partitions were listed, merged, or deleted: ${s3Targets.map((target) => target.model).join(", ")}`,
+          ]
 
-    for (const target of targets) {
+    for (const target of targets.filter((candidate) => !candidate.root.startsWith("s3://"))) {
       const { model, policy, root } = target
       for (const partition of leafPartitions(root)) {
         const skip = (reason: CompactSkipReason): void => {
@@ -384,5 +392,5 @@ export const compact = (
       }
     }
 
-    return { dryRun, compacted, skipped }
+    return { dryRun, compacted, skipped, warnings }
   })

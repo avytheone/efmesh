@@ -4,6 +4,8 @@ import type { ModelGraph } from "../core/graph.ts"
 import { toIso } from "../core/interval.ts"
 import type { AnyModel, Answerable } from "../core/model.ts"
 import { columnNames } from "../core/model.ts"
+import type { ObjectStore } from "../engine/object-store.ts"
+import type { EngineError } from "../engine/adapter.ts"
 import type { StateStoreShape } from "../state/store.ts"
 import { familyOfAst } from "./contract.ts"
 import type { EffectivePassport, ManifestFreshness } from "./passport.ts"
@@ -113,12 +115,23 @@ export const buildManifest = (options: {
  * a truncated document — the same rule the partition writes and the environment
  * promotion follow.
  */
-export const writeManifest = (path: string, manifest: Manifest): Effect.Effect<void> =>
-  Effect.sync(() => {
+export const writeManifest = (
+  path: string,
+  manifest: Manifest,
+  objectStore?: ObjectStore,
+): Effect.Effect<void, EngineError> => {
+  const content = `${JSON.stringify(manifest, null, 2)}\n`
+  if (path.startsWith("s3://")) {
+    return objectStore === undefined
+      ? Effect.die("S3 manifest requires an object-store client")
+      : objectStore.writeText(path, content)
+  }
+  return Effect.sync(() => {
     const temporary = `${path}.tmp`
-    writeFileSync(temporary, `${JSON.stringify(manifest, null, 2)}\n`, "utf8")
+    writeFileSync(temporary, content, "utf8")
     renameSync(temporary, path)
   })
+}
 
 /**
  * `fingerprints` covers the whole plan, not just this model: the effective

@@ -60,6 +60,7 @@ export const compactCommand = Command.make(
         const summary = [...byReason].map(([reason, count]) => `${reason}: ${count}`).join(", ")
         yield* Console.log(`left alone — ${summary}`)
       }
+      for (const warning of report.warnings) yield* Console.error(`warning: ${warning}`)
     }),
 ).pipe(
   Command.withDescription(
