@@ -85,8 +85,12 @@ export const configLayers = (config: EfmeshConfig) =>
       ? PostgresEngineLive({
           url: config.engine.url,
           ...(config.engine.max !== undefined ? { max: config.engine.max } : {}),
+          ...(config.engine.init !== undefined ? { init: config.engine.init } : {}),
         })
-      : DuckDBEngineLive({ path: config.engine?.path ?? "efmesh.duckdb" }),
+      : DuckDBEngineLive({
+          path: config.engine?.path ?? "efmesh.duckdb",
+          ...(config.engine?.init !== undefined ? { init: config.engine.init } : {}),
+        }),
     config.state?.url !== undefined
       ? PostgresStateLive({ url: config.state.url })
       : SqliteStateLive({ path: config.state?.path ?? "efmesh.state.sqlite" }),

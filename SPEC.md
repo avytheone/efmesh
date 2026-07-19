@@ -729,6 +729,26 @@ action. DuckDB was chosen first not only for speed and zero
 infrastructure: httpfs, ATTACH and parquet make it simultaneously an engine,
 a federator and a lake (§9.3). The state store is a separate service with the same pattern.
 
+#### 9.1.1 Engine preparation
+
+Engine preparation is declarative and split at the type boundary. The semantic
+half declares extensions and session settings; it runs before canonicalization
+or execution. DuckDB prepares its single connection before exposing the layer.
+Postgres installs database extensions once and sends settings as startup
+parameters on every connection created by the pool. `testModel` accepts this
+semantic half for its fresh in-memory DuckDB.
+
+Credentials are a separate DuckDB-only declaration rendered as `CREATE SECRET`.
+If it fails, the adapter discards both the rendered statement and the driver's
+cause and emits only `<credential name>` plus a generic redacted cause. Thus a
+credential cannot reach `EngineError.sql`/`.message`, the run journal, `status
+--json`, or logs. An ATTACH declaration may name one of these credentials; it
+does not repeat credential material.
+
+There is deliberately no arbitrary `init: string[]`. Apart from making startup
+an escape hatch for work, it would put printable credentials in the existing
+error path and would admit semantic SQL which fingerprints cannot see.
+
 ### 9.2 Parsing
 
 For canonicalization (§4), diff categorization (§5.2) and lineage a real parser is needed —
@@ -1101,6 +1121,18 @@ object is not a duplicate, two different definitions with one name —
 ---
 
 ## 14. Open questions
+
+### 14.0 Engine-init SQL and fingerprints — decided
+
+**Verdict for v1: macros and native UDFs are refused by construction.** Engine
+init exposes only extensions, session settings, and a separately redacted
+credential declaration; it has no arbitrary SQL field. Reusable SQL belongs in
+`embedded` models, whose definitions and dependency edges already participate
+in fingerprints. A future macro facility must extract referenced macro names
+from each model's canonical tree and hash only those definitions; until that
+dependency is implemented, macros remain outside the supported seam. Native
+connection UDFs are likewise excluded because the engine parser cannot observe
+their implementation.
 
 1. **Raw `.sql` files.** *Closed (F3):* `defineSqlModel({ file, refs })` —
    the body in a `.sql` file with `@ref(name)`/`@start`/`@end`, dependencies declared

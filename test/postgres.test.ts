@@ -33,6 +33,33 @@ const scenario = <A, E>(body: Effect.Effect<A, E, EngineAdapter | StateStore>) =
   )
 
 describe.skipIf(!hasPostgres)("Postgres adapter (SPEC §9.1, F3)", () => {
+  test("engine settings initialize every pooled connection (#66)", async () => {
+    const rows = await Effect.runPromise(
+      Effect.gen(function* () {
+        const engine = yield* EngineAdapter
+        return yield* Effect.all(
+          Array.from({ length: 8 }, () =>
+            engine.query(
+              "SELECT pg_backend_pid() AS pid, current_setting('application_name') AS name, pg_sleep(0.05)",
+            ),
+          ),
+          { concurrency: "unbounded" },
+        )
+      }).pipe(
+        Effect.provide(
+          PostgresEngineLive({
+            url: cluster.url,
+            max: 4,
+            init: { settings: { application_name: "efmesh-init-test" } },
+          }),
+        ),
+      ),
+    )
+    const flattened = rows.flat()
+    expect(new Set(flattened.map((row) => row["pid"])).size).toBeGreaterThan(1)
+    expect(flattened.every((row) => row["name"] === "efmesh-init-test")).toBe(true)
+  })
+
   test("state store: snapshots, promote accounting for orphaning, intervals, lock with ttl", async () => {
     await scenario(
       Effect.gen(function* () {

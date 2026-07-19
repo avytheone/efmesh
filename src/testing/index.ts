@@ -4,6 +4,7 @@ import { escapeLiteral, quoteIdent, render, usesBounds } from "../core/sql.ts"
 import { fromIso, sqlTimestamp } from "../core/interval.ts"
 import { EngineAdapter } from "../engine/adapter.ts"
 import { DuckDBEngineLive } from "../engine/duckdb.ts"
+import type { EngineSemanticInit } from "../engine/init.ts"
 import { familyOfAst, type TypeFamily } from "../plan/contract.ts"
 
 /**
@@ -24,6 +25,8 @@ export interface TestModelSpec {
   readonly expect: ReadonlyArray<Record<string, unknown>>
   /** Whether row order matters; unordered by default. */
   readonly strictOrder?: boolean
+  /** The project's semantic engine preparation. Credentials are intentionally unavailable. */
+  readonly init?: EngineSemanticInit
 }
 
 const DUCK_TYPE: Record<TypeFamily, string> = {
@@ -134,7 +137,7 @@ const canonical = (
 /** Runs the model against fixtures, returning rows — for non-standard checks. */
 export const runModel = async (
   model: AnyModel,
-  spec: Pick<TestModelSpec, "inputs" | "interval">,
+  spec: Pick<TestModelSpec, "inputs" | "interval" | "init">,
 ): Promise<ReadonlyArray<Record<string, unknown>>> => {
   const inputs = spec.inputs ?? {}
   for (const dep of model.deps) {
@@ -171,7 +174,9 @@ export const runModel = async (
     Effect.gen(function* () {
       const engine = yield* EngineAdapter
       return yield* engine.query(query)
-    }).pipe(Effect.provide(DuckDBEngineLive())),
+    }).pipe(
+      Effect.provide(DuckDBEngineLive({ ...(spec.init !== undefined ? { init: spec.init } : {}) })),
+    ),
   )
 }
 

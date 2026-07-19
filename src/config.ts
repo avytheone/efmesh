@@ -1,4 +1,5 @@
 import type { AnyModel } from "./core/model.ts"
+import type { EngineInit } from "./engine/init.ts"
 
 /**
  * Project config — `efmesh.config.ts` (SPEC §11): a typed TS module, no
@@ -19,6 +20,8 @@ export interface EfmeshConfig {
     readonly url?: string
     /** Postgres connection pool size — backfill parallelism (SPEC §5.3). */
     readonly max?: number
+    /** Declarative preparation before parsing or execution. No arbitrary SQL/macros (#66). */
+    readonly init?: EngineInit
   }
   readonly state?: {
     /** Path to the SQLite state file; defaults to `efmesh.state.sqlite`. */
@@ -38,7 +41,17 @@ export interface EfmeshConfig {
     readonly dataPath?: string
   }
   /** ATTACH databases by alias (SPEC §9.3): url + options (`TYPE postgres` etc.). */
-  readonly attach?: Readonly<Record<string, { readonly url: string; readonly options?: string }>>
+  readonly attach?: Readonly<
+    Record<
+      string,
+      {
+        readonly url: string
+        readonly options?: string
+        /** Name of a credential declared in engine.init.credentials. */
+        readonly credential?: string
+      }
+    >
+  >
   /**
    * Per-environment settings (#41). `redacted` environments materialize their
    * own physics with every model's `redact` columns absent — a view mask is no

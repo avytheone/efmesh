@@ -114,4 +114,20 @@ describe("testModel (SPEC §8)", () => {
       expect: [],
     })
   })
+
+  test("semantic engine init is applied to testModel; credentials have no test path", async () => {
+    const ordered = defineModel(
+      {
+        name: "med.ordered",
+        kind: kind.full(),
+        schema: Schema.Struct({ value: Schema.NullOr(Schema.Number) }),
+      },
+      (ctx) => ctx.sql`SELECT value FROM (VALUES (1), (NULL)) AS t(value) ORDER BY value`,
+    )
+    await testModel(ordered, {
+      init: { settings: { default_null_order: "NULLS_FIRST" } },
+      expect: [{ value: null }, { value: 1 }],
+      strictOrder: true,
+    })
+  })
 })

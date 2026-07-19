@@ -100,7 +100,12 @@ export interface ApplyOptions {
    */
   readonly redacted?: boolean
   /** ATTACH databases by alias (SPEC §9.3) — for export models. */
-  readonly attach?: Readonly<Record<string, { readonly url: string; readonly options?: string }>>
+  readonly attach?: Readonly<
+    Record<
+      string,
+      { readonly url: string; readonly options?: string; readonly credential?: string }
+    >
+  >
   /** DuckLake catalog for target: "ducklake" (SPEC §14.5). DuckDB-only. */
   readonly ducklake?: { readonly catalog: string; readonly dataPath?: string }
   /**
@@ -928,7 +933,7 @@ export const applyPlan = (
         })
       }
       yield* engine.execute(
-        `ATTACH IF NOT EXISTS '${attach.url.replaceAll(`'`, `''`)}' AS ${quoteIdent(model.export.attach)}${attach.options !== undefined ? ` (${attach.options})` : ""}`,
+        `ATTACH IF NOT EXISTS '${attach.url.replaceAll(`'`, `''`)}' AS ${quoteIdent(model.export.attach)}${attach.options !== undefined || attach.credential !== undefined ? ` (${[attach.options, attach.credential !== undefined ? `SECRET ${quoteIdent(attach.credential)}` : undefined].filter((part): part is string => part !== undefined).join(", ")})` : ""}`,
       )
       const [exportSchema, exportTable] = model.export.table.includes(".")
         ? (model.export.table.split(".") as [string, string])

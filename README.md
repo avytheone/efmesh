@@ -247,6 +247,43 @@ export default defineConfig({
 })
 ```
 
+Engine capabilities are declared, not supplied as arbitrary startup SQL:
+
+```ts
+engine: {
+  path: "efmesh.duckdb",
+  init: {
+    extensions: ["httpfs"],
+    settings: { threads: 4, memory_limit: "4GB" },
+    credentials: [{
+      name: "lake_s3",
+      type: "s3",
+      values: {
+        KEY_ID: process.env.S3_KEY_ID!,
+        SECRET: process.env.S3_SECRET!,
+        REGION: "eu-central-1",
+      },
+    }],
+  },
+},
+attach: {
+  reporting: {
+    url: "postgres:dbname=reporting",
+    options: "TYPE postgres",
+    credential: "reporting_pg",
+  },
+},
+```
+
+Extensions and settings are the semantic half: they are installed/applied
+before parsing and execution; Postgres settings are startup parameters on every
+pooled connection. `testModel` accepts the same semantic half as `init`.
+Credentials are DuckDB-only and travel through a separate redacted path: their
+SQL and driver error never enter `EngineError`, the run journal, `status
+--json`, terminal output, or fingerprints. SQL macros and arbitrary init SQL
+are intentionally unavailable; use fingerprinted `embedded` models for reusable
+SQL fragments.
+
 ## CLI
 
 | Command | What it does |

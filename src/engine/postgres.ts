@@ -3,6 +3,7 @@ import { Effect, Layer } from "effect"
 import { parse } from "libpg-query"
 import type { Engine, EngineColumn } from "./adapter.ts"
 import { EngineAdapter, EngineError, SqlParseError } from "./adapter.ts"
+import { extension, identifier, type EngineInit } from "./init.ts"
 
 /**
  * Postgres adapter (SPEC §9.1, F3) over Bun's built-in client (`Bun.SQL`):
@@ -53,6 +54,7 @@ export interface PostgresEngineOptions {
   readonly url: string
   /** Connection pool size; by default 8. */
   readonly max?: number
+  readonly init?: EngineInit
 }
 
 export const PostgresEngineLive = (
@@ -63,7 +65,19 @@ export const PostgresEngineLive = (
     Effect.gen(function* () {
       const sql = yield* Effect.acquireRelease(
         Effect.try({
-          try: () => new SQL({ url: options.url, max: options.max ?? 8 }),
+          try: () => {
+            if ((options.init?.credentials?.length ?? 0) > 0) {
+              throw new Error("credentials are supported by the DuckDB engine only")
+            }
+            return new SQL({
+              url: options.url,
+              max: options.max ?? 8,
+              // Bun sends startup parameters for every new pooled connection.
+              ...(options.init?.settings !== undefined
+                ? { connection: { ...options.init.settings } }
+                : {}),
+            })
+          },
           catch: (cause) => new EngineError({ sql: `<connect ${options.url}>`, cause }),
         }),
         (pool) => Effect.promise(() => pool.end()).pipe(Effect.ignore),
@@ -74,6 +88,15 @@ export const PostgresEngineLive = (
           try: async () => (await sql.unsafe(sqlText)) as ReadonlyArray<Record<string, unknown>>,
           catch: (cause) => new EngineError({ sql: sqlText, cause }),
         })
+
+      // Postgres extensions are database capabilities rather than session
+      // state. Settings above are the per-connection half of preparation.
+      for (const item of options.init?.extensions ?? []) {
+        const name = extension(item).name
+        yield* Effect.asVoid(
+          query(`CREATE EXTENSION IF NOT EXISTS ${identifier(name, "extension")}`),
+        )
+      }
 
       const service: Engine = {
         dialect: "postgres",

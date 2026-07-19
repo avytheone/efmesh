@@ -32,6 +32,13 @@ export {
 } from "./core/model.ts"
 export { audit, type Audit, type AuditCtx, type AuditScope } from "./core/audit.ts"
 export { defineConfig, type EfmeshConfig } from "./config.ts"
+export type {
+  DuckDBCredential,
+  EngineExtension,
+  EngineInit,
+  EngineSemanticInit,
+  EngineSettingValue,
+} from "./engine/init.ts"
 export { discoverModels, DiscoveryConflictError, DiscoveryError } from "./discovery.ts"
 
 // — facade and operations: plain Effects for embedding (SPEC §10) —
