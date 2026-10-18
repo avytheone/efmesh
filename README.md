@@ -608,14 +608,15 @@ efmesh apply safe --yes    # safe__core.people → id, name
 ```
 
 Two physical tables, and `ssn` is absent from the second — not filtered out of a
-view over the first. Models that declare no policy are untouched and keep sharing
-physics across environments, so this costs storage only where it buys something.
+view over the first. Models without a policy are not projected; they may share
+storage across environments when their dependency fingerprints also match.
 
 To switch a live environment, set `redacted: true` and run a regular
 `efmesh apply <env> --yes` without `--forward-only`. The new projection uses
 clean storage and backfills history unless a compatible clean snapshot already
-exists. Models without a policy stay shared. The flag is effective only after
-a successful apply; a refused apply keeps serving the old environment.
+exists. Unchanged, policy-free parts of the DAG may stay shared. The flag is
+effective only after a successful apply; a refused apply keeps serving the old
+environment.
 
 Indirect reuse and forward-only are allowed within already-clean storage.
 Redacted apply checks the physical schema of reused/cached storage before model

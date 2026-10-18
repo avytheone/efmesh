@@ -208,17 +208,18 @@ columns: it materializes *different physics* in which the redacted columns were
 never written. The mechanism reuses what already exists — redaction rewrites the
 model's body as a projection of the surviving declared columns and drops them
 from its schema, which changes the canonical AST, hence the fingerprint, hence
-the physical table and the lake prefix. Models declaring no policy are untouched
-and keep sharing physics across environments. Declared per model
+the physical table and the lake prefix. Models declaring no policy are not
+projected; sharing storage still requires matching dependency fingerprints.
+Declared per model
 (`redact: ["col"]`), switched on per environment
 (`environments: { safe: { redacted: true } }`).
 
 **Switching an existing environment:** the flag takes effect on a successful
 `apply`, not when configuration is edited. A changed redaction projection gets
 a new fingerprint and clean storage; absent an already-built compatible clean
-snapshot, incremental history is backfilled rather than inherited. Models with
-no policy still share storage. Old plain tables/files and other environments
-are retained; this is not erasure or a storage-permission change.
+snapshot, incremental history is backfilled rather than inherited. Unchanged,
+policy-free parts of the DAG may still share storage. Old plain tables/files and
+other environments are retained; this is not erasure or a storage-permission change.
 
 Indirect reuse and forward-only may inherit **already-clean** storage. Before
 any model writes, ledger inheritance or promotion, redacted apply inspects the

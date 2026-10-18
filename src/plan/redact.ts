@@ -44,8 +44,8 @@ const projectionOf = (model: AnyModel, keep: ReadonlyArray<string>): SqlFragment
 /**
  * The model as a redacted environment materializes it. Returns the model
  * unchanged when it declares no policy — most models do not, and an untouched
- * model must keep its fingerprint so redacted and plain environments still
- * share the physics of everything that is not sensitive.
+ * model keeps its own payload so plain and redacted environments can still
+ * share its physics when the dependency fingerprints also match.
  */
 export const redactModel = (model: AnyModel): AnyModel => {
   if (model.redact.length === 0) return model
