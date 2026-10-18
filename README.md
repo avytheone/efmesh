@@ -611,6 +611,21 @@ Two physical tables, and `ssn` is absent from the second — not filtered out of
 view over the first. Models that declare no policy are untouched and keep sharing
 physics across environments, so this costs storage only where it buys something.
 
+To switch a live environment, set `redacted: true` and run a regular
+`efmesh apply <env> --yes` without `--forward-only`. The new projection uses
+clean storage and backfills history unless a compatible clean snapshot already
+exists. Models without a policy stay shared. The flag is effective only after
+a successful apply; a refused apply keeps serving the old environment.
+
+Indirect reuse and forward-only are allowed within already-clean storage.
+Redacted apply checks the physical schema of reused/cached storage before model
+writes, interval inheritance and promotion, refusing declared sensitive columns
+with `SchemaMismatchError`. Forward-only is not a way to remove columns from
+historical files. Existing polluted snapshots are refused, not repaired. Old
+plain files/tables remain until normal lifecycle cleanup; the switch does not
+erase them or change storage permissions. Policies cover declared column names,
+not sensitive values aliased into other columns.
+
 > **What this is not.** A redacted environment is *safe defaults* — agents and
 > dev environments see clean data unless someone deliberately points them
 > elsewhere. It is **not** access control over the physical storage: anyone who

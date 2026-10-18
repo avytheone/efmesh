@@ -574,6 +574,35 @@ export const applyPlan = (
     if (options?.ducklake !== undefined && engine.dialect === "duckdb") {
       yield* engine.execute(ducklakeAttachSql(options.ducklake))
     }
+    // Redaction changes logical identity; inheritance can still point at older
+    // storage. Inspect reused/cached physics before any model writes or ledger
+    // inheritance, including pure view-swaps and previously polluted snapshots.
+    if (options?.redacted === true) {
+      for (const action of plan.actions) {
+        const model = graph.models.get(action.name)
+        if (
+          model === undefined ||
+          model.redact.length === 0 ||
+          model.kind._tag === "external" ||
+          model.kind._tag === "embedded" ||
+          (action.build && action.reusedFrom === undefined)
+        )
+          continue
+        const columns = yield* engine.describe(
+          `SELECT * FROM ${physicalFor(model, action.physicalFingerprint)}`,
+        )
+        const exposed = columns.filter((column) => model.redact.includes(column.name))
+        if (exposed.length > 0) {
+          return yield* new SchemaMismatchError({
+            model: action.name,
+            problems: exposed.map(
+              (column) =>
+                `redacted materialization cannot reuse storage containing column «${column.name}»; rebuild clean storage without forward-only`,
+            ),
+          })
+        }
+      }
+    }
     const working = plan.actions.filter(
       (action) =>
         (action.build || action.backfill.length > 0 || action.refresh) &&

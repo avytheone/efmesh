@@ -241,3 +241,114 @@ for (const target of ["native", "parquet"] as const) {
     })
   })
 }
+
+for (const target of ["native", "parquet"] as const) {
+  test(`${target}: enabling redaction cannot inherit plain storage through forward-only`, async () => {
+    await scenario((lake) =>
+      Effect.gen(function* () {
+        yield* seed
+        const model = incremental(target)
+        const models = [raw, model]
+        const first = yield* Efmesh.apply("dev", models, { now: jan3, lakePath: lake })
+        const old = first.plan.actions.find((action) => action.name === "med.people")!
+        const options = { now: jan4, lakePath: lake, redacted: true, forwardOnly: ["med.people"] }
+        const plan = yield* Efmesh.plan("dev", models, options)
+        const action = plan.actions.find((entry) => entry.name === "med.people")!
+        const outcome = yield* Efmesh.apply("dev", models, options).pipe(
+          Effect.map(() => "applied"),
+          Effect.catchTag("SchemaMismatchError", () => Effect.succeed("refused")),
+        )
+        const engine = yield* EngineAdapter
+        const physical = relation(model, old, lake)
+        const physicalColumns = (yield* engine.describe(`SELECT * FROM ${physical}`)).map(
+          (column) => column.name,
+        )
+        const rows = (yield* engine.query(`SELECT * FROM ${physical}`)).length
+        expect({ outcome, physicalColumns, rows }).toEqual({
+          outcome: "refused",
+          physicalColumns: ["id", "happened_at", "secret"],
+          rows: 2,
+        })
+        const store = yield* StateStore
+        expect(
+          (yield* store.getEnvironment("dev")).find((entry) => entry.name === "med.people")!
+            .fingerprint,
+        ).toBe(old.fingerprint)
+        expect(yield* store.getSnapshot(action.name, action.fingerprint)).toBeUndefined()
+        expect(yield* store.listIntervals(action.fingerprint)).toEqual([])
+      }),
+    )
+  })
+}
+
+for (const target of ["native", "parquet"] as const) {
+  test(`${target}: a cached snapshot with plain storage cannot be promoted as redacted`, async () => {
+    await scenario((lake) =>
+      Effect.gen(function* () {
+        yield* seed
+        const model = incremental(target)
+        const models = [raw, model]
+        const first = yield* Efmesh.apply("plain", models, { now: jan3, lakePath: lake })
+        const old = first.plan.actions.find((entry) => entry.name === "med.people")!
+        const plan = yield* Efmesh.plan("safe", models, { now: jan3, redacted: true })
+        const candidate = plan.actions.find((entry) => entry.name === "med.people")!
+        const store = yield* StateStore
+        const previous = (yield* store.getSnapshot(old.name, old.fingerprint))!
+        // Isolated legacy-state fixture: the old forward-only path could publish this mapping.
+        yield* store.upsertSnapshot({
+          name: model.name.full,
+          fingerprint: candidate.fingerprint,
+          physicalFp: old.physicalFingerprint,
+          canonicalAst: candidate.canonicalAst!,
+          renderedSql: previous.renderedSql,
+          kind: previous.kind,
+          fingerprintVersion: previous.fingerprintVersion,
+        })
+        yield* store.markIntervals(
+          candidate.fingerprint,
+          (yield* store.listIntervals(old.fingerprint)).map((entry) => ({
+            startTs: entry.startTs,
+            endTs: entry.endTs,
+          })),
+          "done",
+        )
+        const cached = yield* Efmesh.plan("safe", models, { now: jan3, redacted: true })
+        expect(cached.actions.find((entry) => entry.name === "med.people")!.build).toBe(false)
+        const outcome = yield* Efmesh.apply("safe", models, {
+          now: jan3,
+          lakePath: lake,
+          redacted: true,
+        }).pipe(
+          Effect.map(() => "applied"),
+          Effect.catchTag("SchemaMismatchError", () => Effect.succeed("refused")),
+        )
+        expect(outcome).toBe("refused")
+        expect(yield* store.getEnvironment("safe")).toEqual([])
+        const engine = yield* EngineAdapter
+        expect(
+          (yield* engine.describe(`SELECT * FROM ${relation(model, old, lake)}`)).map(
+            (column) => column.name,
+          ),
+        ).toContain("secret")
+      }),
+    )
+  })
+
+  test(`${target}: removing a redacted model does not inspect a removed graph node`, async () => {
+    await scenario((lake) =>
+      Effect.gen(function* () {
+        yield* seed
+        yield* Efmesh.apply("safe", [raw, incremental(target)], {
+          now: jan3,
+          lakePath: lake,
+          redacted: true,
+        })
+        yield* Efmesh.apply("safe", [raw], { now: jan3, lakePath: lake, redacted: true })
+        const store = yield* StateStore
+        expect(
+          (yield* store.getEnvironment("safe")).some((entry) => entry.name === "med.people"),
+        ).toBe(false)
+      }),
+    )
+  })
+}

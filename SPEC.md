@@ -213,6 +213,25 @@ and keep sharing physics across environments. Declared per model
 (`redact: ["col"]`), switched on per environment
 (`environments: { safe: { redacted: true } }`).
 
+**Switching an existing environment:** the flag takes effect on a successful
+`apply`, not when configuration is edited. A changed redaction projection gets
+a new fingerprint and clean storage; absent an already-built compatible clean
+snapshot, incremental history is backfilled rather than inherited. Models with
+no policy still share storage. Old plain tables/files and other environments
+are retained; this is not erasure or a storage-permission change.
+
+Indirect reuse and forward-only may inherit **already-clean** storage. Before
+any model writes, ledger inheritance or promotion, redacted apply inspects the
+actual reused/cached storage schema and refuses with `SchemaMismatchError` if
+it still contains a declared redacted column. This includes old snapshots whose
+physical fingerprint points at plain storage. A plan's forward-only verdict is
+not proof of clean storage. To enable/tighten redaction, use a regular apply
+that builds clean storage; forward-only cannot sanitize the inherited history.
+A refusal leaves the old environment served, so do not treat it as redacted
+until apply succeeds. Previously polluted snapshots are refused, not silently
+repaired. Checks cover declared column names, not arbitrary sensitive values
+under other names; declare the policy on each materialized model that needs it.
+
 > **Threat model, stated plainly.** A redacted environment is *safe defaults* —
 > agents and dev environments see clean data unless someone deliberately points
 > them elsewhere. It is **not** access control over the physical storage. Anyone

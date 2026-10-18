@@ -16,8 +16,8 @@ import { quoteIdent } from "../core/sql.ts"
  * model's body as a projection of the surviving declared columns and drops the
  * redacted ones from its schema. That changes the canonical AST, which changes
  * the fingerprint, which by construction means a separate physical table and a
- * separate lake prefix. No new concept is introduced, and none of the existing
- * guarantees have to be re-proved for it.
+ * separate lake prefix. Inheritance can cross fingerprints: the executor must
+ * also verify that reused or cached storage contains no declared redacted columns.
  *
  * The projection lists columns explicitly rather than using DuckDB's
  * `SELECT * EXCLUDE`: the declared schema already knows every column, and an
