@@ -475,6 +475,26 @@ past the newest file's mtime, publishes via `.tmp` + atomic rename, and deletes
 only the files snapshotted before the merge. Safe against an appending writer;
 not a substitute for a claim, and not a serialization between two compactors.
 
+**Do not overlap compaction and janitor on the same lake.** The CLI enforces
+this within one configured persistent state store: `compact` (including dry-run)
+uses the existing `janitor` lease, so a second maintenance command fails with
+`LockHeldError` before compact lists/merges files or janitor claims snapshots.
+This also excludes two CLI compactors sharing that store, even for different
+targets. The lease uses the existing heartbeat, fenced release and crash ttl;
+there is no new lock key or store schema. Environment apply/run locks stay
+separate. The CLI lease is coordination, not a transactional compaction claim.
+
+The public `compact()` effect remains engine-only and **uncoordinated**; callers
+must serialize it with janitor and other compactors themselves. Different state
+stores do not coordinate, even when configured for the same lake. Prefer
+janitor then compact; the reverse sequential order is valid but merges orphan
+files that janitor will remove. Local janitor removes the whole version prefix,
+including files published after its state scan. Controlled overlap tests preserve
+live data and show no resurrection at the tested boundaries, but deletion before
+merge or publication still causes an error. Only a consumed input disappearing
+before its final unlink is harmless. These observations are not a guarantee for
+arbitrary parallel filesystem deletion; the no-overlap rule still applies.
+
 The merge is `SELECT * EXCLUDE (_rn)` over `read_parquet(…, union_by_name =
 true, hive_partitioning = false)`, de-duplicating by the declared key with
 `row_number()`: an explicit column list would drop columns added after the

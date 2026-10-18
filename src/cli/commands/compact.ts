@@ -1,6 +1,6 @@
 import { Console, Effect } from "effect"
 import { Command, Flag } from "effect/unstable/cli"
-import { compact } from "../../plan/compact.ts"
+import { compactForCli } from "../maintenance.ts"
 import { configLayers, loadConfig } from "../config.ts"
 import { configFlag, jsonFlag } from "../flags.ts"
 import { compactToJson, printJson } from "../json.ts"
@@ -28,7 +28,7 @@ export const compactCommand = Command.make(
     Effect.gen(function* () {
       const loaded = yield* loadConfig(config)
       const graceMinutes = Number(grace)
-      const report = yield* compact({
+      const report = yield* compactForCli({
         models: loaded.models,
         dryRun,
         ...(loaded.lake !== undefined ? { lakePath: loaded.lake.path } : {}),
