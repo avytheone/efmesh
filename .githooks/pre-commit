@@ -1,0 +1,5 @@
+#!/bin/sh
+# efmesh hook entry point
+set -eu
+root=$(git rev-parse --show-toplevel)
+exec sh "$root/scripts/run-hook.sh" pre-commit "$@"

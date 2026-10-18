@@ -45,7 +45,7 @@
   "scripts": {
     "check": "biome check . && tsc --noEmit",
     "test": "bun test",
-    "prepare": "lefthook install"
+    "prepare": "sh scripts/install-hooks.sh"
   },
   "dependencies": {
     "@duckdb/node-api": "1.5.4-r.1",

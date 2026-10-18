@@ -94,15 +94,26 @@ class of bug this project can have:
   must be green before any commit. Do not pipe test output through `tail`
   inside `&&` chains — the pipe swallows the exit code.
 - Git hooks (lefthook, `lefthook.yml`) are the mechanical source of truth
-  for "what green means" and install themselves via the `prepare` script on
-  `bun install` (or `bunx lefthook install`). **pre-commit** runs
+  for "what green means". `bun install --frozen-lockfile` installs the tracked
+  `.githooks` entry points into the shared Git hooks directory via `prepare`
+  (`bun run prepare` reinstalls them).
+  Do not use `lefthook install`: its generated hooks can silently succeed
+  without lefthook. **pre-commit** runs
   `tsc --noEmit`, biome on the staged files, and the Cyrillic gate
   (`scripts/no-cyrillic.ts`: src/ and test/ are English-only, opt out a
   deliberate non-ASCII fixture with a `cyrillic-ok` marker on or above the
-  line). **pre-push** runs the full `bun test`. Hooks skip when `$CI` is set
-  (CI runs the same checks) and honour `LEFTHOOK=0`. The hooks are a
-  backstop, not a substitute for judgement — the constraints below and the
+  line). **pre-push** runs the full `bun test`. The entry points announce
+  skips when `$CI` is set (CI runs the same checks) and explicit `LEFTHOOK=0`
+  opt-outs. Missing local lefthook fails the commit/push with setup guidance.
+  The hooks are a backstop, not a substitute for judgement — the constraints below and the
   contract sections above are yours to uphold; hooks cannot.
+- **Before working in a new worktree:** run `bun install --frozen-lockfile`
+  there. Shared hooks resolve the active worktree; each worktree needs its
+  own dependencies. A checkout missing the hook runner also fails loudly.
+  Never depend on a global lefthook or another worktree's `node_modules`.
+  If a custom `core.hooksPath` is already
+  set, or a custom pre-commit/pre-push hook exists, prepare refuses to replace
+  it: reconcile that configuration explicitly.
 - Tests that spawn subprocesses or import `effect` from temp dirs must
   create those dirs **inside the repo** (module resolution).
 - DuckDB holds a single connection: model-level concurrency is 1 on DuckDB
