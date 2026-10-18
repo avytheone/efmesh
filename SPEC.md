@@ -1039,6 +1039,22 @@ is a minor at minimum and a loud CHANGELOG entry.
 The `effect` beta pin (exact, peerDependency) is outside this policy: it is a
 peer contract with its own drift CI (#47).
 
+**Release cadence follows thematic milestone checkpoints.** Features accumulate
+on `main` while commits and PRs land independently. When the agreed feature
+package for a milestone checkpoint is ready, batch the user-visible changes
+landed since the previous release into one CHANGELOG block. Finishing an issue
+or merging a PR does not trigger a release. Checkpoints follow scope readiness,
+without mandatory calendar deadlines. Milestones remain named by theme, not
+version; one milestone may span several releases, and one release may include
+work from several milestones.
+
+**Out-of-cycle releases repair broken contracts or wedged environments.** A fix
+for either may ship before the next milestone checkpoint once the fix and its
+required verification are ready; 0.3.1 is the precedent. Other fixes join the
+normal milestone batch. Urgency changes timing, never the version classification
+above or the verification gates. Each release is a separate, explicitly
+authorized operation; permission to commit or merge is not permission to publish.
+
 No test enforces any of this. The enforcement is the release checklist and
 review — stated plainly rather than pretended otherwise.
 
