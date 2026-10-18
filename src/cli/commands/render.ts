@@ -1,5 +1,5 @@
 import { Console, Effect } from "effect"
-import { Argument, Command, Flag } from "effect/unstable/cli"
+import { Argument, Command, Flag } from "effect/cli"
 import { Efmesh } from "../../efmesh.ts"
 import { loadConfig } from "../config.ts"
 import { configFlag, jsonFlag } from "../flags.ts"
@@ -8,9 +8,9 @@ import { printJson, renderToJson } from "../json.ts"
 export const renderCommand = Command.make(
   "render",
   {
-    model: Argument.string("model"),
+    model: Argument.String("model"),
     config: configFlag,
-    env: Flag.string("env").pipe(
+    env: Flag.String("env").pipe(
       Flag.withDefault(""),
       Flag.withDescription("render against an environment's view layer instead of logical names"),
     ),

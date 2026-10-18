@@ -94,5 +94,6 @@ authorization; the cadence and authorization rules above still apply.
 - **Do not publish by hand** (`npm publish` locally). Publishing is
   OIDC/provenance from CI only; a local publish has no provenance and can use
   the wrong dist-tag.
-- The pin `effect@…-beta.N` (peerDependency + devDependency) is a contract —
-  a release is not the moment to bump it.
+- The exact stable `effect` peer/dev pin and matching platform package are a
+  contract — a release is not the moment to bump them. Stable-v4 drift is an
+  advisory job; only explicitly tested versions become supported peers.

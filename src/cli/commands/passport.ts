@@ -1,5 +1,5 @@
 import { Console, Effect } from "effect"
-import { Argument, Command } from "effect/unstable/cli"
+import { Argument, Command } from "effect/cli"
 import type { ModelPassport } from "../../plan/passport.ts"
 import { environmentPassport } from "../../plan/passport.ts"
 import { configLayers, loadConfig } from "../config.ts"
@@ -29,7 +29,7 @@ const line = (passport: ModelPassport): string => {
 
 export const passportCommand = Command.make(
   "passport",
-  { env: Argument.string("env"), config: configFlag, json: jsonFlag },
+  { env: Argument.String("env"), config: configFlag, json: jsonFlag },
   ({ config, env, json }) =>
     Effect.gen(function* () {
       const loaded = yield* loadConfig(config)

@@ -28,7 +28,12 @@ bun add @avytheone/efmesh@<version>     # or npm/pnpm equivalent
 ```
 
 efmesh pins Effect exactly as a peerDependency — install the matching Effect
-beta the release expects (a mismatch surfaces at install/typecheck time).
+version the installed release expects (current main tests stable `4.0.5`). The
+platform package matches it. Do not use `effect@beta` or widen the peer merely
+because a newer patch exists: CLI is still unstable upstream. Older published
+releases can require a different peer; read that installed package's metadata.
+Effect v3 integrations must keep the process/package isolation from README §
+"Next to a codebase on a different Effect major"; stable v4 objects are not v3 objects.
 
 ## Step 2 — migrate the state store
 

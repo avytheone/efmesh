@@ -54,7 +54,7 @@ Honestly placed: the **core** is the same class of system as sqlmesh — snapsho
 
 ## Who this is for (and who it isn't)
 
-**For you**, if you are a TypeScript team on Bun, want a typed dbt/sqlmesh-style workflow on top of DuckDB or Postgres, and are fine living on a beta (efmesh is 0.5.x; Effect v4 is beta, pinned exactly as a peer dependency).
+**For you**, if you are a TypeScript team on Bun, want a typed dbt/sqlmesh-style workflow on top of DuckDB or Postgres, and accept efmesh's 0.x stability (current unreleased main uses stable Effect `4.0.5`, pinned exactly as a peer with matching platform-bun; older published releases may require the beta).
 
 **Not for you**, if you need: a Node runtime (Bun-only for now), multi-dialect or cloud DWHs (Snowflake/BigQuery are out of scope), 1.0-grade stability, or the Python ecosystem — take sqlmesh instead, honestly.
 
@@ -75,6 +75,12 @@ Honestly placed: the **core** is the same class of system as sqlmesh — snapsho
 **Engines.** DuckDB (default, including httpfs/ATTACH federation) and Postgres (`Bun.SQL` pool, canonicalization via libpg_query, parallel backfill). State store: SQLite next to the project, or a schema in Postgres.
 
 ## Quickstart
+
+Install the exact Effect peer declared by the efmesh package you use. Current
+unreleased main requires `effect@4.0.5` with matching platform-bun; this does not
+change an older published release's beta peer. The stable migration changes the
+peer compatibility boundary, so existing beta consumers must upgrade together.
+
 
 ```sh
 bun add -d @avytheone/efmesh
@@ -698,7 +704,7 @@ yourself with `Metric.snapshot` and ship it wherever you like.
 
 ## Next to a codebase on a different Effect major
 
-efmesh pins Effect v4 exactly, as a peer dependency. Two Effect majors cannot
+Current main pins stable Effect `4.0.5` exactly, as a peer dependency. Two Effect majors cannot
 share one process — `Schema` identity and the context registry are per-instance
 — so if your platform runs Effect v3, do not import efmesh into it. The failure
 is at least loud and immediate: the import throws (`Export named 'Semaphore' not
@@ -771,7 +777,7 @@ The architectural non-goals (heavy ingest, general orchestration, BI) live in [S
 
 ## Status
 
-**0.5.0** (beta). The core is built and exercised on a live example: phases F0–F6 ([SPEC.md §13](https://github.com/avytheone/efmesh/blob/main/SPEC.md), [CHANGELOG](https://github.com/avytheone/efmesh/blob/main/CHANGELOG.md)), 288 tests including a live Postgres cluster and golden tests freezing fingerprint stability. Effect v4 is a beta dependency: pinned exactly (peerDependencies); a weekly CI job tracks drift against fresh betas.
+**Current main is unreleased; efmesh remains 0.x.** The core is exercised on a live example and a full suite including PostgreSQL, MinIO and fingerprint goldens ([SPEC.md §13](https://github.com/avytheone/efmesh/blob/main/SPEC.md), [CHANGELOG](https://github.com/avytheone/efmesh/blob/main/CHANGELOG.md)). The candidate uses stable Effect `4.0.5` with matching platform-bun. The exact peer is deliberate: upstream CLI modules remain unstable, so a passing candidate does not certify untested patches. A separate weekly stable-v4 drift job provides upgrade evidence without changing the locked release gate. Historical release dependency requirements remain in their published metadata and CHANGELOG.
 
 Making efmesh legible, developable and operable by an AI agent — complete `--json` coverage with a pinnable `apiVersion`, in-repo and packaged skills, honest contracts — is done. Current work runs under the `dogfood: onto` theme: what a real deployment asks for once the pipeline runs unattended, which so far has meant telemetry, compaction, a lake a browser can read, and a run of work on not claiming more than the data supports: a passport that travels the DAG, audits that declare their scope, continuity gates that refuse with numbers. Work is grouped by theme rather than by version — which release a change lands in is decided when it is cut ([SPEC.md §11.1](https://github.com/avytheone/efmesh/blob/main/SPEC.md)) — and the themes come from dogfood needs rather than a fixed roadmap. Known limitation: a single `bun build --compile` binary builds, but standalone Bun executables can't resolve the `"efmesh"` import from a runtime-loaded config — distribution is via the package (SPEC §10).
 

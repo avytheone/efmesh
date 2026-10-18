@@ -1,5 +1,5 @@
 import { Clock, Console, Effect } from "effect"
-import { Argument, Command } from "effect/unstable/cli"
+import { Argument, Command } from "effect/cli"
 import { buildGraph } from "../../core/graph.ts"
 import { Efmesh } from "../../efmesh.ts"
 import { applyPlan } from "../../plan/executor.ts"
@@ -33,7 +33,7 @@ import { printPlan } from "../print.ts"
 export const planCommand = Command.make(
   "plan",
   {
-    env: Argument.string("env"),
+    env: Argument.String("env"),
     config: configFlag,
     forwardOnly: forwardOnlyFlag,
     reclassify: reclassifyFlag,
@@ -62,7 +62,7 @@ export const planCommand = Command.make(
 export const applyCommand = Command.make(
   "apply",
   {
-    env: Argument.string("env"),
+    env: Argument.String("env"),
     config: configFlag,
     forwardOnly: forwardOnlyFlag,
     reclassify: reclassifyFlag,

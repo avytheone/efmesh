@@ -1,6 +1,6 @@
 import * as NodePath from "node:path"
 import { Console, Effect } from "effect"
-import { Argument, Command, Flag } from "effect/unstable/cli"
+import { Argument, Command, Flag } from "effect/cli"
 import {
   listSchedules,
   registerSchedule,
@@ -13,19 +13,22 @@ import { printJson, scheduleListToJson } from "../json.ts"
 export const scheduleCommand = Command.make(
   "schedule",
   {
-    env: Argument.string("env").pipe(Argument.withDefault("")),
+    env: Argument.String("env").pipe(Argument.withDefault("")),
     config: configFlag,
-    cron: Flag.string("cron").pipe(
+    cron: Flag.String("cron").pipe(
       Flag.withDefault("@hourly"),
       Flag.withDescription("cron expression or nickname (@hourly, @daily, …)"),
     ),
-    remove: Flag.boolean("remove").pipe(
+    remove: Flag.Boolean("remove").pipe(
+      Flag.withDefault(false),
       Flag.withDescription("unregister the environment from the OS scheduler"),
     ),
-    list: Flag.boolean("list").pipe(
+    list: Flag.Boolean("list").pipe(
+      Flag.withDefault(false),
       Flag.withDescription("list efmesh entries in the OS scheduler"),
     ),
-    printSystemd: Flag.boolean("print-systemd").pipe(
+    printSystemd: Flag.Boolean("print-systemd").pipe(
+      Flag.withDefault(false),
       Flag.withDescription(
         "print systemd user units instead of cron (Persistent=true catches up misses; a lifeline without a cron daemon)",
       ),

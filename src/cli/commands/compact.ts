@@ -1,5 +1,5 @@
 import { Console, Effect } from "effect"
-import { Command, Flag } from "effect/unstable/cli"
+import { Command, Flag } from "effect/cli"
 import { compactForCli } from "../maintenance.ts"
 import { configLayers, loadConfig } from "../config.ts"
 import { configFlag, jsonFlag } from "../flags.ts"
@@ -9,17 +9,18 @@ export const compactCommand = Command.make(
   "compact",
   {
     config: configFlag,
-    model: Flag.string("model").pipe(
+    model: Flag.String("model").pipe(
       Flag.withDefault(""),
       Flag.withDescription("compact only this model's partitions"),
     ),
-    grace: Flag.string("grace").pipe(
+    grace: Flag.String("grace").pipe(
       Flag.withDefault(""),
       Flag.withDescription(
         "minutes to wait past a partition's newest file before merging it (overrides the declared policy; default 10)",
       ),
     ),
-    dryRun: Flag.boolean("dry-run").pipe(
+    dryRun: Flag.Boolean("dry-run").pipe(
+      Flag.withDefault(false),
       Flag.withDescription("report what would be merged; write and delete nothing"),
     ),
     json: jsonFlag,

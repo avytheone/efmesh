@@ -118,6 +118,25 @@ describe.skipIf(!hasPostgres)("Postgres adapter (SPEC §9.1, F3)", () => {
     expect(report).toEqual({ from: 0, to: STATE_VERSION })
   })
 
+  test("a failed transaction rolls back and the pool remains usable", async () => {
+    await scenario(
+      Effect.gen(function* () {
+        const engine = yield* EngineAdapter
+        yield* engine.execute("CREATE TABLE rollback_probe (id INTEGER)")
+        const error = yield* Effect.flip(
+          engine.transaction([
+            "INSERT INTO rollback_probe VALUES (1)",
+            "INSERT INTO no_such_rollback_table VALUES (2)",
+          ]),
+        )
+        expect(error._tag).toBe("EngineError")
+        expect(yield* engine.query("SELECT * FROM rollback_probe")).toEqual([])
+        yield* engine.transaction(["INSERT INTO rollback_probe VALUES (3)"])
+        expect(yield* engine.query("SELECT * FROM rollback_probe")).toEqual([{ id: 3 }])
+      }),
+    )
+  })
+
   test("canonicalize: libpg_query, format invariance and a parse error", async () => {
     await scenario(
       Effect.gen(function* () {

@@ -50,9 +50,10 @@ do not add new Russian text.)
   the type authority). Do not hand-format or debate whitespace in review: run
   `bun run check` (biome check + `tsc --noEmit`) before every commit and let it
   fix. The bullets below are the things biome *cannot* enforce.
-- **Effect everywhere.** Effect v4, pinned to an exact beta as a
-  peerDependency — never bump the pin casually; a weekly drift CI exists for
-  that. Shapes are `Schema`, wiring is `Layer`, services are
+- **Effect everywhere.** Stable Effect v4, tested and pinned to `4.0.5` in
+  peer/dev dependencies with matching `@effect/platform-bun`. Keep the exact
+  peer until a new version is explicitly tested: CLI remains upstream unstable.
+  The weekly stable-v4 drift job is advisory; it does not widen the supported peer. Shapes are `Schema`, wiring is `Layer`, services are
   `Context.Service`. No bare `throw` in `src/` — errors are
   `Data.TaggedError` with fields that name the culprit (model, env, file,
   interval) and carry an actionable message.

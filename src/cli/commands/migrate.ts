@@ -1,5 +1,5 @@
 import { Console, Effect } from "effect"
-import { Command } from "effect/unstable/cli"
+import { Command } from "effect/cli"
 import { migratePostgresState } from "../../state/postgres.ts"
 import { migrateSqliteState } from "../../state/sqlite.ts"
 import { loadConfig } from "../config.ts"

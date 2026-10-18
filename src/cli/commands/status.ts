@@ -1,5 +1,5 @@
 import { Console, Effect } from "effect"
-import { Argument, Command } from "effect/unstable/cli"
+import { Argument, Command } from "effect/cli"
 import { environmentStatus, isEnvHealthy } from "../../plan/status.ts"
 import { configLayers, loadConfig } from "../config.ts"
 import { checkFlag, configFlag, jsonFlag } from "../flags.ts"
@@ -29,7 +29,7 @@ const tickDetailText = (detail: string): string => {
 
 export const statusCommand = Command.make(
   "status",
-  { env: Argument.string("env"), config: configFlag, json: jsonFlag, check: checkFlag },
+  { env: Argument.String("env"), config: configFlag, json: jsonFlag, check: checkFlag },
   ({ check, config, env, json }) =>
     Effect.gen(function* () {
       const loaded = yield* loadConfig(config)

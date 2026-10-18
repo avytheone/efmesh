@@ -1070,8 +1070,23 @@ own bump ritual; the package version says nothing about them. Exit codes (`0` ok
 `1` error, `2` awaiting a human) are frozen regardless of version — changing one
 is a minor at minimum and a loud CHANGELOG entry.
 
-The `effect` beta pin (exact, peerDependency) is outside this policy: it is a
-peer contract with its own drift CI (#47).
+The Effect peer is a separate compatibility contract. Current main tests exact
+stable `effect@4.0.5` with matching `@effect/platform-bun@4.0.5`; the peer is not
+widened to untested versions because the CLI module remains upstream unstable.
+Moving consumers from beta.98 to stable changes their peer/runtime requirement;
+it is not an additive compatibility claim for beta consumers and must be reflected
+in the next release under this policy. No package version is assigned here and
+historical release metadata is unchanged. The advisory stable-v4 drift job is
+separate from lockfile-pinned CI; #72 replaces the deferred v3 direction of #47
+once this migration is accepted. The v3/v4 process-isolation guidance stays valid.
+
+The stable adapter uses `effect/cli`, explicit false defaults for previously
+optional Boolean flags, and Logger.LogToStderr to preserve JSON stdout. Stable
+Schema.Struct is callable; definition guards accept it while retaining field
+validation. DateTime AST declarations identify their family through
+`annotations.representation.id`, covered at runtime rather than assumed from
+type-checking. No fingerprint payload or goldens, state schema or JSON version
+changes are part of the migration.
 
 **Release cadence follows thematic milestone checkpoints.** Features accumulate
 on `main` while commits and PRs land independently. When the agreed feature

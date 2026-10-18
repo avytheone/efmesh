@@ -1,27 +1,27 @@
 import { Effect } from "effect"
-import { Flag } from "effect/unstable/cli"
+import { Flag } from "effect/cli"
 import { ReclassifyError } from "../plan/planner.ts"
 
-export const configFlag = Flag.string("config").pipe(
+export const configFlag = Flag.String("config").pipe(
   Flag.withDefault("efmesh.config.ts"),
   Flag.withDescription("path to efmesh.config.ts"),
 )
 
-export const forwardOnlyFlag = Flag.string("forward-only").pipe(
+export const forwardOnlyFlag = Flag.String("forward-only").pipe(
   Flag.withDefault(""),
   Flag.withDescription(
     "comma-separated models: changes apply forward-only — physics and history are reused",
   ),
 )
 
-export const reclassifyFlag = Flag.string("reclassify").pipe(
+export const reclassifyFlag = Flag.String("reclassify").pipe(
   Flag.withDefault(""),
   Flag.withDescription(
     'override categorization (#5): "model=breaking|non-breaking[,…]" on top of --explain; journaled with applied_by',
   ),
 )
 
-export const jobsFlag = Flag.string("jobs").pipe(
+export const jobsFlag = Flag.String("jobs").pipe(
   Flag.withDefault(""),
   Flag.withDescription("how many models to build at once (DAG concurrency; always 1 on DuckDB)"),
 )
@@ -35,7 +35,7 @@ export const parseJobs = (value: string): number | undefined => {
  * Where to drop the scrape file (#39). Empty = no file: the default stays a
  * command that writes nothing it was not asked to write.
  */
-export const metricsFlag = Flag.string("metrics").pipe(
+export const metricsFlag = Flag.String("metrics").pipe(
   Flag.withDefault(""),
   Flag.withDescription(
     "write an OpenMetrics/Prometheus text file after the command (for node_exporter's textfile collector)",
@@ -45,7 +45,7 @@ export const metricsFlag = Flag.string("metrics").pipe(
 export const parseMetricsPath = (value: string): string | undefined =>
   value.trim() === "" ? undefined : value
 
-export const retriesFlag = Flag.string("retries").pipe(
+export const retriesFlag = Flag.String("retries").pipe(
   Flag.withDefault(""),
   Flag.withDescription(
     "how many times to retry a failed backfill batch (exponential backoff; default 0)",
@@ -99,7 +99,8 @@ export const parseReclassify = (
     return parsed
   })
 
-export const yesFlag = Flag.boolean("yes").pipe(
+export const yesFlag = Flag.Boolean("yes").pipe(
+  Flag.withDefault(false),
   Flag.withAlias("y"),
   Flag.withDescription(
     "apply without confirmation; required in a non-TTY when the plan has changes (else exit 2)",
@@ -129,17 +130,20 @@ export const decideApply = (
   tty: boolean,
 ): "apply" | "ask" | "refuse" => (!hasChanges || yes ? "apply" : tty ? "ask" : "refuse")
 
-export const jsonFlag = Flag.boolean("json").pipe(
+export const jsonFlag = Flag.Boolean("json").pipe(
+  Flag.withDefault(false),
   Flag.withDescription("machine-readable output (stable shape — a contract for CI)"),
 )
 
-export const checkFlag = Flag.boolean("check").pipe(
+export const checkFlag = Flag.Boolean("check").pipe(
+  Flag.withDefault(false),
   Flag.withDescription(
     "exit non-zero when the environment is unhealthy (failed intervals or the last tick errored) — for systemd OnFailure / healthchecks.io",
   ),
 )
 
-export const explainFlag = Flag.boolean("explain").pipe(
+export const explainFlag = Flag.Boolean("explain").pipe(
+  Flag.withDefault(false),
   Flag.withDescription(
     "for each change — which canonical AST nodes diverged and why the category is what it is",
   ),

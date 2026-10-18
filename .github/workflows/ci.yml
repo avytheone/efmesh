@@ -42,3 +42,6 @@ jobs:
 
       - name: Tests
         run: bun test
+
+      - name: Fresh consumer and CLI smoke
+        run: bun run scripts/smoke-consumer.ts

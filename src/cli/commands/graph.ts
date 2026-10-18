@@ -1,6 +1,6 @@
 import { writeFileSync } from "node:fs"
 import { Console, Effect } from "effect"
-import { Command, Flag } from "effect/unstable/cli"
+import { Command, Flag } from "effect/cli"
 import { buildGraph } from "../../core/graph.ts"
 import { renderGraphHtml } from "../../plan/graph-html.ts"
 import { loadConfig } from "../config.ts"
@@ -12,7 +12,7 @@ export const graphCommand = Command.make(
   {
     config: configFlag,
     json: jsonFlag,
-    html: Flag.string("html").pipe(
+    html: Flag.String("html").pipe(
       Flag.withDefault(""),
       Flag.withDescription("write the DAG as a self-contained HTML page at the given path"),
     ),
