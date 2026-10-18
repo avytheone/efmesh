@@ -13,8 +13,10 @@ the first version gathers them in full.
 - Redacted apply refuses reused or cached storage that still contains declared
   sensitive columns before writing models, inheriting interval accounting or
   promoting views (#57). In particular, enabling redaction with forward-only
-  could reuse unredacted parquet history. Regular redaction activation builds
-  clean storage; it does not erase existing plain storage or grant access control.
+  could reuse unredacted parquet history. Disabling redaction via forward-only
+  also refuses to restore declared sensitive columns into clean storage still
+  shared with a safe environment. Regular flag changes use separate compatible
+  storage; they do not erase plain storage or grant access control.
 
 ## [0.5.0] — 2026-07-18
 

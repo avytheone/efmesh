@@ -621,8 +621,12 @@ environment.
 Indirect reuse and forward-only are allowed within already-clean storage.
 Redacted apply checks the physical schema of reused/cached storage before model
 writes, interval inheritance and promotion, refusing declared sensitive columns
-with `SchemaMismatchError`. Forward-only is not a way to remove columns from
-historical files. Existing polluted snapshots are refused, not repaired. Old
+with `SchemaMismatchError`. With the declared policy retained, plain apply also
+refuses to restore a declared redacted column absent from inherited/cached
+storage, which may still serve a safe environment. Use a regular apply when
+switching the flag in either direction; forward-only cannot remove or restore
+sensitive columns in shared history. Already-plain forward-only evolution remains
+supported. Existing polluted snapshots are refused, not repaired. Old
 plain files/tables remain until normal lifecycle cleanup; the switch does not
 erase them or change storage permissions. Policies cover declared column names,
 not sensitive values aliased into other columns.

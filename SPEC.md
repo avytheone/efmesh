@@ -225,9 +225,13 @@ Indirect reuse and forward-only may inherit **already-clean** storage. Before
 any model writes, ledger inheritance or promotion, redacted apply inspects the
 actual reused/cached storage schema and refuses with `SchemaMismatchError` if
 it still contains a declared redacted column. This includes old snapshots whose
-physical fingerprint points at plain storage. A plan's forward-only verdict is
-not proof of clean storage. To enable/tighten redaction, use a regular apply
-that builds clean storage; forward-only cannot sanitize the inherited history.
+physical fingerprint points at plain storage. With the declared policy retained,
+plain apply also refuses to restore a declared redacted column absent from the
+inherited/cached schema: another environment may still use that clean storage.
+This is conservative even when only one environment currently refers to it.
+A plan's forward-only verdict is not proof of compatible storage. To change the
+redacted flag in either direction, use a regular apply with separate compatible
+storage; forward-only cannot sanitize or reintroduce sensitive history in place.
 A refusal leaves the old environment served, so do not treat it as redacted
 until apply succeeds. Previously polluted snapshots are refused, not silently
 repaired. Checks cover declared column names, not arbitrary sensitive values

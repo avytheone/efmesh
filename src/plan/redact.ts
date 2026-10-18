@@ -17,7 +17,7 @@ import { quoteIdent } from "../core/sql.ts"
  * redacted ones from its schema. That changes the canonical AST, which changes
  * the fingerprint, which by construction means a separate physical table and a
  * separate lake prefix. Inheritance can cross fingerprints: the executor must
- * also verify that reused or cached storage contains no declared redacted columns.
+ * also check reused/cached schemas before crossing between clean and plain storage.
  *
  * The projection lists columns explicitly rather than using DuckDB's
  * `SELECT * EXCLUDE`: the declared schema already knows every column, and an

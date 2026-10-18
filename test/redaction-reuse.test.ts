@@ -352,3 +352,105 @@ for (const target of ["native", "parquet"] as const) {
     )
   })
 }
+
+for (const target of ["native", "parquet"] as const) {
+  test(`${target}: disabling redaction cannot pollute storage still shared by a safe environment`, async () => {
+    await scenario((lake) =>
+      Effect.gen(function* () {
+        yield* seed
+        const model = incremental(target)
+        const models = [raw, model]
+        const first = yield* Efmesh.apply("safe", models, {
+          now: jan3,
+          lakePath: lake,
+          redacted: true,
+        })
+        const safe = first.plan.actions.find((entry) => entry.name === "med.people")!
+        const second = yield* Efmesh.apply("dev", models, {
+          now: jan3,
+          lakePath: lake,
+          redacted: true,
+        })
+        expect(
+          second.plan.actions.find((entry) => entry.name === "med.people")!.physicalFingerprint,
+        ).toBe(safe.physicalFingerprint)
+        const options = { now: jan4, lakePath: lake, redacted: false, forwardOnly: ["med.people"] }
+        const plan = yield* Efmesh.plan("dev", models, options)
+        const candidate = plan.actions.find((entry) => entry.name === "med.people")!
+        expect(candidate.reusedFrom).toBe(safe.fingerprint)
+        expect(candidate.physicalFingerprint).toBe(safe.physicalFingerprint)
+        const outcome = yield* Efmesh.apply("dev", models, options).pipe(
+          Effect.map(() => "applied"),
+          Effect.catchTag("SchemaMismatchError", () => Effect.succeed("refused")),
+        )
+        const engine = yield* EngineAdapter
+        const physical = relation(model, safe, lake)
+        const physicalColumns = (yield* engine.describe(`SELECT * FROM ${physical}`)).map(
+          (column) => column.name,
+        )
+        const rows = (yield* engine.query(`SELECT * FROM ${physical}`)).length
+        expect({ outcome, physicalColumns, rows }).toEqual({
+          outcome: "refused",
+          physicalColumns: ["id", "happened_at"],
+          rows: 2,
+        })
+        yield* inspectClean(model, safe, lake, ["id", "happened_at"], 2)
+        const store = yield* StateStore
+        for (const env of ["safe", "dev"]) {
+          expect(
+            (yield* store.getEnvironment(env)).find((entry) => entry.name === "med.people")!
+              .fingerprint,
+          ).toBe(safe.fingerprint)
+        }
+        expect(yield* store.getSnapshot(candidate.name, candidate.fingerprint)).toBeUndefined()
+        expect(yield* store.listIntervals(candidate.fingerprint)).toEqual([])
+        // A regular apply forks clean and plain storage instead of mutating the shared prefix/table.
+        const plain = yield* Efmesh.apply("dev", models, {
+          now: jan4,
+          lakePath: lake,
+          redacted: false,
+        })
+        const plainAction = plain.plan.actions.find((entry) => entry.name === "med.people")!
+        expect(plainAction.physicalFingerprint).not.toBe(safe.physicalFingerprint)
+        expect(
+          (yield* engine.describe(`SELECT * FROM ${relation(model, plainAction, lake)}`)).map(
+            (column) => column.name,
+          ),
+        ).toContain("secret")
+        yield* inspectClean(model, safe, lake, ["id", "happened_at"], 2)
+      }),
+    )
+  })
+
+  test(`${target}: forward-only may evolve already-plain storage with a retained redaction policy`, async () => {
+    await scenario((lake) =>
+      Effect.gen(function* () {
+        yield* seed
+        const first = yield* Efmesh.apply("dev", [raw, incremental(target)], {
+          now: jan3,
+          lakePath: lake,
+        })
+        const old = first.plan.actions.find((entry) => entry.name === "med.people")!
+        const model = incremental(target, true)
+        const applied = yield* Efmesh.apply("dev", [raw, model], {
+          now: jan4,
+          lakePath: lake,
+          redacted: false,
+          forwardOnly: ["med.people"],
+        })
+        const action = applied.plan.actions.find((entry) => entry.name === "med.people")!
+        expect(action.change).toBe("forward-only")
+        expect(action.physicalFingerprint).toBe(old.physicalFingerprint)
+        const engine = yield* EngineAdapter
+        expect(
+          (yield* engine.describe(`SELECT * FROM ${relation(model, action, lake)}`)).map(
+            (column) => column.name,
+          ),
+        ).toEqual(["id", "happened_at", "secret", "score"])
+        expect(yield* engine.query(`SELECT * FROM ${relation(model, action, lake)}`)).toHaveLength(
+          3,
+        )
+      }),
+    )
+  })
+}
