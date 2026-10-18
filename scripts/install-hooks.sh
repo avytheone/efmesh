@@ -14,6 +14,10 @@ hooks=$(git rev-parse --git-path hooks)
 # Validate both targets before replacing either; preserve unrelated custom hooks.
 for hook in pre-commit pre-push; do
   target="$hooks/$hook"
+  if [ -L "$target" ]; then
+    echo "efmesh: refusing to replace symlink hook $target" >&2
+    exit 1
+  fi
   if [ -e "$target" ] && ! grep -q -e 'efmesh hook entry point' -e 'call_lefthook' "$target"; then
     echo "efmesh: refusing to replace custom hook $target" >&2
     exit 1

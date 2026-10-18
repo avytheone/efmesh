@@ -3,10 +3,14 @@ import { spawnSync } from "node:child_process"
 import {
   chmodSync,
   cpSync,
+  existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   rmSync,
   renameSync,
+  readFileSync,
+  readlinkSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs"
@@ -130,3 +134,46 @@ test("prepare preserves custom hooks", () => {
   expect(result.status).not.toBe(0)
   expect(result.output).toContain("refusing to replace custom hook")
 })
+
+for (const hook of ["pre-commit", "pre-push"]) {
+  for (const dangling of [false, true]) {
+    test(`prepare preserves ${hook} symlinks (${dangling ? "dangling" : "existing target"}) without partial writes`, () => {
+      const fixture = join(root, `symlink-${hook}-${dangling}`)
+      mkdirSync(fixture)
+      expect(git(fixture, "init").status).toBe(0)
+      for (const path of [".githooks", "scripts"]) {
+        cpSync(join(source, path), join(fixture, path), { recursive: true })
+      }
+      const hooks = join(fixture, ".git/hooks")
+      for (const name of ["pre-commit", "pre-push"]) {
+        writeFileSync(join(hooks, name), `#!/bin/sh\n# call_lefthook: original ${name}\n`)
+        chmodSync(join(hooks, name), 0o750)
+      }
+      // The simulated shared target lives outside the fixture repo, inside our temp root.
+      const target = join(root, `shared-${hook}-${dangling}`)
+      const original = "#!/bin/sh\n# call_lefthook: shared hook\n"
+      if (!dangling) {
+        writeFileSync(target, original)
+        chmodSync(target, 0o640)
+      }
+      const destination = join(hooks, hook)
+      rmSync(destination)
+      symlinkSync(target, destination)
+      const sibling = join(hooks, hook === "pre-commit" ? "pre-push" : "pre-commit")
+      const siblingContents = readFileSync(sibling, "utf8")
+      const siblingMode = lstatSync(sibling).mode
+      const result = run(fixture, ["sh", "scripts/install-hooks.sh"])
+      expect(lstatSync(destination).isSymbolicLink()).toBe(true)
+      expect(readlinkSync(destination)).toBe(target)
+      expect(existsSync(target)).toBe(!dangling)
+      if (!dangling) {
+        expect(readFileSync(target, "utf8")).toBe(original)
+        expect(lstatSync(target).mode & 0o777).toBe(0o640)
+      }
+      expect(readFileSync(sibling, "utf8")).toBe(siblingContents)
+      expect(lstatSync(sibling).mode).toBe(siblingMode)
+      expect(result.status).not.toBe(0)
+      expect(result.output).toContain("refusing to replace symlink hook")
+    })
+  }
+}
