@@ -2,11 +2,12 @@ import { execSync, spawnSync } from "node:child_process"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { requireIntegrationInCi } from "./integration.ts"
 
 /**
  * A throwaway Postgres cluster for integration tests: initdb in tmp, TCP on a
  * free port, fsync off — startup ~1 s. Without Postgres binaries in PATH the
- * tests are skipped (see hasPostgres).
+ * local tests are skipped (see hasPostgres); CI refuses to run without them.
  */
 
 export const hasPostgres: boolean = (() => {
@@ -18,6 +19,8 @@ export const hasPostgres: boolean = (() => {
     return false
   }
 })()
+
+requireIntegrationInCi("PostgreSQL", hasPostgres)
 
 export interface TestCluster {
   readonly url: string

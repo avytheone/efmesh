@@ -287,9 +287,24 @@ SQL fragments.
 For an S3-compatible lake, the same explicit S3 credential also powers manifest
 publication and janitor deletion; credentials sourced only through DuckDB's
 ambient credential chain can read/write parquet, but cannot be reused by those
-two operational paths. A MinIO integration test exercises apply, promotion,
-querying, another interval, restate, manifest readback, aborted-upload
-visibility, and janitor deletion against a real endpoint.
+two operational paths. A MinIO integration test exercises apply, dev-to-prod
+promotion without rebuilding or rewriting objects, view/direct Parquet queries,
+another interval, corrected-source restate/reapply, manifest readback, preservation
+while prod still references a version, and janitor deletion after its last
+reference moves. CI requires Docker and PostgreSQL; missing prerequisites fail
+instead of silently skipping either integration suite. Local runs without them
+may skip, so report local and CI evidence separately.
+
+The failed-COPY probe observes no key after one expression error on MinIO; it
+does not establish that a multipart upload began or prove safety under process
+crash, network loss, interrupted multipart completion or every S3-compatible
+provider. S3 writes use direct object replacement, not POSIX rename. Object writes,
+interval-ledger updates, audits and manifest publication are separate steps;
+there is no transaction over them or across multiple objects. Views read a prefix
+rather than filtering by the ledger, so "not marked done" alone does not make an
+object invisible. Concurrent reads during rewrite/restate have no snapshot
+isolation or general crash-atomicity guarantee. The test documents this limited
+observation; it does not extend compaction to S3.
 
 `efmesh compact` does **not** compact S3 partitions yet. It says so on stderr and
 in `compact --json` under `warnings`; it never silently reports an S3 lake as

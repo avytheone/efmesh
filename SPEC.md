@@ -156,9 +156,11 @@ Where to put the physical layer is a property of the model (by default taken fro
 - **`target: "parquet"`** — a lake: the snapshot is materialized into parquet files
   (`<lake>/med/stays/fp=a3f9c1/interval=2026-01-01/*.parquet`), a view over
   `read_parquet('…/fp=a3f9c1/**')`. The lake path is a local directory or S3 (httpfs).
-  The S3 claim is covered by a live MinIO test: apply, promotion and view reads,
-  interval append, restate, manifest readback, an aborted upload remaining
-  invisible, and janitor prefix deletion. S3 manifest and janitor operations use
+  The S3 claim is covered by a live MinIO test: apply, dev-to-prod promotion
+  without rebuilding/rewriting objects, view/direct Parquet reads, interval append,
+  corrected-source restate/reapply, manifest readback, a failed-COPY absent-key
+  observation, and janitor preservation until the last reference moves followed
+  by prefix deletion. S3 manifest and janitor operations use
   the same explicit credential declaration as DuckDB; an ambient-only DuckDB
   credential cannot be reused outside the engine and produces an operational
   warning rather than a false cleanup claim. S3 compaction is not implemented;
@@ -174,9 +176,20 @@ Where to put the physical layer is a property of the model (by default taken fro
 
 efmesh's incrementality maps onto a parquet lake without a single new concept:
 **an interval = a partition**. Recomputing an interval means rewriting its partition's files;
-interval tracking (§6) remains the source of truth here too, so the non-atomicity
-of overwriting an S3 prefix is not scary — an under-written interval is simply not marked
-`done` and will be recomputed.
+interval tracking (§6) remains the source of truth for recomputation: an interval
+not marked `done` is retried. It is not a visibility barrier: views glob the
+physical prefix, not the ledger. S3 writes directly replace objects, without
+POSIX rename or a transaction spanning objects, audits, ledger marks and manifest
+publication. Concurrent readers during append/rewrite/restate do not receive a
+snapshot-isolation or general crash-atomicity guarantee. The MinIO test proves
+only that one expression-error COPY leaves its destination key absent; it does
+not establish that multipart upload began. Process termination, network failure,
+interrupted multipart completion and other providers are not covered by that
+probe. No stronger atomicity claim follows from the ledger alone.
+
+CI requires the Docker daemon and PostgreSQL binaries and fails when unavailable;
+it must execute the live MinIO and Postgres suites. Local capability-based skips
+remain available and are not equivalent integration evidence.
 
 ### 3.4 The manifest, and what it forces about masking
 
@@ -186,8 +199,9 @@ over HTTP; without this document a client enumerates files by walking a web
 server's directory listings — fragile (listing formats differ), slow (many round
 trips before the first byte), and non-atomic (a listing can catch a partition
 mid-rewrite). The manifest names the file set of one version, so a client fetches
-one document and then the data. It is published temp-file-then-rename, like
-everything else a reader can catch mid-write.
+one document and then the data. Local publication uses temp-file-then-rename;
+S3 publication uses an object-store write. Neither is a transaction spanning the
+data files, ledger and manifest.
 
 The format carries the answer passport (`answerable`, `caveats`, `freshness`)
 from the outset, ahead of the issue that consumes it (#43): a document that

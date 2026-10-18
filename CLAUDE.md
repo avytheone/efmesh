@@ -116,6 +116,9 @@ class of bug this project can have:
   If a custom `core.hooksPath` is already
   set, or a custom pre-commit/pre-push hook exists, prepare refuses to replace
   it: reconcile that configuration explicitly.
+- CI requires a working Docker daemon (the pinned-source MinIO suite) and
+  PostgreSQL `initdb`/`pg_ctl`; the probes fail instead of skipping when `CI`
+  is set. Local capability skips are not successful integration evidence.
 - Tests that spawn subprocesses or import `effect` from temp dirs must
   create those dirs **inside the repo** (module resolution).
 - DuckDB holds a single connection: model-level concurrency is 1 on DuckDB

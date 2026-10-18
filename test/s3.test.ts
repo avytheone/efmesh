@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { Effect, Layer, Schema } from "effect"
+import { compactToJson } from "../src/cli.ts"
 import { fromIso } from "../src/core/interval.ts"
 import { defineExternal, defineModel, external, kind } from "../src/core/model.ts"
 import { Efmesh } from "../src/efmesh.ts"
@@ -8,10 +9,15 @@ import { DuckDBEngineLive } from "../src/engine/duckdb.ts"
 import { fp8, parquetPrefix } from "../src/plan/naming.ts"
 import { janitor } from "../src/plan/janitor.ts"
 import { restate } from "../src/plan/restate.ts"
+import { compact } from "../src/plan/compact.ts"
 import { SqliteStateLive } from "../src/state/sqlite.ts"
+import { StateStore } from "../src/state/store.ts"
 import { hasDocker, startMinio, type MinioEndpoint } from "./helpers/minio.ts"
 
 let minio: MinioEndpoint
+
+const s3CompactWarning =
+  "S3 compaction is not implemented; no S3 partitions were listed, merged, or deleted: med.events"
 
 beforeAll(async () => {
   if (!hasDocker) return
@@ -46,7 +52,7 @@ const eventsModel = (suffix = "") =>
   )
 
 describe.skipIf(!hasDocker)("S3 parquet lake against MinIO (#65)", () => {
-  test("apply, query, append, restate, manifest, atomic failure and janitor", async () => {
+  test("apply, dev-to-prod promotion, query, append, corrected restate, manifest, failed COPY and janitor", async () => {
     const lake = `s3://${minio.bucket}/project`
     const credential = {
       name: "lake_s3",
@@ -71,6 +77,7 @@ describe.skipIf(!hasDocker)("S3 parquet lake against MinIO (#65)", () => {
     await Effect.runPromise(
       Effect.gen(function* () {
         const engine = yield* EngineAdapter
+        const store = yield* StateStore
         expect(engine.objectStore).toBeDefined()
         yield* engine.execute(`CREATE SCHEMA src`)
         yield* engine.execute(`
@@ -95,6 +102,56 @@ describe.skipIf(!hasDocker)("S3 parquet lake against MinIO (#65)", () => {
           (yield* engine.query(`SELECT count(*)::INT AS n FROM dev__med.events`))[0]?.["n"],
         ).toBe(2)
 
+        // Promotion reuses dev's physical S3 version without writing objects.
+        const beforePromotion = yield* engine.objectStore!.list(`${prefix}/`)
+        const beforeManifest = yield* engine.objectStore!.readText(`${prefix}/manifest.json`)
+        const publicationWrites: string[] = []
+        const objectStore = engine.objectStore!
+        const promotionEngine = {
+          ...engine,
+          execute: (sql: string) => {
+            if (/^\s*COPY\s/i.test(sql)) publicationWrites.push("COPY")
+            return engine.execute(sql)
+          },
+          objectStore: {
+            ...objectStore,
+            writeText: (path: string, content: string) => {
+              publicationWrites.push(path)
+              return objectStore.writeText(path, content)
+            },
+            delete: (path: string) => {
+              publicationWrites.push(path)
+              return objectStore.delete(path)
+            },
+            deletePrefix: (path: string) => {
+              publicationWrites.push(path)
+              return objectStore.deletePrefix(path)
+            },
+          },
+        }
+        const promoted = yield* Efmesh.apply("prod", models, {
+          now: fromIso("2026-01-03T00:00:00Z"),
+          lakePath: lake,
+        }).pipe(Effect.provideService(EngineAdapter, promotionEngine))
+        expect(promoted.built).toEqual([])
+        expect(publicationWrites).toEqual([])
+        for (const env of ["dev", "prod"])
+          expect(
+            (yield* store.getEnvironment(env)).find((row) => row.name === "med.events")!
+              .fingerprint,
+          ).toBe(fingerprint)
+        expect(yield* engine.objectStore!.list(`${prefix}/`)).toEqual(beforePromotion)
+        expect(yield* engine.objectStore!.readText(`${prefix}/manifest.json`)).toBe(beforeManifest)
+        expect(yield* engine.query("SELECT id FROM med.events ORDER BY id")).toEqual([
+          { id: "e1" },
+          { id: "e2" },
+        ])
+        expect(
+          yield* engine.query(
+            `SELECT count(*)::INT AS n FROM read_parquet('${prefix}/**/*.parquet')`,
+          ),
+        ).toEqual([{ n: 2 }])
+
         yield* Efmesh.apply("dev", models, {
           now: fromIso("2026-01-04T00:00:00Z"),
           lakePath: lake,
@@ -103,6 +160,11 @@ describe.skipIf(!hasDocker)("S3 parquet lake against MinIO (#65)", () => {
           (yield* engine.query(`SELECT count(*)::INT AS n FROM dev__med.events`))[0]?.["n"],
         ).toBe(3)
 
+        expect(yield* engine.query("SELECT count(*)::INT AS n FROM med.events")).toEqual([{ n: 3 }])
+        // Corrected data must be read by the reopened interval, not just counted again.
+        yield* engine.execute(
+          "INSERT INTO src.events VALUES ('e2-corrected', TIMESTAMP '2026-01-02 15:00:00')",
+        )
         yield* restate("dev", "med.events", "2026-01-02T00:00:00Z", "2026-01-03T00:00:00Z", models)
         yield* Efmesh.apply("dev", models, {
           now: fromIso("2026-01-04T00:00:00Z"),
@@ -110,15 +172,35 @@ describe.skipIf(!hasDocker)("S3 parquet lake against MinIO (#65)", () => {
         })
         expect(
           (yield* engine.query(`SELECT count(*)::INT AS n FROM dev__med.events`))[0]?.["n"],
-        ).toBe(3)
+        ).toBe(4)
+        expect(yield* engine.query("SELECT id FROM med.events ORDER BY id")).toEqual([
+          { id: "e1" },
+          { id: "e2" },
+          { id: "e2-corrected" },
+          { id: "e3" },
+        ])
 
         const manifest = JSON.parse(
           yield* engine.objectStore!.readText(`${prefix}/manifest.json`),
-        ) as { files: ReadonlyArray<string>; intervals: ReadonlyArray<unknown> }
+        ) as {
+          fingerprint: string
+          files: ReadonlyArray<string>
+          intervals: ReadonlyArray<unknown>
+          effective: { completeThrough: string | null }
+        }
         expect(manifest.files).toHaveLength(3)
         expect(manifest.intervals).toHaveLength(3)
+        expect(manifest.fingerprint).toBe(fingerprint)
+        expect(manifest.effective.completeThrough).toBe("2026-01-04T00:00:00.000Z")
+        const objectsBeforeCompact = yield* engine.objectStore!.list(`${prefix}/`)
+        const compactReport = yield* compact({ models, lakePath: lake })
+        expect(compactReport.compacted).toEqual([])
+        expect(compactReport.warnings).toEqual([s3CompactWarning])
+        expect(compactToJson(compactReport)).toMatchObject({ warnings: [s3CompactWarning] })
+        expect(yield* engine.objectStore!.list(`${prefix}/`)).toEqual(objectsBeforeCompact)
 
-        // DuckDB/httpfs must abort a failed upload rather than expose a partial key.
+        // This expression-error COPY leaves no key on the tested endpoint.
+        // It does not establish that multipart upload began, or cover crashes/network loss.
         const unfinished = `${lake}/atomicity/unfinished.parquet`
         yield* Effect.flip(
           engine.execute(
@@ -133,10 +215,24 @@ describe.skipIf(!hasDocker)("S3 parquet lake against MinIO (#65)", () => {
           now: fromIso("2026-01-04T00:00:00Z"),
           lakePath: lake,
         })
+        // Prod still references the old version: janitor must preserve those objects.
+        const kept = yield* janitor({ ttlDays: 0, lakePath: lake })
+        expect(kept.removed).not.toContain(`med.events@${fp8(fingerprint)}`)
+        expect(yield* engine.objectStore!.list(`${prefix}/`)).toEqual(objectsBeforeCompact)
+        expect(yield* engine.query("SELECT count(*)::INT AS n FROM med.events")).toEqual([{ n: 4 }])
+        const promotedChanged = yield* Efmesh.apply("prod", [raw, changed], {
+          now: fromIso("2026-01-04T00:00:00Z"),
+          lakePath: lake,
+        })
+        expect(promotedChanged.built).toEqual([])
         const report = yield* janitor({ ttlDays: 0, lakePath: lake })
         expect(report.warnings).toEqual([])
         expect(report.removed).toContain(`med.events@${fp8(fingerprint)}`)
         expect(yield* engine.objectStore!.list(`${prefix}/`)).toEqual([])
+        expect(yield* engine.query("SELECT count(*)::INT AS n FROM dev__med.events")).toEqual([
+          { n: 4 },
+        ])
+        expect(yield* engine.query("SELECT count(*)::INT AS n FROM med.events")).toEqual([{ n: 4 }])
       }).pipe(Effect.provide(layer)),
     )
   }, 60_000)
