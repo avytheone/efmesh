@@ -8,6 +8,12 @@ description: Land a change against a GitHub issue the efmesh way — atomic comm
 One issue = one shippable concern. A commit closes it. Keep the history atomic
 and the docs honest.
 
+Before a substantial merge or merging any subagent branch, invoke
+[claim-sheet](../claim-sheet/SKILL.md). Put its six claims and exact reviewed SHA
+in the PR body (or link the sheet there), refresh them after fixes and test runs,
+and hand them off for independent review before merging. This also applies to
+workflow-policy changes; a green suite alone does not satisfy it.
+
 ## Checklist
 
 1. **Scope to the issue.** One logical change per commit. If the work splits into

@@ -30,6 +30,12 @@ timing only: SPEC §11.1 still determines the version, and every gate below stil
 applies. Start the checklist only with explicit authorization for the release;
 permission to commit or merge does not authorize publishing.
 
+Before every release, invoke [claim-sheet](../claim-sheet/SKILL.md) and retain
+the sheet in `docs/claims/` for the exact release candidate and base. Link it
+from the release review, refresh it after any candidate change, and obtain
+independent review before tagging/publishing. The sheet does not grant release
+authorization; the cadence and authorization rules above still apply.
+
 ## Checklist
 
 1. **Green first.** `bun test` and `bun run check` must pass. Working tree clean.
