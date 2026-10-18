@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { Effect } from "effect"
+import { Effect, Schema } from "effect"
 import {
   API_VERSION,
   applyToJson,
@@ -19,6 +19,12 @@ import {
   statusToJson,
   withApiVersion,
 } from "../src/cli.ts"
+
+import { buildGraph } from "../src/core/graph.ts"
+import { defineModel, kind } from "../src/core/model.ts"
+import type { Plan } from "../src/plan/planner.ts"
+import type { RestatePlan } from "../src/plan/restate.ts"
+import type { StatusReport } from "../src/plan/status.ts"
 
 describe("--reclassify — flag parsing (#5)", () => {
   test("model=category pairs; empty — undefined; garbage — an error", async () => {
@@ -73,7 +79,7 @@ describe("the plan's fate in apply (F6: non-TTY without --yes = refusal)", () =>
 describe("plan --json — the shape contract (#3)", () => {
   test("intervals — ISO UTC, fields are stable", async () => {
     const { planToJson } = await import("../src/cli.ts")
-    const json = planToJson({
+    const plan: Plan = {
       env: "dev",
       hasChanges: true,
       actions: [
@@ -100,7 +106,8 @@ describe("plan --json — the shape contract (#3)", () => {
         },
       ],
       warnings: [],
-    } as never)
+    }
+    const json = planToJson(plan)
     expect(json).toEqual({
       env: "dev",
       hasChanges: true,
@@ -177,7 +184,7 @@ describe("--json shapes for headless commands (#16)", () => {
 })
 
 describe("apply/run/status/graph --json — the shape contract (#28)", () => {
-  const plan = {
+  const plan: Plan = {
     env: "dev",
     hasChanges: true,
     actions: [
@@ -193,7 +200,7 @@ describe("apply/run/status/graph --json — the shape contract (#28)", () => {
       },
     ],
     warnings: [],
-  } as never
+  }
 
   test("apply — env/applied/plan/built/promoted; plan rides the planToJson shape", () => {
     expect(
@@ -246,7 +253,7 @@ describe("apply/run/status/graph --json — the shape contract (#28)", () => {
   })
 
   test("status — lastPlan.summary and ticks[].detail are objects, not JSON-in-a-string", () => {
-    const report = {
+    const report: StatusReport = {
       env: "dev",
       storeVersion: 5,
       models: 2,
@@ -269,7 +276,7 @@ describe("apply/run/status/graph --json — the shape contract (#28)", () => {
           detail: JSON.stringify({ built: ["med.daily"] }),
         },
       ],
-    } as never
+    }
     // the store's internal row ids and the redundant per-row env are dropped (#28)
     expect(statusToJson(report)).toEqual({
       env: "dev",
@@ -294,7 +301,7 @@ describe("apply/run/status/graph --json — the shape contract (#28)", () => {
   })
 
   test("status — an unparseable legacy detail falls back to { raw } rather than throwing", () => {
-    const report = {
+    const report: StatusReport = {
       env: "dev",
       storeVersion: 5,
       models: 0,
@@ -311,20 +318,22 @@ describe("apply/run/status/graph --json — the shape contract (#28)", () => {
           detail: "EngineError",
         },
       ],
-    } as never
+    }
     expect(
       (statusToJson(report) as { ticks: Array<{ detail: unknown }> }).ticks[0]!.detail,
     ).toEqual({ raw: "EngineError" })
   })
 
   test("graph — models in topological order with kind and sorted deps", () => {
-    const graph = {
-      order: ["med.a", "med.b"],
-      models: new Map([
-        ["med.a", { kind: { _tag: "full" }, deps: new Set<string>() }],
-        ["med.b", { kind: { _tag: "view" }, deps: new Set(["med.a"]) }],
-      ]),
-    } as never
+    const a = defineModel(
+      { name: "med.a", kind: kind.full(), schema: Schema.Struct({ n: Schema.Number }) },
+      (ctx) => ctx.sql`SELECT 1 AS n`,
+    )
+    const b = defineModel(
+      { name: "med.b", kind: kind.view(), schema: Schema.Struct({ n: Schema.Number }) },
+      (ctx) => ctx.sql`SELECT n FROM ${ctx.ref(a)}`,
+    )
+    const graph = Effect.runSync(buildGraph([b, a]))
     expect(graphToJson(graph)).toEqual({
       models: [
         { name: "med.a", kind: "full", deps: [] },
@@ -335,8 +344,8 @@ describe("apply/run/status/graph --json — the shape contract (#28)", () => {
 })
 
 describe("apiVersion — one wrapper stamps every --json payload (#20)", () => {
-  const plan = { env: "dev", hasChanges: false, actions: [], warnings: [] } as never
-  const restate = {
+  const plan: Plan = { env: "dev", hasChanges: false, actions: [], warnings: [] }
+  const restate: RestatePlan = {
     env: "dev",
     model: "med.a",
     from: 0,
@@ -344,7 +353,7 @@ describe("apiVersion — one wrapper stamps every --json payload (#20)", () => {
     interval: "day",
     dryRun: true,
     targets: [],
-  } as never
+  }
 
   test("withApiVersion prepends apiVersion and preserves every field", () => {
     expect(withApiVersion({ env: "dev", hasChanges: false })).toEqual({
@@ -367,8 +376,8 @@ describe("apiVersion — one wrapper stamps every --json payload (#20)", () => {
         lastPlan: null,
         lag: [],
         ticks: [],
-      } as never),
-      janitorToJson({ removed: [], kept: [] } as never),
+      }),
+      janitorToJson({ removed: [], kept: [], warnings: [] }),
       restateToJson(restate),
     ]) {
       expect((withApiVersion(payload) as { apiVersion: number }).apiVersion).toBe(API_VERSION)
