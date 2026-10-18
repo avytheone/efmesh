@@ -208,10 +208,34 @@ columns: it materializes *different physics* in which the redacted columns were
 never written. The mechanism reuses what already exists — redaction rewrites the
 model's body as a projection of the surviving declared columns and drops them
 from its schema, which changes the canonical AST, hence the fingerprint, hence
-the physical table and the lake prefix. Models declaring no policy are untouched
-and keep sharing physics across environments. Declared per model
+the physical table and the lake prefix. Models declaring no policy are not
+projected; sharing storage still requires matching dependency fingerprints.
+Declared per model
 (`redact: ["col"]`), switched on per environment
 (`environments: { safe: { redacted: true } }`).
+
+**Switching an existing environment:** the flag takes effect on a successful
+`apply`, not when configuration is edited. A changed redaction projection gets
+a new fingerprint and clean storage; absent an already-built compatible clean
+snapshot, incremental history is backfilled rather than inherited. Unchanged,
+policy-free parts of the DAG may still share storage. Old plain tables/files and
+other environments are retained; this is not erasure or a storage-permission change.
+
+Indirect reuse and forward-only may inherit **already-clean** storage. Before
+any model writes, ledger inheritance or promotion, redacted apply inspects the
+actual reused/cached storage schema and refuses with `SchemaMismatchError` if
+it still contains a declared redacted column. This includes old snapshots whose
+physical fingerprint points at plain storage. With the declared policy retained,
+plain apply also refuses to restore a declared redacted column absent from the
+inherited/cached schema: another environment may still use that clean storage.
+This is conservative even when only one environment currently refers to it.
+A plan's forward-only verdict is not proof of compatible storage. To change the
+redacted flag in either direction, use a regular apply with separate compatible
+storage; forward-only cannot sanitize or reintroduce sensitive history in place.
+A refusal leaves the old environment served, so do not treat it as redacted
+until apply succeeds. Previously polluted snapshots are refused, not silently
+repaired. Checks cover declared column names, not arbitrary sensitive values
+under other names; declare the policy on each materialized model that needs it.
 
 > **Threat model, stated plainly.** A redacted environment is *safe defaults* —
 > agents and dev environments see clean data unless someone deliberately points

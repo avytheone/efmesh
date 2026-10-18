@@ -16,8 +16,8 @@ import { quoteIdent } from "../core/sql.ts"
  * model's body as a projection of the surviving declared columns and drops the
  * redacted ones from its schema. That changes the canonical AST, which changes
  * the fingerprint, which by construction means a separate physical table and a
- * separate lake prefix. No new concept is introduced, and none of the existing
- * guarantees have to be re-proved for it.
+ * separate lake prefix. Inheritance can cross fingerprints: the executor must
+ * also check reused/cached schemas before crossing between clean and plain storage.
  *
  * The projection lists columns explicitly rather than using DuckDB's
  * `SELECT * EXCLUDE`: the declared schema already knows every column, and an
@@ -44,8 +44,8 @@ const projectionOf = (model: AnyModel, keep: ReadonlyArray<string>): SqlFragment
 /**
  * The model as a redacted environment materializes it. Returns the model
  * unchanged when it declares no policy — most models do not, and an untouched
- * model must keep its fingerprint so redacted and plain environments still
- * share the physics of everything that is not sensitive.
+ * model keeps its own payload so plain and redacted environments can still
+ * share its physics when the dependency fingerprints also match.
  */
 export const redactModel = (model: AnyModel): AnyModel => {
   if (model.redact.length === 0) return model

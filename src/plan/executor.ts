@@ -574,6 +574,40 @@ export const applyPlan = (
     if (options?.ducklake !== undefined && engine.dialect === "duckdb") {
       yield* engine.execute(ducklakeAttachSql(options.ducklake))
     }
+    // Inheritance can cross redaction projections in either direction. Check
+    // actual storage before writes/ledger changes: restoring a sensitive column
+    // into clean shared physics would also expose it to other environments.
+    for (const action of plan.actions) {
+      const model = graph.models.get(action.name)
+      if (
+        model === undefined ||
+        model.redact.length === 0 ||
+        model.kind._tag === "external" ||
+        model.kind._tag === "embedded" ||
+        (action.build && action.reusedFrom === undefined)
+      )
+        continue
+      const columns = yield* engine.describe(
+        `SELECT * FROM ${physicalFor(model, action.physicalFingerprint)}`,
+      )
+      const present = new Set(columns.map((column) => column.name))
+      const redacting = options?.redacted === true
+      const incompatible = model.redact.filter((column) =>
+        redacting
+          ? present.has(column)
+          : Object.hasOwn(model.schema.fields, column) && !present.has(column),
+      )
+      if (incompatible.length > 0) {
+        return yield* new SchemaMismatchError({
+          model: action.name,
+          problems: incompatible.map((column) =>
+            redacting
+              ? `redacted materialization cannot reuse storage containing column «${column}»; rebuild clean storage without forward-only`
+              : `plain materialization cannot restore declared redacted column «${column}» into inherited/cached storage; use a regular apply with separate storage`,
+          ),
+        })
+      }
+    }
     const working = plan.actions.filter(
       (action) =>
         (action.build || action.backfill.length > 0 || action.refresh) &&
