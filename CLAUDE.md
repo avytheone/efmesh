@@ -85,7 +85,9 @@ class of bug this project can have:
   never a patch; see the versioning policy (SPEC §11.1) for which release a
   change belongs in — including why additive counts as minor.
 - **Locks**: `apply` and `run` of an environment share one cross-process
-  lock; janitor has its own. Stale-lock reclaim is ttl-based and tested
+  lock; janitor has a separate maintenance lease, also used by CLI compact
+  in the same state store. Raw library compact remains uncoordinated.
+  Stale-lock reclaim is ttl-based and tested
   under a real `kill -9` — keep it that way.
 
 ## Testing & verification

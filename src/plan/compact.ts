@@ -40,6 +40,8 @@ import { parquetModelPrefix } from "./naming.ts"
  * They do not make it safe against a writer that rewrites or deletes files in
  * place, and they do not serialize two concurrent compactors. Do not ascribe
  * janitor's guarantees to compaction — the mechanism does not deliver them.
+ * The CLI separately takes the existing janitor lease; this engine-only effect
+ * does not. Programmatic callers must prevent overlap with janitor themselves.
  */
 
 /** Default wait past the newest file's mtime, in minutes. */

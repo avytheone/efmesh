@@ -30,7 +30,7 @@ export class LockHeldError extends Data.TaggedError("LockHeldError")<{
   readonly name: string
 }> {
   override get message(): string {
-    return `lock «${this.name}» is held by another apply/run process`
+    return `lock «${this.name}» is held by another process`
   }
 }
 
@@ -50,7 +50,7 @@ export interface LockOptions {
 /** Name of the lock under which an environment is mutated (shared by apply and run). */
 export const envLockName = (env: string): string => `env:${env}`
 
-/** The janitor lock is global: physical-storage cleanup is not tied to an environment. */
+/** Global per state store; CLI compaction shares this lease to exclude janitor. */
 export const janitorLockName = "janitor"
 
 export const withStateLock =

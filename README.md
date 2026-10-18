@@ -422,8 +422,24 @@ the lake's writer through file conventions and timing alone:
 
 Those rules make compaction safe against a well-behaved **appending** writer.
 They do not make it safe against a writer that rewrites or deletes files in
-place, and they do not serialize two concurrent compactors. Do not ascribe
-janitor's guarantees here — the mechanism does not deliver them.
+place. The raw library effect does not serialize compactors; do not ascribe
+janitor's transactional guarantees to it.
+
+**Run janitor and compact sequentially on a lake.** CLI commands using the same
+persistent state store share the existing `janitor` lease: an overlapping
+`compact` (even `--dry-run`) or janitor fails with `LockHeldError`. Two CLI
+compactors sharing the store also exclude each other. A dry-run changes no lake
+files, but still acquires the maintenance lease. Lease cleanup/heartbeat/crash ttl
+are unchanged; this does not coordinate with an apply rewriting partitions.
+Prefer `efmesh janitor --ttl 7 && efmesh compact`; compact then janitor also works,
+but spends work on orphan files that will be deleted.
+
+Programmatic `compact()` stays engine-only and takes no lease. Its caller must
+prevent overlap with janitor/other compactors. Different state stores do not
+coordinate access to a shared lake. Deleting a file before compact consumes it,
+or deleting its temp before publication, is an error; a missing already-consumed
+input at final unlink is harmless. No general concurrent-deletion guarantee is
+claimed.
 
 The merge is `SELECT * EXCLUDE (_rn)` over `read_parquet(…, union_by_name =
 true)` — never an explicit column list, so a column the writer started emitting

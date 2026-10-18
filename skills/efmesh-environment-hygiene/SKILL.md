@@ -109,7 +109,12 @@ set — `current-day`, `grace-period`, `already-compact`, `undated`.
   period past the newest file's mtime (`--grace N` overrides), publishes via
   `.tmp` + atomic rename, and deletes only the files it listed before merging.
   Safe against an appending writer; NOT safe against one that rewrites files in
-  place, and it does not serialize two concurrent compactors — schedule one.
+  place. The CLI shares janitor's maintenance lease in the same persistent
+  state store: overlapping janitor/compact/compact commands refuse with
+  `LockHeldError` (including compact dry-run). Prefer janitor then compact;
+  reverse sequential order is safe but can waste work on orphan versions.
+  Raw library `compact()` takes no lease: serialize its calls externally.
+  Different state stores do not coordinate, even for the same lake.
 - Cadence: daily, off the hour a writer is busiest. Run `--dry-run` first on a
   lake you have not compacted before, and read the `skipped` reasons: "all
   `undated`" means the declared `partitionKey` does not match the layout.

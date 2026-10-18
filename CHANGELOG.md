@@ -8,6 +8,14 @@ the first version gathers them in full.
 
 ## [Unreleased]
 
+### Fixed
+
+- CLI `compact` and `janitor` sharing a persistent state store now exclude each
+  other through the existing janitor lease (#58), including compact dry-run.
+  Overlap fails with `LockHeldError` before maintenance work. Public library
+  `compact()` remains uncoordinated: callers must serialize it themselves;
+  different state stores do not protect a shared lake.
+
 ## [0.5.0] — 2026-07-18
 
 ### Added
