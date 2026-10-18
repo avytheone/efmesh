@@ -18,10 +18,23 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      # Postgres binaries exist in the image but are outside PATH; with them
-      # the integration tests run too (initdb cluster), without them — skipIf
+      # Missing integration prerequisites are errors, never a green skip.
       - name: Postgres on PATH
-        run: ls -d /usr/lib/postgresql/*/bin 2>/dev/null | head -1 >> "$GITHUB_PATH" || true
+        run: |
+          for pg_bin in /usr/lib/postgresql/*/bin; do
+            if [ -x "$pg_bin/initdb" ] && [ -x "$pg_bin/pg_ctl" ]; then
+              echo "$pg_bin" >> "$GITHUB_PATH"
+              exit 0
+            fi
+          done
+          echo "::error::PostgreSQL initdb/pg_ctl are required for CI integration tests"
+          exit 1
+
+      - name: Integration prerequisites
+        run: |
+          docker info > /dev/null
+          initdb --version
+          pg_ctl --version
 
       # Lint + format check (biome) and types (tsc), same `check` script as local
       - name: Check

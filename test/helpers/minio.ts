@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
+import { requireIntegrationInCi } from "./integration.ts"
 
 export const hasDocker: boolean = (() => {
   try {
@@ -12,6 +13,8 @@ export const hasDocker: boolean = (() => {
     return false
   }
 })()
+
+requireIntegrationInCi("Docker", hasDocker)
 
 export interface MinioEndpoint {
   readonly endpoint: string

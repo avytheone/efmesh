@@ -452,8 +452,9 @@ const backfillIntoParquet = (
               .pipe(Effect.andThen(Metric.update(intervalsFailed, 1)), Effect.ignore)
           // locally COPY writes to a temp file, rename is atomic (POSIX): a kill
           // mid-write leaves no broken partition, and a lookback recompute does
-          // not hand the view reader an unfinished file; s3 — direct write
-          // (no rename; the unfinished key is not marked done and gets overwritten)
+          // not hand the view reader an unfinished file. S3 directly replaces
+          // the object: the ledger controls retry, not prefix-reader visibility.
+          // No transaction spans the object write, audits and ledger mark (§3.3).
           const target = `${partition}/data.parquet`
           const writePath = partition.startsWith("s3://") ? target : `${target}.tmp`
           yield* engine

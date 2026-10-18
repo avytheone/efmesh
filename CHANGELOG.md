@@ -10,6 +10,12 @@ the first version gathers them in full.
 
 ### Fixed
 
+- S3 evidence and CI gates (#65): exercise dev-to-prod promotion without object
+  rewrites, corrected-source restate, reference-aware janitor cleanup and explicit
+  unsupported-compaction output. Missing Docker/PostgreSQL now fails CI rather
+  than skipping integrations. Document the failed-COPY probe's limits: it does
+  not prove general S3 crash/network atomicity or snapshot isolation.
+
 - CLI `compact` and `janitor` sharing a persistent state store now exclude each
   other through the existing janitor lease (#58), including compact dry-run.
   Overlap fails with `LockHeldError` before maintenance work. Public library
