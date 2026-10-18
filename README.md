@@ -602,6 +602,28 @@ effective value, and a human debugging why it degraded needs the difference.
 Read it for every model an environment serves — not only the parquet ones, which
 are the only models a `manifest.json` can reach.
 
+A real `restate` immediately retreats the live `completeThrough` to the reopened
+middle-range gap, including descendants. Equal local/inherited coverage keeps
+the ancestor's `limitedBy`; ties between ancestors use model-name order.
+`--dry-run` changes neither live passports nor published files.
+
+**Pause manifest serving before restate.** Published `manifest.json` files remain
+snapshots of publication time, and can still claim the old completeness afterward.
+There is no automatic refresh deadline: failed recomputation, a warning-only
+manifest-write failure, an unchanged descendant or a no-op apply can leave an old
+document in place. Before real restate, withdraw affected source/descendant
+manifests and cached copies, including other environments sharing their snapshot
+ledger or physical prefix. Keep them offline until the reopened intervals are done
+and each document's fingerprint, interval coverage, freshness and effective
+passport agree with the promoted version and live `efmesh passport <env> --json`.
+Keep writers/restate stopped through validation and republication; invalidate
+caches before reopening serving. If verification fails, keep the gate closed and
+resolve publication. This is manual mitigation: efmesh does not enforce the gate
+or bound manifest staleness. The automatic-invalidation requirement of #59 remains
+open; already-downloaded copies cannot be revoked. The live passport remains
+useful throughout the maintenance window. See
+[SPEC §3.5](SPEC.md#35-the-answer-honesty-passport) for the full constraint.
+
 ## Redacted environments
 
 Once clients read the files directly, a masking view protects nothing — a view

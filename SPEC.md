@@ -273,6 +273,41 @@ only the parquet ones. It reads through the environment's promoted pointers, not
 the project's local fingerprints, for the same reason `status` does: a consumer
 queries the view, so the honest passport describes the physics behind that view.
 
+A completed `restate` immediately reopens the live ledger's middle-range coverage:
+`completeThrough` retreats to the first gap, including in descendants. On equal
+coverage, an inherited limit wins over the model's own limit, so the cascade
+keeps naming its limiting ancestor; ties between inherited limits remain lexical.
+`--dry-run` changes neither ledger nor passports nor published files.
+
+**Unresolved manifest staleness after restate (#59).** A `manifest.json` is a publication-time
+snapshot (`generatedAt`), not a live read of the ledger. Restate deliberately has
+only a state-store dependency: it does not rewrite or invalidate local/S3 manifests.
+The old document can overstate completeness until recomputation and publication;
+there is **no automatic elapsed-time bound**. A failed apply leaves it stale, a
+successful apply may only log a manifest-publication warning, and a no-op apply
+need not republish anything. An unchanged full descendant may retain its earlier
+manifest even when its inherited live passport changes.
+
+Operators serving manifests must withdraw the affected source/descendant documents
+and cached copies **before** a real restate, including other environments sharing
+the same snapshot ledger or physical prefix. Keep that serving gate closed while
+recomputing. Reopen it only after checking the reopened intervals are done and each
+served manifest's fingerprint, `intervals`, `freshness` and `effective` against the
+current promoted version and live ledger/passport, with no concurrent restate or
+writer between validation and publication. Invalidate caches when publishing.
+This is manual mitigation only: the current API neither enforces that serving
+gate nor guarantees a bound on manifest staleness. The manifest acceptance criterion
+of #59 remains unresolved. If apply skips publication or verification fails, keep
+the affected documents offline and resolve republication before reopening.
+Previously downloaded copies cannot be revoked. State-backed
+`efmesh passport <env> --json` remains available for current completeness;
+`generatedAt` alone is not proof of validity after a restate. Automatic invalidation
+requires an explicit storage-location/authority contract: `restate()` currently
+requires only StateStore, takes no lake path or object-store client, and snapshot
+records do not persist the manifest location. Do not guess a root or remove foreign
+files. No public arguments, services, state versions or manifest shapes are changed
+by this partial fix.
+
 ---
 
 ## 4. Snapshots and fingerprint

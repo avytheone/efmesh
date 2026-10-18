@@ -87,6 +87,30 @@ a model bug), which is a `breaking` change applied via **efmesh-safe-apply**
 > without mutating the store. Use it when the data is wrong but the model logic
 > is unchanged; use a `breaking` re-apply when the logic itself changed.
 
+## Restate and published passports
+
+A real restate immediately retreats the live passport's `completeThrough` at a
+middle-range gap, including descendants. On equal coverage the inherited
+`limitedBy` wins over self; ties between ancestors use model-name order. Check
+`efmesh passport <env> --json`, not just `status`'s latest interval. Dry-run leaves
+passports, ledger and published bytes unchanged.
+
+Before a real restate on a served lake, withdraw the affected source/descendant
+manifests and cached copies, including other environments sharing the same ledger
+or physical prefix. Restate does not invalidate `manifest.json`: old completeness
+can remain indefinitely without verified republication. Failed apply does not fix
+it; even successful apply can warn on a manifest write, skip unchanged descendants
+or do no publication. Do not use an exit-0 apply or `generatedAt` as proof.
+
+Keep serving paused until the reopened intervals are done and every served
+document's fingerprint, intervals, freshness and effective passport match the
+promoted version and live ledger/passport. Stop concurrent writers/restate through
+validation and republication, then invalidate caches and reopen serving. A mismatch
+keeps the gate closed pending republication; already-downloaded copies cannot be
+revoked. This manual procedure does not satisfy a guaranteed staleness bound;
+efmesh does not enforce the gate, and #59's manifest criterion remains open.
+See SPEC §3.5; do not promise "the next apply" as an automatic repair.
+
 ## Guard rails
 
 - Never hand-edit the `intervals` table to mark something `done`. `run` and
