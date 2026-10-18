@@ -10,6 +10,13 @@ the first version gathers them in full.
 
 ### Fixed
 
+- Restate/passport interaction (#59): an equally incomplete descendant retains
+  its limiting ancestor in `limitedBy` instead of choosing itself alphabetically.
+  Middle-range retreat, cascading limits and dry-run preservation are tested on
+  native tables and local Parquet. Published manifests remain publication-time
+  snapshots: documented manual mitigation is not automatic invalidation or a
+  staleness bound (SPEC §3.5). The manifest criterion of #59 remains unresolved.
+
 - CLI `compact` and `janitor` sharing a persistent state store now exclude each
   other through the existing janitor lease (#58), including compact dry-run.
   Overlap fails with `LockHeldError` before maintenance work. Public library
