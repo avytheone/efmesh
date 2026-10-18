@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process"
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { fileURLToPath } from "node:url"
 
 export const hasDocker: boolean = (() => {
   try {
@@ -32,7 +33,15 @@ const freePort = (): number => {
   return port
 }
 
+const image = "efmesh-test-minio:9e49d5e7a648f00e26f2246f4dc28e6b07f8c84a"
+
 export const startMinio = async (): Promise<MinioEndpoint> => {
+  // Build from pinned upstream sources: public MinIO binary images are no longer available.
+  execFileSync(
+    "docker",
+    ["build", "-q", "-t", image, fileURLToPath(new URL("./minio-image/", import.meta.url))],
+    { stdio: "inherit" },
+  )
   const root = mkdtempSync(join(tmpdir(), "efmesh-minio-"))
   const bucket = "lake"
   mkdirSync(join(root, bucket))
@@ -56,7 +65,7 @@ export const startMinio = async (): Promise<MinioEndpoint> => {
       `MINIO_ROOT_USER=${accessKeyId}`,
       "-e",
       `MINIO_ROOT_PASSWORD=${secretAccessKey}`,
-      "minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e",
+      image,
       "server",
       "/data",
     ],

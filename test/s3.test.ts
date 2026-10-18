@@ -16,7 +16,7 @@ let minio: MinioEndpoint
 beforeAll(async () => {
   if (!hasDocker) return
   minio = await startMinio()
-}, 120_000)
+}, 600_000)
 
 afterAll(() => minio?.stop())
 
