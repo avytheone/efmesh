@@ -124,6 +124,16 @@ class of bug this project can have:
 
 ## Commits & releases
 
+- **Claim sheet required:** before every substantial merge, every merge of a
+  subagent branch, and every release, invoke
+  [claim-sheet](.claude/skills/claim-sheet/SKILL.md). It records contract/bump
+  decisions, considered and unchecked feature combinations, observed before/after
+  evidence, additive limits, test discoveries, and first diagnosis. Attach it to
+  the PR/release review for the exact SHA and refresh it after changes. Historical
+  test definitions and later CI are not historical execution evidence. Hand off
+  the assertions for independent review; the sheet does not replace checks or
+  authorize a release.
+
 - Atomic commits: one logical change, message explains the *why*, references
   the issue (`closes #N`). Conventional prefixes: `feat(scope):`,
   `fix:`, `docs:`, `test:`, `perf:`, `release:`.
