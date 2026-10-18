@@ -5,7 +5,7 @@
 Scope, stated honestly so an evaluation does not mislead itself:
 
 - **It is** the sqlmesh *core* for **DuckDB-class small data lakes** — gigabytes to a terabyte on one machine (DuckDB or Postgres). Snapshots, AST fingerprints, plans-as-diffs, virtual environments, interval-based incrementals, a parquet/DuckLake lake.
-- **It is NOT** a distributed-warehouse tool. No cloud engines (Snowflake/BigQuery are out of scope), no multi-dialect (you write your engine's dialect), no web UI, no package ecosystem, no Node runtime (Bun-only), not 1.0-stable (0.2.x on beta Effect v4).
+- **It is NOT** a distributed-warehouse tool. No cloud engines (Snowflake/BigQuery are out of scope), no multi-dialect (you write your engine's dialect), no web UI, no package ecosystem, no Node runtime (Bun-only), not 1.0-stable (efmesh remains 0.x; current main uses stable Effect 4.0.5).
 - **Runtime:** Bun (`engines.bun >= 1.3.11`). **License:** MIT.
 
 ## Contracts (versioned; do not break silently)
@@ -27,7 +27,7 @@ Scope, stated honestly so an evaluation does not mislead itself:
 
 ## Running it (for an agent operating efmesh)
 
-- Install: `bun add -d @avytheone/efmesh`; scaffold: `bunx efmesh init my-warehouse && cd my-warehouse` (writes config, example models, a seed).
+- Install: `bun add -d @avytheone/efmesh`; install the exact Effect peer required by that package (current unreleased main: `effect@4.0.5`, matching platform-bun; older published versions can differ). scaffold: `bunx efmesh init my-warehouse && cd my-warehouse` (writes config, example models, a seed).
 - Lifecycle: `plan <env>` (diff, changes nothing) → `apply <env>` (build physics, backfill, swap views) → `run <env>` (idempotent scheduler tick, new intervals only). Promotion to prod is `apply prod --yes` — a view swap, zero recomputation.
 - `run` only advances existing versions; structural changes go through `plan`/`apply`. Read `efmesh status <env>` for the tick journal, lag, and last plan.
 - Prefer `--json` on `plan`/`audit`/`status`/`diff` — stable shapes. In a non-TTY, `apply` with changes needs `--yes` or it refuses with exit 2. `run` exits 2 when unapplied changes await a human.

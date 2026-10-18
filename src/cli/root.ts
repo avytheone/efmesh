@@ -1,4 +1,4 @@
-import { Command } from "effect/unstable/cli"
+import { Command } from "effect/cli"
 import { auditCommand } from "./commands/audit.ts"
 import { compactCommand } from "./commands/compact.ts"
 import { diffCommand } from "./commands/diff.ts"

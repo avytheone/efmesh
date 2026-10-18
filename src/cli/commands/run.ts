@@ -1,5 +1,5 @@
 import { Clock, Console, Effect } from "effect"
-import { Argument, Command } from "effect/unstable/cli"
+import { Argument, Command } from "effect/cli"
 import { recordCommandOutcome, writeMetricsFile } from "../../observe/report.ts"
 import { run } from "../../plan/run.ts"
 import { configLayers, loadConfig } from "../config.ts"
@@ -37,7 +37,7 @@ const report = (options: {
 export const runCommand = Command.make(
   "run",
   {
-    env: Argument.string("env"),
+    env: Argument.String("env"),
     config: configFlag,
     jobs: jobsFlag,
     retries: retriesFlag,

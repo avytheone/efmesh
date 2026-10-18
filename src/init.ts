@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs"
 import * as NodePath from "node:path"
 import { Data, Effect } from "effect"
+import { peerDependencies } from "../package.json"
 
 /**
  * `efmesh init` (SPEC §12): scaffold a minimal, runnable project — config, a
@@ -23,7 +24,8 @@ export class InitError extends Data.TaggedError("InitError")<{
   }
 }
 
-const MODELS_TS = `import { Schema } from "effect"
+const MODELS_TS = `// Requires stable effect@${peerDependencies.effect}, matching efmesh's exact peer.
+import { Schema } from "effect"
 import { audit, defineModel, defineSeed, kind } from "@avytheone/efmesh"
 
 // A seed is reference data loaded from a file. Its *content* feeds the

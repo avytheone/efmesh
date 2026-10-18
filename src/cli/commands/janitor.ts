@@ -1,5 +1,5 @@
 import { Console, Effect } from "effect"
-import { Command, Flag } from "effect/unstable/cli"
+import { Command, Flag } from "effect/cli"
 import { janitor } from "../../plan/janitor.ts"
 import { configLayers, loadConfig } from "../config.ts"
 import { configFlag, jsonFlag } from "../flags.ts"
@@ -9,7 +9,7 @@ export const janitorCommand = Command.make(
   "janitor",
   {
     config: configFlag,
-    ttl: Flag.string("ttl").pipe(
+    ttl: Flag.String("ttl").pipe(
       Flag.withDefault("7"),
       Flag.withDescription("how many days orphaned physics lives before removal"),
     ),

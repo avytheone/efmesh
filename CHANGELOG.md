@@ -8,6 +8,17 @@ the first version gathers them in full.
 
 ## [Unreleased]
 
+### Changed
+
+- Move the tested Effect peer/dev pin and platform-bun from beta.98 to stable
+  `4.0.5` (#72). The peer stays exact because CLI remains upstream unstable;
+  beta consumers must upgrade their Effect runtime together. Adapt CLI imports,
+  Boolean defaults, stderr routing, callable Schema.Struct and date AST metadata
+  while retaining schema enforcement, CLI JSON/exit codes and fingerprint goldens.
+  Replace beta drift with a separate advisory stable-v4 job and verify a packed
+  fresh consumer. This is a peer compatibility change, not support for mixed
+  beta/stable or v3/v4 runtime values; release versioning is deferred to a release.
+
 ### Fixed
 
 - S3 evidence and CI gates (#65): exercise dev-to-prod promotion without object

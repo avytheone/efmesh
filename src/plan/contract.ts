@@ -29,7 +29,7 @@ export const familyOfAst = (ast: unknown): TypeFamily => {
   const node = ast as {
     readonly _tag: string
     readonly types?: ReadonlyArray<unknown>
-    readonly annotations?: { readonly typeConstructor?: { readonly _tag?: string } }
+    readonly annotations?: { readonly representation?: { readonly id?: string } }
   }
   switch (node._tag) {
     case "String":
@@ -40,8 +40,8 @@ export const familyOfAst = (ast: unknown): TypeFamily => {
     case "Boolean":
       return "boolean"
     case "Declaration": {
-      const constructorTag = node.annotations?.typeConstructor?._tag ?? ""
-      return constructorTag.startsWith("effect/DateTime") ? "temporal" : "any"
+      const representation = node.annotations?.representation?.id ?? ""
+      return representation.startsWith("effect/schema/DateTime") ? "temporal" : "any"
     }
     case "Union": {
       // NullOr(X) and the like: the single recognized family among the members

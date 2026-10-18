@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { BunRuntime, BunServices } from "@effect/platform-bun"
 import { Cause, Effect, Logger } from "effect"
-import { Command } from "effect/unstable/cli"
+import { Command } from "effect/cli"
 import { renderFailure, rootCommand, wantsTrace } from "./cli.ts"
 import { version } from "../package.json"
 
@@ -14,7 +14,7 @@ import { version } from "../package.json"
 // embedder wanting different sinks/levels provides its own Logger layer instead.
 const loggerLayer = Logger.layer([
   process.stderr.isTTY === true
-    ? Logger.consolePretty({ stderr: true })
+    ? Logger.consolePretty()
     : Logger.withConsoleError(Logger.formatLogFmt),
 ])
 
@@ -44,6 +44,7 @@ rootCommand.pipe(
         }),
   ),
   Effect.provide(loggerLayer),
+  Effect.provideService(Logger.LogToStderr, true),
   Effect.provide(BunServices.layer),
   BunRuntime.runMain,
 )

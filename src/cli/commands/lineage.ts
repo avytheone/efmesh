@@ -1,5 +1,5 @@
 import { Console, Effect } from "effect"
-import { Argument, Command } from "effect/unstable/cli"
+import { Argument, Command } from "effect/cli"
 import { buildGraph } from "../../core/graph.ts"
 import { formatLineage, lineage, LineageError, type LineageNode } from "../../plan/lineage.ts"
 import { configLayers, loadConfig } from "../config.ts"
@@ -8,7 +8,7 @@ import { lineageToJson, printJson } from "../json.ts"
 
 export const lineageCommand = Command.make(
   "lineage",
-  { target: Argument.string("model[.column]"), config: configFlag, json: jsonFlag },
+  { target: Argument.String("model[.column]"), config: configFlag, json: jsonFlag },
   ({ config, json, target }) =>
     Effect.gen(function* () {
       const loaded = yield* loadConfig(config)

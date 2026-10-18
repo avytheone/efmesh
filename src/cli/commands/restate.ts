@@ -1,5 +1,5 @@
 import { Console, Effect } from "effect"
-import { Argument, Command, Flag } from "effect/unstable/cli"
+import { Argument, Command, Flag } from "effect/cli"
 import { restate } from "../../plan/restate.ts"
 import { configLayers, loadConfig } from "../config.ts"
 import { configFlag, jsonFlag } from "../flags.ts"
@@ -8,21 +8,22 @@ import { printJson, restateToJson } from "../json.ts"
 export const restateCommand = Command.make(
   "restate",
   {
-    env: Argument.string("env"),
+    env: Argument.String("env"),
     config: configFlag,
-    model: Flag.string("model").pipe(
+    model: Flag.String("model").pipe(
       Flag.withDefault(""),
       Flag.withDescription("the incrementalByTimeRange model to replay (its descendants cascade)"),
     ),
-    from: Flag.string("from").pipe(
+    from: Flag.String("from").pipe(
       Flag.withDefault(""),
       Flag.withDescription("range start, ISO UTC, aligned to the model's grain (inclusive)"),
     ),
-    to: Flag.string("to").pipe(
+    to: Flag.String("to").pipe(
       Flag.withDefault(""),
       Flag.withDescription("range end, ISO UTC, aligned to the model's grain (exclusive)"),
     ),
-    dryRun: Flag.boolean("dry-run").pipe(
+    dryRun: Flag.Boolean("dry-run").pipe(
+      Flag.withDefault(false),
       Flag.withDescription("show what would be recomputed and change nothing (takes no lock)"),
     ),
     json: jsonFlag,

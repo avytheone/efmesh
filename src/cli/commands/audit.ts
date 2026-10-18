@@ -1,5 +1,5 @@
 import { Console, Effect } from "effect"
-import { Argument, Command, Flag } from "effect/unstable/cli"
+import { Argument, Command, Flag } from "effect/cli"
 import { auditEnvironment, EnvironmentAuditError } from "../../plan/audit-run.ts"
 import { configLayers, loadConfig } from "../config.ts"
 import { configFlag, jsonFlag, parseForwardOnly } from "../flags.ts"
@@ -8,9 +8,9 @@ import { printJson } from "../json.ts"
 export const auditCommand = Command.make(
   "audit",
   {
-    env: Argument.string("env"),
+    env: Argument.String("env"),
     config: configFlag,
-    model: Flag.string("model").pipe(
+    model: Flag.String("model").pipe(
       Flag.withDefault(""),
       Flag.withDescription("only these models, comma-separated (default — all with audits)"),
     ),

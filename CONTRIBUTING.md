@@ -49,8 +49,9 @@ examples/hospital/ — live example, dogfooded here
 
 - **Effect everywhere.** Errors are typed (`Data.TaggedError`), no
   `throw` in business logic; resources are `Layer`/`Scope`; data shape is
-  `Schema`. The target version is Effect v4 (beta): we stick to the stable
-  subset of the API.
+  `Schema`. The tested target is stable Effect `4.0.5`, with an exact peer
+  and matching platform package. CLI still uses upstream unstable APIs; upgrades
+  require the schema/runtime/CLI/consumer gates and unchanged fingerprint goldens.
 - **SPEC.md is the source of truth.** Behavioral changes are first
   reflected in the spec (or discussed in an issue), then in the code. What
   is implemented is marked in the spec with notes "*Implemented in Fn: …*".

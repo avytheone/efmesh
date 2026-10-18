@@ -1,0 +1,53 @@
+# Separate advisory job: stable v4 upgrades are candidates, never automatic pins.
+# Main/release CI keep the committed exact versions and lockfile.
+name: effect-stable-drift
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Monday, 06:00 UTC
+  workflow_dispatch:
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies (pinned by the lockfile)
+        run: bun install --frozen-lockfile
+
+      - name: Try matching stable v4 packages
+        run: |
+          bun add --dev --exact "effect@4"
+          bun add --exact "@effect/platform-bun@4"
+          bun -e 'const p = await Bun.file("package.json").json(); const v = p.devDependencies.effect; if (!/^4\.\d+\.\d+$/.test(v) || p.dependencies["@effect/platform-bun"] !== v) throw new Error("matching stable v4 packages required"); p.peerDependencies.effect = v; await Bun.write("package.json", JSON.stringify(p, null, 2) + "\n"); console.log("stable candidate:", v)'
+
+      - name: Postgres on PATH
+        run: |
+          for pg_bin in /usr/lib/postgresql/*/bin; do
+            if [ -x "$pg_bin/initdb" ] && [ -x "$pg_bin/pg_ctl" ]; then
+              echo "$pg_bin" >> "$GITHUB_PATH"
+              exit 0
+            fi
+          done
+          echo "::error::PostgreSQL initdb/pg_ctl are required"
+          exit 1
+
+      - name: Integration prerequisites
+        run: |
+          docker info > /dev/null
+          initdb --version
+          pg_ctl --version
+
+      - name: Types
+        run: bunx tsc --noEmit
+
+      - name: Tests
+        run: bun test
+
+      - name: Fresh consumer and CLI smoke
+        run: bun run scripts/smoke-consumer.ts

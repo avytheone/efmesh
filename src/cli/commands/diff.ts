@@ -1,5 +1,5 @@
 import { Console, Effect } from "effect"
-import { Argument, Command, Flag } from "effect/unstable/cli"
+import { Argument, Command, Flag } from "effect/cli"
 import { EngineAdapter } from "../../engine/adapter.ts"
 import { dataDiffEnvironments, diffEnvironments } from "../../plan/diff.ts"
 import { ducklakeAttachSql } from "../../plan/naming.ts"
@@ -11,19 +11,20 @@ import { printDataDiff } from "../print.ts"
 export const diffCommand = Command.make(
   "diff",
   {
-    envA: Argument.string("envA"),
-    envB: Argument.string("envB"),
+    envA: Argument.String("envA"),
+    envB: Argument.String("envB"),
     config: configFlag,
-    data: Flag.boolean("data").pipe(
+    data: Flag.Boolean("data").pipe(
+      Flag.withDefault(false),
       Flag.withDescription(
         "compare view-layer DATA: row counts, key intersection, per-column divergences",
       ),
     ),
-    model: Flag.string("model").pipe(
+    model: Flag.String("model").pipe(
       Flag.withDefault(""),
       Flag.withDescription("only these models, comma-separated (for --data)"),
     ),
-    sample: Flag.string("sample").pipe(
+    sample: Flag.String("sample").pipe(
       Flag.withDefault(""),
       Flag.withDescription(
         "percent 1–99: compare a deterministic fraction of keys (md5 buckets; for --data)",

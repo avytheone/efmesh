@@ -307,7 +307,7 @@ export const columnNames = (model: AnyModel): ReadonlyArray<string> =>
  */
 const requireSchema = (name: ModelName, schema: unknown): void => {
   if (
-    typeof schema !== "object" ||
+    (typeof schema !== "object" && typeof schema !== "function") ||
     schema === null ||
     typeof (schema as { fields?: unknown }).fields !== "object"
   ) {

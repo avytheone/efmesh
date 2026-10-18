@@ -1,10 +1,10 @@
 import { Console, Effect } from "effect"
-import { Argument, Command } from "effect/unstable/cli"
+import { Argument, Command } from "effect/cli"
 import { scaffold } from "../../init.ts"
 
 export const initCommand = Command.make(
   "init",
-  { dir: Argument.string("dir").pipe(Argument.withDefault(".")) },
+  { dir: Argument.String("dir").pipe(Argument.withDefault(".")) },
   ({ dir }) =>
     Effect.gen(function* () {
       const created = yield* scaffold(dir)
