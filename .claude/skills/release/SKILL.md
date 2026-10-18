@@ -13,10 +13,28 @@ no tokens). Your job is the commit, the tag, and verification.
 The package is scoped: **`@avytheone/efmesh`** (the `bin` is `efmesh`, but the
 npm name is scoped). Every `npm view` uses the scoped name.
 
+## When to release (SPEC §11.1)
+
+Feature releases follow agreed checkpoints of a thematic milestone: collect
+features on `main`, then batch the user-visible changes since the previous
+release into one CHANGELOG block when the agreed feature package is ready.
+Individual commits, merged PRs, and completed issues do not trigger releases.
+There is no mandatory calendar deadline. A milestone may span several releases,
+and a release may include work from several milestones; names describe themes,
+not versions.
+
+An out-of-cycle release is justified by a fix for a broken contract or a wedged
+environment, once the fix and required verification are ready (0.3.1 is the
+precedent). Other fixes join the normal milestone batch. This exception changes
+timing only: SPEC §11.1 still determines the version, and every gate below still
+applies. Start the checklist only with explicit authorization for the release;
+permission to commit or merge does not authorize publishing.
+
 ## Checklist
 
 1. **Green first.** `bun test` and `bun run check` must pass. Working tree clean.
-2. **Pick the version** (SemVer). A hyphen (`0.3.0-beta.1`) → `beta` dist-tag;
+2. **Pick the version** under SPEC §11.1 (the repository's `0.x` policy).
+   A hyphen (`0.3.0-beta.1`) → `beta` dist-tag;
    a clean version (`0.3.0`) → `latest`. The workflow derives this from the
    version string — do not fight it.
 3. **Review `README.md`** — a read, not a find-and-replace. The CHANGELOG is
